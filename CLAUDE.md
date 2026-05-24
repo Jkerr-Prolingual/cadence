@@ -278,38 +278,64 @@ join (`classes.teacher_id = auth.uid()`). Admins read/write all rows.
 
 ---
 
-## Key Data Files (from VocabFrontier)
+## Vocabulary Classification: EFLLex
+
+Cadence uses **EFLLex** (EFL Lexicon) as its sole vocabulary classification
+backbone. EFLLex assigns CEFR levels directly based on word frequency in
+actual EFL textbook corpora — no intermediate band-to-tier mapping needed.
+
+### Data files (src/data/)
+- `cefrLookup.js` — 10,019 unique single words → CEFR level (A1–C1).
+  Where a word has multiple POS entries, the lowest CEFR level wins.
+- `cefrMultiWord` (in cefrLookup.js) — 3,852 multi-word collocations/phrases
+  → CEFR level. Available for future quiz/probe generation.
+- `lemmaMap.js` — 34,466 inflected form → headword mappings extracted from
+  BNC/COCA wordData.js. Used to resolve surface forms (e.g. "running" → "run")
+  before EFLLex lookup.
 - `es_dictionary.js` — ~37k Spanish definitions
 - `en_dictionary.js` — ~3,400 learner-friendly English definitions
-  for NGSL and AWL headwords
-- BNC/COCA word frequency data (~60k word forms across bands)
-- NGSL: 2,809 lemmas across 5 bands
-- AWL: 570 word families across 10 sublists
+
+### Lookup chain (`lookupCefr()` in wordUtils.js)
+1. Clean and lowercase the token
+2. Direct lookup in `cefrLookup`
+3. If not found, resolve via `lemmaMap` → retry `cefrLookup`
+4. If still not found → `{ cefr: null, via: 'unclassified' }`
+
+### CEFR Distribution (single words)
+| Level | Count |
+|---|---|
+| A1 | 1,325 |
+| A2 | 1,184 |
+| B1 | 2,154 |
+| B2 | 2,596 |
+| C1 | 2,760 |
+
+### Off-list / Unclassified Words
+Words not found in EFLLex after lemma resolution are classified as
+`unclassified`. They are still trackable and still receive depth scoring
+— they just don't get a CEFR color. This is the correct behavior for
+above-level vocabulary, proper nouns, and domain-specific terms.
+
+### AWL (Academic Word List) — Not Used
+AWL is not maintained as a separate system. 82% of AWL headwords appear
+in EFLLex naturally (mostly at B1–C1). The remaining 18% are tracked as
+unclassified when encountered.
+
+### NGSL / BNC/COCA — Not Used
+Cadence does not use NGSL bands, BNC/COCA frequency tiers, or the
+BAND_TIER_MAP system from VocabFrontier. The `lemmaMap.js` file was
+extracted from wordData.js for its inflection-to-headword mappings only;
+the frequency data was discarded.
 
 ### English Definition Lookup Order
 1. IndexedDB cache (`enDefinitions` store)
-2. Bundled `en_dictionary.js` (NGSL/AWL headwords)
+2. Bundled `en_dictionary.js`
 3. Merriam-Webster Learner's Dictionary API (`VITE_MW_LEARNERS_KEY`)
 4. Cache MW results to IndexedDB
 
----
-
-## Frequency Band System
-
-### BNC/COCA Bands (text profiling)
-| Tier | CEFR Label | BNC/COCA Band |
-|---|---|---|
-| 1 | A1 | 1k |
-| 2 | A2 | 2k |
-| 3 | B1 | 3k |
-| 4 | B2 | 4k |
-| 5 | C1 | 5k |
-| 6–7 | C2 | 6k–7k |
-| 8+ | Off-list | — |
-
-Pedagogical floor rules:
-- AWL words never displayed below B1 regardless of BNC/COCA rank
-- Non-NGSL words never displayed below A2
+### Build script
+`scripts/build-data.mjs` regenerates `cefrLookup.js` and `lemmaMap.js`
+from source files. Run `node scripts/build-data.mjs` if source data changes.
 
 ---
 
@@ -317,6 +343,8 @@ Pedagogical floor rules:
 
 ```
 cadence/
+  scripts/
+    build-data.mjs    — generates cefrLookup.js + lemmaMap.js from source data
   src/
     components/
       reading/        — Read & Track, word highlighting, popups
@@ -329,7 +357,7 @@ cadence/
       shared/         — Layout, LoginPage, shared UI
     hooks/            — useAudioRecorder, useProgressSync
     lib/              — supabase client, db (IndexedDB), wordUtils
-    data/             — dictionaries, word lists, frequency data
+    data/             — cefrLookup, lemmaMap, dictionaries
     context/          — AuthContext
   supabase/
     migrations/       — SQL migration files

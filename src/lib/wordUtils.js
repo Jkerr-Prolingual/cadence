@@ -1,3 +1,6 @@
+import { cefrLookup, cefrMultiWord } from '../data/cefrLookup.js';
+import { lemmaMap } from '../data/lemmaMap.js';
+
 export const CONTRACTIONS = {
   "i'm": 'i am', "i've": 'i have', "i'll": 'i will', "i'd": 'i would',
   "you're": 'you are', "you've": 'you have', "you'll": 'you will', "you'd": 'you would',
@@ -13,21 +16,15 @@ export const CONTRACTIONS = {
   "couldn't": 'could not', "can't": 'cannot', "let's": 'let us',
 };
 
-export const BAND_TIER_MAP = {
-  1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 6,
-};
+export const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
 
-export const TIER_LABELS = {
-  1: 'A1', 2: 'A2', 3: 'B1', 4: 'B2', 5: 'C1', 6: 'C2',
-};
-
-export const TIER_COLORS = {
-  1: '#22c55e',
-  2: '#3b82f6',
-  3: '#a855f7',
-  4: '#f59e0b',
-  5: '#ef4444',
-  6: '#6b7280',
+export const CEFR_COLORS = {
+  A1: '#22c55e',
+  A2: '#3b82f6',
+  B1: '#a855f7',
+  B2: '#f59e0b',
+  C1: '#ef4444',
+  unclassified: '#6b7280',
 };
 
 export function cleanToken(raw) {
@@ -43,3 +40,41 @@ export function expandContraction(token) {
   const lower = token.toLowerCase();
   return CONTRACTIONS[lower] || null;
 }
+
+/**
+ * Look up CEFR level for a word. Tries direct match first, then lemma.
+ * Returns { cefr, lemma, via } where cefr is 'A1'–'C1' or null.
+ */
+export function lookupCefr(word) {
+  const w = cleanToken(word);
+  if (!w) return { cefr: null, lemma: w, via: 'empty' };
+
+  const direct = cefrLookup[w];
+  if (direct) return { cefr: direct, lemma: w, via: 'direct' };
+
+  const lemma = lemmaMap[w];
+  if (lemma) {
+    const viaParts = cefrLookup[lemma];
+    if (viaParts) return { cefr: viaParts, lemma, via: 'lemma' };
+  }
+
+  return { cefr: null, lemma: lemma || w, via: 'unclassified' };
+}
+
+/**
+ * Get the display color for a CEFR level (or unclassified).
+ */
+export function cefrColor(level) {
+  return CEFR_COLORS[level] || CEFR_COLORS.unclassified;
+}
+
+/**
+ * Check if a word is a function word (A1 level, not worth tracking depth on).
+ * Used to filter out "the", "is", "a", etc. from depth tracking.
+ */
+export function isFunctionWord(word) {
+  const { cefr } = lookupCefr(word);
+  return cefr === 'A1';
+}
+
+export { cefrMultiWord };
