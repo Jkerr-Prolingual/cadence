@@ -1,6 +1,8 @@
 import { useMemo, useCallback } from 'react';
 import { lookupCefr, cefrColor, cleanToken } from '../../lib/wordUtils';
 
+const SHOW_CEFR_UNDERLINES = false;
+
 function extractSentence(tokens, targetIdx) {
   let start = targetIdx;
   while (start > 0) {
@@ -89,10 +91,9 @@ export default function TextDisplay({
               && token.wordIdx >= loopWordRange.first
               && token.wordIdx <= loopWordRange.last;
 
-            let wordStyle = {
-              borderBottom: isA1 ? 'none' : `2px solid ${color}`,
-              paddingBottom: isA1 ? 0 : '1px',
-            };
+            let wordStyle = SHOW_CEFR_UNDERLINES
+              ? { borderBottom: isA1 ? 'none' : `2px solid ${color}`, paddingBottom: isA1 ? 0 : '1px' }
+              : {};
 
             if (isInActiveSentence) {
               wordStyle.backgroundColor = 'rgba(217,119,6,0.15)';
