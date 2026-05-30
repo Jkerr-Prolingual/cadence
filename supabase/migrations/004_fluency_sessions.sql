@@ -1,5 +1,6 @@
 -- Fluency sessions: timed reading records for WPM tracking
-create table if not exists fluency_sessions (
+drop table if exists fluency_sessions cascade;
+create table fluency_sessions (
   id           text primary key,
   user_id      uuid not null references auth.users(id) on delete cascade,
   text_id      text not null,
