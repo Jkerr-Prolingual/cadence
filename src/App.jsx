@@ -7,6 +7,7 @@ import ShadowingView from './components/shadowing/ShadowingView';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
 import AdminPanel from './components/admin/AdminPanel';
 import WorkshopView from './components/workshop/WorkshopView';
+import LibraryPage from './components/library/LibraryPage';
 import LoginPage from './components/shared/LoginPage';
 
 function ProtectedRoute({ children, requireTeacher, requireAdmin }) {
@@ -33,20 +34,15 @@ function AppRoutes() {
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<ReadingView />} />
+        <Route path="library" element={<LibraryPage />} />
         <Route path="flashcards" element={<FlashcardPage />} />
         <Route path="workshop" element={<WorkshopView />} />
+        <Route path="teacher" element={<TeacherDashboard />} />
+        <Route path="admin" element={<AdminPanel />} />
       </Route>
 
       <Route path="/shadow/:textId" element={
         <ProtectedRoute><ShadowingView /></ProtectedRoute>
-      } />
-
-      <Route path="/teacher" element={
-        <ProtectedRoute requireTeacher><TeacherDashboard /></ProtectedRoute>
-      } />
-
-      <Route path="/admin" element={
-        <ProtectedRoute requireAdmin><AdminPanel /></ProtectedRoute>
       } />
     </Routes>
   );

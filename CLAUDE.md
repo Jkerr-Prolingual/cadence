@@ -214,25 +214,39 @@ Target: 2–3 minutes of teacher attention per 10-minute recording.
 
 ## Features
 
-### Read & Track
-Text display with word-level highlighting. Click triggers word popup
-with definition, Spanish translation, English definition. Cursor-gated
-colored underlines by vocabulary tier. Encounter tracking across sessions.
+### Read & Listen (Unified Reading View)
+Reading while listening is the primary mode. The reading view and shadow
+reading are integrated into one cohesive screen — shadow reading is a
+sub-mode of reading, not a separate destination.
+
+**Text display:** Word-level and particle-level highlighting. Single words
+and multi-word particles are both clickable. Click triggers a popup with
+CEFR level, Spanish translation, English definition. For particles, the
+popup supports Pleco-style drill-down to constituent words and back up to
+the particle as a unit (see "Particle-aware reading view" in the Particle
+Model section). Cursor-gated colored underlines by CEFR tier. Encounter
+tracking across sessions.
+
+**Audio playback:** ElevenLabs-generated audio with word-level timestamps,
+synchronized highlighting, speed slider (0.5×–1.25×), sentence loop for
+practice. Tapping a word during playback pauses audio and shows the popup;
+popup includes a resume button for zero-friction vocabulary investigation.
+
+**Student recording:** Full-text recording (saved, one per user per text)
+and sentence-loop ephemeral recording (not saved, auto-plays back).
+useAudioRecorder hook (MediaRecorder, 32kbps opus/webm).
+
+**Shadow reading sub-mode:** When the student is actively shadowing
+(listen-then-repeat), vocabulary popups remain available but encounter
+crediting is capped at cursor-level passive credit (depth ceiling 0.10).
+Shadowing builds phonological fluency; explicit vocabulary knowledge is
+built through the primary read-and-listen mode.
 
 ### Flashcards (Leitner SRS)
 Five-box Leitner system. Intervals: Box 1 = immediate, 2 = 1 day,
 3 = 3 days, 4 = 1 week, 5 = 2 weeks. Card types: dual (word + L1),
 definition, cloze. Pleco-style 0–5 response scale. Cards recommended
 from quiz results, not auto-added.
-
-### Shadow Reading
-Full-screen audio playback with synchronized word-level highlighting.
-ElevenLabs-generated audio (admin-time, cached in Supabase Storage).
-Speed slider (0.5×–1.25×). Sentence loop for practice. Student
-self-recording with playback.
-
-Shadowing is a fluency activity, not vocabulary acquisition. Words
-receive cursor-level passive encounter credit only (depth ceiling 0.10).
 
 ### Story Workshop
 Guided writing with vocabulary scaffolding. Will be redesigned for
@@ -316,6 +330,30 @@ Words not found in EFLLex after lemma resolution are classified as
 — they just don't get a CEFR color. This is the correct behavior for
 above-level vocabulary, proper nouns, and domain-specific terms.
 
+### EFLLex Rule C — Canonical CEFR Derivation
+
+EFLLex reports a normalized frequency at each of five CEFR levels (A1,
+A2, B1, B2, C1). Rule C collapses these into a single level:
+
+```
+frequencies = [freq_a1, freq_a2, freq_b1, freq_b2, freq_c1]
+peak = max(frequencies)
+threshold = max(0.2 × peak, 1.0)
+
+For each level in order A1 → A2 → B1 → B2 → C1:
+    if frequency at level ≥ threshold:
+        assign this level; stop.
+
+If no level meets threshold:
+    fallback: assign lowest level with non-zero frequency.
+```
+
+Rule C is defined in `C:\Users\User\graded_readers\methodology\vocabulary_framework.md`
+§5. Cadence's `cefrLookup.js` (10,019 entries) is a subset of the graded
+reader project's `efllex.json` (15,281 entries with Rule C applied).
+Cadence should adopt the full Rule C dataset; `build-data.mjs` should
+regenerate from the graded reader's `efllex.json` as the canonical source.
+
 ### AWL (Academic Word List) — Not Used
 AWL is not maintained as a separate system. 82% of AWL headwords appear
 in EFLLex naturally (mostly at B1–C1). The remaining 18% are tracked as
@@ -336,6 +374,189 @@ the frequency data was discarded.
 ### Build script
 `scripts/build-data.mjs` regenerates `cefrLookup.js` and `lemmaMap.js`
 from source files. Run `node scripts/build-data.mjs` if source data changes.
+
+---
+
+## The Particle Model
+
+Cadence adopts the **particle** as the unit of vocabulary tracking for
+multi-word expressions. A particle is a vocabulary item the learner
+processes as a single cognitive unit — either a single word (*house*,
+*eventually*) or a multi-word chunk (*of course*, *pick up*, *a lot of*).
+
+The particle model is defined in the graded reader project's vocabulary
+framework (`C:\Users\User\graded_readers\methodology\vocabulary_framework.md`).
+Graded reader content produced under that framework is ingested into
+Cadence; the particle model must be consistent across both projects.
+
+### Why particles matter for Cadence
+
+Traditional word-level tracking inflates apparent cognitive load. A student
+who reads "of course" and looks it up gets an encounter event for "of",
+"course", and "of course" — but the learner is processing one unit, not
+three. The particle model fixes this: multi-word chunks are clickable units
+in the reading view, tracked as single items in the depth model, and
+credited correctly in encounter accounting.
+
+### Compositionality classification
+
+Multi-word particles are classified as **compositional** or
+**non-compositional**. This classification determines encounter crediting:
+
+- **Compositional chunk** (*bus stop*): meaning derivable from parts.
+  An encounter credits each constituent word toward its own depth score
+  (if tracked independently).
+- **Non-compositional chunk** (*of course*): meaning NOT derivable from
+  parts. An encounter credits ONLY the chunk — constituents receive no
+  depth credit for their independent senses.
+
+The PHRASE List (Martinez & Schmitt, 2012) is the authoritative source for
+non-compositional classification — 506 entries in the graded reader
+project's `data/phrase_list.json`. Additional chunks are classified by
+the content author during graded reader production and recorded in
+`data/observed_chunks.json`.
+
+### CEFR assignment for particles
+
+| Particle type | Method |
+|---|---|
+| Single word | EFLLex lookup via Rule C |
+| Compositional chunk | Highest CEFR level among constituent words (constituent ceiling) |
+| Non-compositional chunk | Author-assigned based on chunk-meaning difficulty (chunk-meaning principle) |
+
+The **chunk-meaning principle**: for non-compositional chunks, CEFR level
+reflects the difficulty of acquiring the chunk meaning as a unit, not the
+difficulty of its parts. Constituent ceiling is inappropriate because by
+definition the learner cannot derive the chunk meaning from parts.
+"Nothing but" (= "only") is not A1 despite both constituents being A1.
+
+### Pre-known vs. tiered chunks
+
+Every registered chunk is dispositioned as either:
+
+- **Pre-known** — chunk meaning at or below A2. Budget-exempt, no
+  encounter floor, but registered for accounting accuracy. Examples:
+  *have to*, *going to*, *there is/are*, *get up*.
+- **Tiered** — chunk meaning at B1+. Assigned to Core/Thematic/Peripheral
+  with encounter floor enforcement. These are chunks the text actively
+  teaches.
+
+### Particle-aware reading view (popup interaction)
+
+The reading view renders particles as clickable multi-word spans. The
+popup supports Pleco-style drill-down / drill-up navigation:
+
+1. **Tap a particle span** (e.g., "pick up") → popup shows: particle as
+   a unit, CEFR level, Spanish translation, compositionality tag
+2. **Decompose** → shows constituent words ("pick", "up") with their own
+   CEFR levels and translations
+3. For non-compositional chunks, signal that meaning is NOT the sum of
+   parts — this is itself a learning event
+4. **Navigate back** → return to particle-level view
+
+When a student taps a word that is part of a recognized particle, the
+popup defaults to the particle view (the cognitively relevant unit) with
+the option to drill down to the individual word.
+
+### Particle identification during ingestion
+
+Particles are identified during corpus ingestion via two sources:
+
+1. **Inventory lookup** — match token sequences in the text against
+   `phrase_list.json`, `observed_chunks.json`, and `cefrMultiWord` data.
+   This catches known multi-word expressions.
+2. **AI annotation** — the ingestion pipeline identifies additional
+   collocations and lexical chunks per text (stored in
+   `textCollocates` and `lexicalChunks` on the TextAnalysis object).
+
+Both sources produce **span annotations** per text: character positions
+marking where each particle occurs. These spans drive clickable rendering
+in the reading view.
+
+### Relationship to existing Cadence concepts
+
+The particle model unifies three previously separate multi-word concepts:
+
+| Previous concept | Maps to |
+|---|---|
+| `cefrMultiWord` (3,852 EFLLex phrases) | Static particle lookup table |
+| `textCollocates` (AI per-text collocations) | Compositional particles identified at ingestion |
+| `lexicalChunks` (AI per-text formulaic phrases, `holistic: true`) | Non-compositional particles identified at ingestion |
+
+### Encounter crediting in the depth model
+
+When a student encounters a particle in the reading view:
+
+- The particle itself receives a depth event (encounter, lookup, flag,
+  etc.) tracked against the particle as a unit.
+- If the particle is **compositional**, each constituent word that is
+  independently tracked also receives an encounter credit.
+- If the particle is **non-compositional**, constituents receive NO
+  encounter credit for their independent senses.
+
+This mirrors the graded reader framework's crediting rules (vocabulary
+framework §6) and ensures consistency between content production and
+content consumption.
+
+---
+
+## Content Pipeline: Graded Readers
+
+Cadence consumes graded reader content produced in the graded reader
+project (`C:\Users\User\graded_readers`). The two projects share the
+same EFLLex data source and vocabulary framework. Changes to the
+vocabulary framework in the graded reader project have downstream
+implications for Cadence's vocabulary tracking and reading view.
+
+### What the graded reader project produces
+
+Each graded reader series produces:
+- Chapter text files (`series/<slug>/chapters/ch*.md`)
+- A vocabulary inventory (`series/<slug>/vocabulary_inventory.md`) with
+  particles tiered as Core/Thematic/Peripheral, encounter counts, and
+  chapter spread
+- A constraint specification (`series/<slug>/constraint_spec.md`) with
+  CEFR target, sentence constraints, and compliance rules
+- L1 transfer adjustments (`series/<slug>/l1_adjustments.md`) with
+  cognate transparency and false friend penalties
+- Observed chunks (`data/observed_chunks.json`) — compositionality
+  decisions accumulated across all series, with PHRASE List source,
+  compositionality classification, and encounter data
+
+### What Cadence needs from ingested content
+
+When a graded reader chapter is ingested into Cadence as a `curated_text`:
+- The chapter text
+- **Particle span annotations** — character positions marking every
+  multi-word particle occurrence in the text
+- **Per-particle metadata** — CEFR level, compositionality, tier,
+  Spanish translation, constituent words
+- Audio (ElevenLabs TTS with word-level timestamps)
+- L1 adjustments (cognate/false-friend effective CEFR overrides)
+
+### Data flow
+
+```
+graded_readers/                          cadence/
+  data/efllex.json ───────────────────→ build-data.mjs → cefrLookup.js
+  data/phrase_list.json ──────────────→ particle lookup table
+  data/observed_chunks.json ──────────→ particle lookup table
+  series/<slug>/chapters/ch*.md ──────→ curated_texts (Supabase + IndexedDB)
+  series/<slug>/vocabulary_inventory ─→ per-text particle metadata
+  series/<slug>/l1_adjustments.md ────→ effective CEFR overrides
+```
+
+### Shared data artifacts
+
+Both projects use EFLLex as the CEFR classification backbone. The graded
+reader project's `data/efllex.json` (15,281 entries, Rule C applied) is
+the canonical source. Cadence's `cefrLookup.js` should be regenerated
+from this file.
+
+The PHRASE List (`data/phrase_list.json`, 506 entries) is the canonical
+source for non-compositional classification. Cadence should bundle or
+reference this data for particle identification during ingestion and
+for compositionality-aware encounter crediting.
 
 ---
 

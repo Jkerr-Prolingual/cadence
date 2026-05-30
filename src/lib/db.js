@@ -1,5 +1,5 @@
 const DB_NAME = 'cadence';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 const STORES = {
   srsCards: { keyPath: 'word' },
@@ -15,6 +15,10 @@ const STORES = {
   fluencySessions: { keyPath: 'id', autoIncrement: true },
   sets: { keyPath: 'id', autoIncrement: true },
   cards: { keyPath: 'id', autoIncrement: true },
+  studentRecordings: { keyPath: 'textId' },
+  classes: { keyPath: 'id' },
+  assignments: { keyPath: 'id' },
+  assignmentProgress: { keyPath: 'id' },
 };
 
 let dbPromise = null;
@@ -46,6 +50,13 @@ export function getDB() {
           }
           if (name === 'cards') {
             store.createIndex('setId', 'setId');
+          }
+          if (name === 'assignments') {
+            store.createIndex('classId', 'classId');
+          }
+          if (name === 'assignmentProgress') {
+            store.createIndex('assignmentId', 'assignmentId');
+            store.createIndex('studentId', 'studentId');
           }
         }
       }

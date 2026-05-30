@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npx vite build --mode development 2>&1)"
+    ]
+  }
+}
