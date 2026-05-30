@@ -66,7 +66,7 @@ export default function TeacherDashboard() {
         const [profilesRes, recordingsRes, fluencyRes] = await Promise.all([
           supabase.from('profiles').select('id, display_name, email').in('id', studentIds),
           supabase.from('student_recordings').select('*').in('user_id', studentIds),
-          supabase.from('fluency_sessions').select('*').in('student_id', studentIds).order('session_date', { ascending: true }),
+          supabase.from('fluency_sessions').select('*').in('user_id', studentIds).order('session_date', { ascending: true }),
         ]);
         if (profilesRes.error) console.error('Profiles fetch error:', profilesRes.error);
         const map = {};

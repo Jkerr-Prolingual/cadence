@@ -5,6 +5,10 @@
 [functions]
   directory = "netlify/functions"
 
+[[edge_functions]]
+  path = "/*"
+  function = "ua_blocker_ef"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
