@@ -662,11 +662,7 @@ export default function AdminPanel() {
             <>
               {/* Audio generation */}
               <Section label="Audio Generation">
-                {!import.meta.env.VITE_ELEVENLABS_API_KEY ? (
-                  <p className="text-sm text-gray-500">
-                    Set <code className="bg-gray-100 px-1 rounded">VITE_ELEVENLABS_API_KEY</code> in .env.local to enable audio generation.
-                  </p>
-                ) : voices.length === 0 ? (
+                {voices.length === 0 ? (
                   <p className="text-sm text-gray-500">
                     Set <code className="bg-gray-100 px-1 rounded">VITE_ELEVENLABS_VOICE_IDS</code> in .env.local (comma-separated voice IDs).
                   </p>
@@ -736,7 +732,7 @@ export default function AdminPanel() {
                 >
                   {publishing ? 'Publishing...' : 'Publish to Corpus'}
                 </button>
-                {!audioData && import.meta.env.VITE_ELEVENLABS_API_KEY && (
+                {!audioData && (
                   <span className="text-xs text-gray-400">Publishing without audio — you can generate it later</span>
                 )}
               </div>

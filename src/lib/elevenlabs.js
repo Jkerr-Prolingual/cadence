@@ -1,5 +1,3 @@
-const API_BASE = 'https://api.elevenlabs.io/v1';
-
 export function getVoiceOptions() {
   const ids = (import.meta.env.VITE_ELEVENLABS_VOICE_IDS || '').split(',').filter(Boolean);
   const names = (import.meta.env.VITE_ELEVENLABS_VOICE_NAMES || '').split(',').filter(Boolean);
@@ -7,34 +5,21 @@ export function getVoiceOptions() {
 }
 
 export async function generateAudio(text, voiceId, options = {}) {
-  const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
-  if (!apiKey) throw new Error('VITE_ELEVENLABS_API_KEY not configured');
-
   const {
     modelId = 'eleven_turbo_v2',
     stability = 0.5,
     similarityBoost = 0.75,
   } = options;
 
-  const response = await fetch(`${API_BASE}/text-to-speech/${voiceId}/with-timestamps`, {
+  const response = await fetch('/.netlify/functions/generate-audio', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'xi-api-key': apiKey,
-    },
-    body: JSON.stringify({
-      text,
-      model_id: modelId,
-      voice_settings: {
-        stability,
-        similarity_boost: similarityBoost,
-      },
-    }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voiceId, modelId, stability, similarityBoost }),
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`ElevenLabs API error: ${response.status} — ${error}`);
+    const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+    throw new Error(err.error || `Audio generation failed: ${response.status}`);
   }
 
   const data = await response.json();
