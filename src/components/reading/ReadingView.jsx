@@ -25,6 +25,8 @@ export default function ReadingView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [curatedTexts, setCuratedTexts] = useState([]);
 
+  const [selectedTextId, setSelectedTextId] = useState(null);
+
   const allTexts = useMemo(() => {
     const curated = curatedTexts.map(t => ({
       ...t,
@@ -49,8 +51,6 @@ export default function ReadingView() {
       bookId: text.book_id,
     };
   }, [allTexts, selectedTextId]);
-
-  const [selectedTextId, setSelectedTextId] = useState(null);
   const [popup, setPopup] = useState(null);
   const [cardCreator, setCardCreator] = useState(null);
   const [encounters, setEncounters] = useState({});
