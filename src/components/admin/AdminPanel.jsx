@@ -163,11 +163,24 @@ export default function AdminPanel() {
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [cefrEstimate, setCefrEstimate] = useState('B1');
-  const [seriesId, setSeriesId] = useState('');
-  const [seriesOrder, setSeriesOrder] = useState('');
+  const [bookId, setBookId] = useState('');
+  const [chapterOrder, setChapterOrder] = useState('');
   const [rawText, setRawText] = useState('');
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
+
+  // Books management
+  const [books, setBooks] = useState([]);
+  const [showBookForm, setShowBookForm] = useState(false);
+  const [editingBookId, setEditingBookId] = useState(null);
+  const [bookTitle, setBookTitle] = useState('');
+  const [bookAuthor, setBookAuthor] = useState('');
+  const [bookDescription, setBookDescription] = useState('');
+  const [bookCefr, setBookCefr] = useState('B1');
+  const [bookCoverFile, setBookCoverFile] = useState(null);
+  const [bookCoverPreview, setBookCoverPreview] = useState(null);
+  const [savingBook, setSavingBook] = useState(false);
+  const [bookError, setBookError] = useState(null);
 
   // Step 2: Analysis
   const [analysisJson, setAnalysisJson] = useState('');
@@ -192,6 +205,7 @@ export default function AdminPanel() {
 
   useEffect(() => {
     loadCorpus();
+    loadBooks();
   }, []);
 
   useEffect(() => {
@@ -213,8 +227,8 @@ export default function AdminPanel() {
         author: t.author,
         body: t.body,
         cefrEstimate: t.cefr_estimate,
-        seriesId: t.series_id,
-        seriesOrder: t.series_order,
+        bookId: t.book_id,
+        chapterOrder: t.chapter_order,
         textAnalysis: t.analysis,
         audioBlob: null,
         hasAudio: !!(t.audio_urls?.mp3),
@@ -225,6 +239,92 @@ export default function AdminPanel() {
         publishedAt: t.published_at,
       })));
     } catch {}
+  }
+
+  async function loadBooks() {
+    try {
+      const { data, error } = await supabase
+        .from('books')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setBooks(data || []);
+    } catch (err) {
+      console.warn('Failed to load books:', err);
+    }
+  }
+
+  function resetBookForm() {
+    setShowBookForm(false);
+    setEditingBookId(null);
+    setBookTitle('');
+    setBookAuthor('');
+    setBookDescription('');
+    setBookCefr('B1');
+    setBookCoverFile(null);
+    setBookCoverPreview(null);
+    setBookError(null);
+  }
+
+  async function handleSaveBook() {
+    if (!bookTitle.trim()) return;
+    setSavingBook(true);
+    setBookError(null);
+    try {
+      const id = editingBookId || titleToSlug(bookTitle);
+      let coverImageUrl = null;
+      if (editingBookId) {
+        const existing = books.find(b => b.id === editingBookId);
+        coverImageUrl = existing?.cover_image_url || null;
+      }
+      if (bookCoverFile) {
+        const ext = bookCoverFile.name.split('.').pop();
+        const coverPath = `${id}.${ext}`;
+        const { error: coverError } = await supabase.storage
+          .from('book-covers')
+          .upload(coverPath, bookCoverFile, { contentType: bookCoverFile.type, upsert: true });
+        if (coverError) throw coverError;
+        const { data: urlData } = supabase.storage.from('book-covers').getPublicUrl(coverPath);
+        coverImageUrl = urlData.publicUrl;
+      }
+      const record = {
+        id,
+        title: bookTitle,
+        author: bookAuthor || null,
+        description: bookDescription || null,
+        cefr_estimate: bookCefr,
+        cover_image_url: coverImageUrl,
+        status: 'published',
+      };
+      const { error } = await supabase.from('books').upsert(record, { onConflict: 'id' });
+      if (error) throw error;
+      resetBookForm();
+      await loadBooks();
+    } catch (err) {
+      console.error('Book save error:', err);
+      setBookError(err.message);
+    }
+    setSavingBook(false);
+  }
+
+  async function handleDeleteBook(id) {
+    try {
+      await supabase.from('curated_texts').update({ book_id: null, chapter_order: null }).eq('book_id', id);
+      await supabase.from('books').delete().eq('id', id);
+      await loadBooks();
+      await loadCorpus();
+    } catch {}
+  }
+
+  function handleEditBook(book) {
+    setEditingBookId(book.id);
+    setBookTitle(book.title || '');
+    setBookAuthor(book.author || '');
+    setBookDescription(book.description || '');
+    setBookCefr(book.cefr_estimate || 'B1');
+    setBookCoverFile(null);
+    setBookCoverPreview(book.cover_image_url || null);
+    setShowBookForm(true);
   }
 
   function handleCopyPrompt() {
@@ -325,8 +425,8 @@ export default function AdminPanel() {
         title,
         author,
         cefr_estimate: cefrEstimate,
-        series_id: seriesId || null,
-        series_order: seriesOrder ? Number(seriesOrder) : null,
+        book_id: bookId || null,
+        chapter_order: chapterOrder ? Number(chapterOrder) : null,
         body: rawText,
         analysis: textAnalysis || null,
         audio_urls: audioUrls,
@@ -355,8 +455,8 @@ export default function AdminPanel() {
     setTitle(text.title || '');
     setAuthor(text.author || '');
     setCefrEstimate(text.cefrEstimate || 'B1');
-    setSeriesId(text.seriesId || '');
-    setSeriesOrder(text.seriesOrder != null ? String(text.seriesOrder) : '');
+    setBookId(text.bookId || '');
+    setChapterOrder(text.chapterOrder != null ? String(text.chapterOrder) : '');
     setRawText(text.body || '');
     setTextAnalysis(text.textAnalysis || null);
     setAnalysisJson(text.textAnalysis ? JSON.stringify(text.textAnalysis, null, 2) : '');
@@ -383,8 +483,8 @@ export default function AdminPanel() {
     setTitle('');
     setAuthor('');
     setCefrEstimate('B1');
-    setSeriesId('');
-    setSeriesOrder('');
+    setBookId('');
+    setChapterOrder('');
     setRawText('');
     setCoverFile(null);
     setCoverPreview(null);
@@ -424,6 +524,143 @@ export default function AdminPanel() {
         })}
       </div>
 
+      {/* Books Management */}
+      <div className="mb-8 border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">Books ({books.length})</h2>
+          <button
+            onClick={() => { resetBookForm(); setShowBookForm(true); }}
+            className="text-xs font-medium text-blue-600 hover:text-blue-800"
+          >
+            + New Book
+          </button>
+        </div>
+
+        {showBookForm && (
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Title</label>
+                <input
+                  type="text"
+                  value={bookTitle}
+                  onChange={(e) => setBookTitle(e.target.value)}
+                  placeholder="The Monkey's Paw"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+                {bookTitle && !editingBookId && (
+                  <p className="text-xs text-gray-400 mt-1">ID: {titleToSlug(bookTitle)}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Author</label>
+                <input
+                  type="text"
+                  value={bookAuthor}
+                  onChange={(e) => setBookAuthor(e.target.value)}
+                  placeholder="Adapted from W.W. Jacobs"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">CEFR Estimate</label>
+                <select
+                  value={bookCefr}
+                  onChange={(e) => setBookCefr(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                >
+                  {CEFR_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Cover Image</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setBookCoverFile(file);
+                        setBookCoverPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    className="text-sm text-gray-500 file:mr-2 file:px-2 file:py-1 file:rounded file:border file:border-gray-300 file:text-xs file:bg-white file:text-gray-700"
+                  />
+                  {bookCoverPreview && (
+                    <img src={bookCoverPreview} alt="Cover" className="w-10 h-14 object-cover rounded border border-gray-200" />
+                  )}
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Description</label>
+              <textarea
+                value={bookDescription}
+                onChange={(e) => setBookDescription(e.target.value)}
+                placeholder="A short description of the book..."
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-y"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSaveBook}
+                disabled={savingBook || !bookTitle.trim()}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  savingBook || !bookTitle.trim()
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-900 text-white hover:bg-gray-800'
+                }`}
+              >
+                {savingBook ? 'Saving...' : editingBookId ? 'Update Book' : 'Create Book'}
+              </button>
+              <button
+                onClick={resetBookForm}
+                className="px-4 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+            {bookError && (
+              <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{bookError}</p>
+            )}
+          </div>
+        )}
+
+        {books.length > 0 && (
+          <div className="space-y-1.5">
+            {books.map(book => {
+              const chapterCount = corpusTexts.filter(t => t.bookId === book.id).length;
+              return (
+                <div key={book.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-xs font-bold px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: (CEFR_COLORS[book.cefr_estimate] || '#6b7280') + '20',
+                        color: CEFR_COLORS[book.cefr_estimate] || '#6b7280',
+                      }}
+                    >
+                      {book.cefr_estimate}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">{book.title}</span>
+                    {book.author && <span className="text-xs text-gray-400">{book.author}</span>}
+                    <span className="text-xs text-gray-400">({chapterCount} ch.)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleEditBook(book)} className="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</button>
+                    <button onClick={() => handleDeleteBook(book.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Step 1: Content & Metadata */}
       {step === 1 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -452,7 +689,7 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className={`grid gap-4 ${bookId ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <div>
                 <label className="block text-xs font-medium text-gray-500 uppercase mb-1">CEFR Estimate</label>
                 <select
@@ -464,25 +701,28 @@ export default function AdminPanel() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Series ID</label>
-                <input
-                  type="text"
-                  value={seriesId}
-                  onChange={(e) => setSeriesId(e.target.value)}
-                  placeholder="monkeys-paw"
+                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Book</label>
+                <select
+                  value={bookId}
+                  onChange={(e) => setBookId(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                />
+                >
+                  <option value="">Standalone text</option>
+                  {books.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+                </select>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Series Order</label>
-                <input
-                  type="number"
-                  value={seriesOrder}
-                  onChange={(e) => setSeriesOrder(e.target.value)}
-                  placeholder="1"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                />
-              </div>
+              {bookId && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Chapter Order</label>
+                  <input
+                    type="number"
+                    value={chapterOrder}
+                    onChange={(e) => setChapterOrder(e.target.value)}
+                    placeholder="1"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  />
+                </div>
+              )}
             </div>
 
             <div>

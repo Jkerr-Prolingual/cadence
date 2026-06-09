@@ -8,6 +8,7 @@ import TeacherDashboard from './components/teacher/TeacherDashboard';
 import AdminPanel from './components/admin/AdminPanel';
 import WorkshopView from './components/workshop/WorkshopView';
 import LibraryPage from './components/library/LibraryPage';
+import BookChaptersPage from './components/library/BookChaptersPage';
 import LoginPage from './components/shared/LoginPage';
 
 function ProtectedRoute({ children, requireTeacher, requireAdmin }) {
@@ -33,12 +34,13 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" /> : <LoginPage />} />
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route index element={<ReadingView />} />
-        <Route path="library" element={<LibraryPage />} />
+        <Route index element={<LibraryPage />} />
+        <Route path="book/:bookId" element={<BookChaptersPage />} />
+        <Route path="read" element={<ReadingView />} />
         <Route path="flashcards" element={<FlashcardPage />} />
         <Route path="workshop" element={<WorkshopView />} />
         <Route path="teacher" element={<TeacherDashboard />} />
-        <Route path="admin" element={<AdminPanel />} />
+        <Route path="admin" element={<ProtectedRoute requireAdmin><AdminPanel /></ProtectedRoute>} />
       </Route>
 
       <Route path="/shadow/:textId" element={

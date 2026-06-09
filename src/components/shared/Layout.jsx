@@ -4,8 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 
 const navItems = [
-  { to: '/', label: 'Read' },
-  { to: '/library', label: 'Library' },
+  { to: '/', label: 'Library' },
+  { to: '/read', label: 'Read' },
   { to: '/flashcards', label: 'Flashcards' },
   { to: '/workshop', label: 'Workshop' },
 ];

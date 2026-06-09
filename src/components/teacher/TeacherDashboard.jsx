@@ -16,6 +16,7 @@ export default function TeacherDashboard() {
   const [assignments, setAssignments] = useState([]);
   const [progress, setProgress] = useState([]);
   const [curatedTexts, setCuratedTexts] = useState([]);
+  const [books, setBooks] = useState([]);
   const [studentRecordings, setStudentRecordings] = useState([]);
   const [fluencySessions, setFluencySessions] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState(null);
@@ -37,14 +38,16 @@ export default function TeacherDashboard() {
   }, []);
 
   async function loadData() {
-    const [clsRes, textsRes] = await Promise.all([
+    const [clsRes, textsRes, booksRes] = await Promise.all([
       supabase.from('classes').select('*').eq('teacher_id', user.id),
-      supabase.from('curated_texts').select('id, title, author, cefr_estimate, status, audio_urls')
+      supabase.from('curated_texts').select('id, title, author, cefr_estimate, status, audio_urls, book_id, chapter_order')
         .eq('status', 'published'),
+      supabase.from('books').select('id, title').eq('status', 'published'),
     ]);
     const cls = clsRes.data || [];
     setClasses(cls);
     setCuratedTexts(textsRes.data || []);
+    setBooks(booksRes.data || []);
 
     if (cls.length > 0) {
       if (!selectedClassId) setSelectedClassId(cls[0].id);
@@ -206,6 +209,7 @@ export default function TeacherDashboard() {
               <AssignmentsPanel
                 assignments={classAssignments}
                 allTexts={allTexts}
+                books={books}
                 students={classStudents}
                 progress={progress}
                 studentRecordings={studentRecordings}
@@ -277,7 +281,7 @@ function ClassInfoPanel({ cls, students, onRemoveStudent, onDeleteClass }) {
   );
 }
 
-function AssignmentsPanel({ assignments, allTexts, students, progress, studentRecordings, fluencySessions, classId, showCreate, onShowCreate, onCreated, onDeleted }) {
+function AssignmentsPanel({ assignments, allTexts, books, students, progress, studentRecordings, fluencySessions, classId, showCreate, onShowCreate, onCreated, onDeleted }) {
   const [showArchived, setShowArchived] = useState(false);
 
   const activeAssignments = assignments.filter(a => !a.archivedAt);
@@ -309,6 +313,7 @@ function AssignmentsPanel({ assignments, allTexts, students, progress, studentRe
       {showCreate && (
         <CreateAssignmentForm
           allTexts={allTexts}
+          books={books}
           classId={classId}
           onCreated={() => { onShowCreate(false); onCreated(); }}
           onCancel={() => onShowCreate(false)}
@@ -339,13 +344,36 @@ function AssignmentsPanel({ assignments, allTexts, students, progress, studentRe
   );
 }
 
-function CreateAssignmentForm({ allTexts, classId, onCreated, onCancel }) {
+function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCancel }) {
   const [selectedTextId, setSelectedTextId] = useState('');
   const [title, setTitle] = useState('');
   const [tasks, setTasks] = useState({ readingPass: true, flashcards: true, recordAudio: false, shadowReading: false, timedReading: false });
   const [dueDate, setDueDate] = useState('');
   const selectedText = allTexts.find(t => t.id === selectedTextId);
   const hasAudio = selectedText?.audio_urls || selectedText?.audioUrls;
+
+  const bookMap = useMemo(() => {
+    const map = {};
+    for (const b of books) map[b.id] = b.title;
+    return map;
+  }, [books]);
+
+  const { bookTexts, standaloneTexts } = useMemo(() => {
+    const byBook = {};
+    const standalone = [];
+    for (const t of allTexts) {
+      if (t.book_id && bookMap[t.book_id]) {
+        if (!byBook[t.book_id]) byBook[t.book_id] = [];
+        byBook[t.book_id].push(t);
+      } else {
+        standalone.push(t);
+      }
+    }
+    for (const id of Object.keys(byBook)) {
+      byBook[id].sort((a, b) => (a.chapter_order ?? 0) - (b.chapter_order ?? 0));
+    }
+    return { bookTexts: byBook, standaloneTexts: standalone };
+  }, [allTexts, bookMap]);
 
   async function handleCreate() {
     if (!selectedTextId) return;
@@ -384,7 +412,29 @@ function CreateAssignmentForm({ allTexts, classId, onCreated, onCancel }) {
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
         >
           <option value="">Select a text...</option>
-          {allTexts.map(t => (
+          {books.map(b => {
+            const chapters = bookTexts[b.id];
+            if (!chapters?.length) return null;
+            return (
+              <optgroup key={b.id} label={b.title}>
+                {chapters.map(t => (
+                  <option key={t.id} value={t.id}>
+                    Ch. {t.chapter_order ?? '?'}: {t.title} — {t.cefr || t.cefr_estimate || 'unrated'}
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
+          {standaloneTexts.length > 0 && books.some(b => bookTexts[b.id]?.length) && (
+            <optgroup label="Standalone Texts">
+              {standaloneTexts.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.title} — {t.cefr || t.cefr_estimate || 'unrated'}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {(!books.some(b => bookTexts[b.id]?.length)) && standaloneTexts.map(t => (
             <option key={t.id} value={t.id}>
               {t.title} — {t.cefr || t.cefr_estimate || 'unrated'}
             </option>

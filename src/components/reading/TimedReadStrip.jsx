@@ -4,7 +4,7 @@ function formatElapsed(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function TimedReadingBanner({
+export default function TimedReadStrip({
   mode,
   elapsed,
   result,
@@ -15,30 +15,25 @@ export default function TimedReadingBanner({
   onSave,
   onDiscard,
 }) {
-  if (mode === 'pending') {
+  if (mode === 'idle' || mode === 'pending') {
     return (
-      <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
-        <div className="max-w-2xl mx-auto flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-amber-900">Ready to time your reading</p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              The clock starts when you tap the button. Read at your natural pace.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={onCancel}
-              className="px-3 py-2 sm:py-1.5 text-xs text-gray-600 hover:text-gray-800 active:text-gray-900 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onStart}
-              className="px-4 py-2 sm:py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 active:bg-amber-800 transition-colors"
-            >
-              Start the clock
-            </button>
-          </div>
+      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
+        <div className="max-w-2xl mx-auto text-center space-y-3">
+          <p className="text-xs text-gray-500">
+            Read at your natural pace. The clock starts when you tap the button. Tap any word to mark where you stopped.
+          </p>
+          <button
+            onClick={onStart}
+            className="inline-flex items-center gap-2 px-5 py-3 sm:py-2.5 text-sm font-medium bg-amber-600 text-white rounded-full hover:bg-amber-700 active:bg-amber-800 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="8" cy="9" r="6" />
+              <line x1="8" y1="9" x2="8" y2="6" />
+              <line x1="8" y1="1" x2="8" y2="3" />
+              <line x1="6" y1="1" x2="10" y2="1" />
+            </svg>
+            Start the clock
+          </button>
         </div>
       </div>
     );
@@ -46,14 +41,14 @@ export default function TimedReadingBanner({
 
   if (mode === 'active') {
     return (
-      <div className="bg-red-50 border-b border-red-200 px-4 py-3">
+      <div className="border-t border-red-200 bg-red-50 px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
             <span className="text-sm font-semibold text-red-900 tabular-nums">
               {formatElapsed(elapsed)}
             </span>
-            <span className="text-xs text-red-700 hidden sm:inline">Timed read</span>
+            <span className="text-xs text-red-700 hidden sm:inline">Tap any word to mark where you stopped</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button

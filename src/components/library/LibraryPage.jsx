@@ -6,25 +6,33 @@ import { CEFR_LEVELS, CEFR_COLORS } from '../../lib/wordUtils';
 export default function LibraryPage() {
   const navigate = useNavigate();
   const [texts, setTexts] = useState([]);
+  const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeLevels, setActiveLevels] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    loadTexts();
+    loadLibrary();
   }, []);
 
-  async function loadTexts() {
+  async function loadLibrary() {
     try {
-      const { data, error } = await supabase
-        .from('curated_texts')
-        .select('id, title, author, cefr_estimate, word_count, cover_image_url, series_id')
-        .eq('status', 'published')
-        .order('published_at', { ascending: false });
-      if (error) throw error;
-      setTexts(data || []);
+      const [textsRes, booksRes] = await Promise.all([
+        supabase
+          .from('curated_texts')
+          .select('id, title, author, cefr_estimate, word_count, cover_image_url, book_id, chapter_order')
+          .eq('status', 'published')
+          .order('chapter_order', { ascending: true }),
+        supabase
+          .from('books')
+          .select('*')
+          .eq('status', 'published'),
+      ]);
+      if (textsRes.error) throw textsRes.error;
+      setTexts(textsRes.data || []);
+      setBooks(booksRes.data || []);
     } catch (e) {
-      console.warn('Failed to load library texts', e);
+      console.warn('Failed to load library', e);
     }
     setLoading(false);
   }
@@ -38,16 +46,38 @@ export default function LibraryPage() {
     });
   }
 
-  const filteredTexts = useMemo(() => {
-    return texts.filter(t => {
-      if (activeLevels.size > 0 && !activeLevels.has(t.cefr_estimate)) return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        return t.title.toLowerCase().includes(q) || (t.author || '').toLowerCase().includes(q);
+  const chaptersByBook = useMemo(() => {
+    const map = {};
+    for (const t of texts) {
+      if (t.book_id) {
+        if (!map[t.book_id]) map[t.book_id] = [];
+        map[t.book_id].push(t);
       }
-      return true;
-    });
-  }, [texts, activeLevels, searchQuery]);
+    }
+    return map;
+  }, [texts]);
+
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    const items = [];
+
+    for (const book of books) {
+      const chapters = chaptersByBook[book.id] || [];
+      if (activeLevels.size > 0 && !activeLevels.has(book.cefr_estimate)) continue;
+      if (q && !book.title.toLowerCase().includes(q) && !(book.author || '').toLowerCase().includes(q)) continue;
+      items.push({ type: 'book', book, chapterCount: chapters.length });
+    }
+
+    const bookIds = new Set(books.map(b => b.id));
+    for (const t of texts) {
+      if (t.book_id && bookIds.has(t.book_id)) continue;
+      if (activeLevels.size > 0 && !activeLevels.has(t.cefr_estimate)) continue;
+      if (q && !t.title.toLowerCase().includes(q) && !(t.author || '').toLowerCase().includes(q)) continue;
+      items.push({ type: 'text', text: t });
+    }
+
+    return items;
+  }, [texts, books, chaptersByBook, activeLevels, searchQuery]);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -93,19 +123,76 @@ export default function LibraryPage() {
 
         {loading ? (
           <div className="text-center text-gray-400 py-16">Loading...</div>
-        ) : filteredTexts.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="text-center text-gray-400 py-16">
-            {texts.length === 0 ? 'No texts in the library yet.' : 'No texts match your filters.'}
+            {texts.length === 0 && books.length === 0 ? 'No texts in the library yet.' : 'No texts match your filters.'}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {filteredTexts.map(text => (
-              <TextCard key={text.id} text={text} onClick={() => navigate(`/?text=${text.id}`)} />
-            ))}
+            {filteredItems.map(item =>
+              item.type === 'book' ? (
+                <BookCard
+                  key={`book-${item.book.id}`}
+                  book={item.book}
+                  chapterCount={item.chapterCount}
+                  onClick={() => navigate(`/book/${item.book.id}`)}
+                />
+              ) : (
+                <TextCard
+                  key={`text-${item.text.id}`}
+                  text={item.text}
+                  onClick={() => navigate(`/read?text=${item.text.id}`)}
+                />
+              )
+            )}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function BookCard({ book, chapterCount, onClick }) {
+  const color = CEFR_COLORS[book.cefr_estimate] || CEFR_COLORS.unclassified;
+  const initial = (book.title || '?')[0].toUpperCase();
+
+  return (
+    <button
+      onClick={onClick}
+      className="text-left border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
+    >
+      <div className="relative aspect-[3/4]">
+        {book.cover_image_url ? (
+          <img
+            src={book.cover_image_url}
+            alt={book.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div
+            className="w-full h-full flex items-center justify-center"
+            style={{ background: `linear-gradient(135deg, ${color}18, ${color}35)` }}
+          >
+            <span className="text-5xl font-bold" style={{ color }}>{initial}</span>
+          </div>
+        )}
+        {book.cefr_estimate && (
+          <span
+            className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-semibold text-white"
+            style={{ backgroundColor: color }}
+          >
+            {book.cefr_estimate}
+          </span>
+        )}
+      </div>
+      <div className="p-3">
+        <p className="text-sm font-semibold text-gray-900 line-clamp-2 group-hover:text-gray-700">{book.title}</p>
+        {book.author && (
+          <p className="text-xs text-gray-500 mt-1 truncate">{book.author}</p>
+        )}
+        <p className="text-xs text-gray-400 mt-1">{chapterCount} {chapterCount === 1 ? 'chapter' : 'chapters'}</p>
+      </div>
+    </button>
   );
 }
 

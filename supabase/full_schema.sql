@@ -42,7 +42,19 @@ create table if not exists class_enrollments (
   primary key (class_id, student_id)
 );
 
--- 4. CURATED TEXTS
+-- 4a. BOOKS
+create table if not exists books (
+  id text primary key,
+  title text not null,
+  author text,
+  description text,
+  cefr_estimate text,
+  cover_image_url text,
+  status text default 'draft' check (status in ('draft', 'published', 'archived')),
+  created_at timestamptz default now()
+);
+
+-- 4b. CURATED TEXTS (chapters)
 create table if not exists curated_texts (
   id text primary key,
   title text not null,
@@ -52,6 +64,8 @@ create table if not exists curated_texts (
   youtube_id text,
   series_id text,
   series_order integer,
+  book_id text references books(id),
+  chapter_order integer,
   word_count integer,
   cefr_estimate text,
   provenance_type text default 'original',
@@ -233,6 +247,7 @@ create table if not exists student_recordings (
 alter table profiles enable row level security;
 alter table classes enable row level security;
 alter table class_enrollments enable row level security;
+alter table books enable row level security;
 alter table curated_texts enable row level security;
 alter table assignments enable row level security;
 alter table assignment_progress enable row level security;
@@ -328,6 +343,12 @@ create policy "Teachers manage enrollments for own classes"
   on class_enrollments for delete using (
     public.is_class_teacher(class_id)
   );
+
+-- ── books ─────────────────────────────────────────────────────
+create policy "Anyone reads published books"
+  on books for select using (status = 'published');
+create policy "Admins manage all books"
+  on books for all using (public.is_admin());
 
 -- ── curated_texts ─────────────────────────────────────────────
 create policy "Anyone reads published texts"
@@ -538,6 +559,10 @@ insert into storage.buckets (id, name, public)
 values ('text-covers', 'text-covers', true)
 on conflict (id) do nothing;
 
+insert into storage.buckets (id, name, public)
+values ('book-covers', 'book-covers', true)
+on conflict (id) do nothing;
+
 -- Curated audio
 create policy "Authenticated users read curated audio"
   on storage.objects for select
@@ -614,3 +639,20 @@ create policy "Admins update text covers"
 create policy "Admins delete text covers"
   on storage.objects for delete
   using (bucket_id = 'text-covers' and public.is_admin());
+
+-- Book covers (public bucket)
+create policy "Anyone reads book covers"
+  on storage.objects for select
+  using (bucket_id = 'book-covers');
+
+create policy "Admins upload book covers"
+  on storage.objects for insert
+  with check (bucket_id = 'book-covers' and public.is_admin());
+
+create policy "Admins update book covers"
+  on storage.objects for update
+  using (bucket_id = 'book-covers' and public.is_admin());
+
+create policy "Admins delete book covers"
+  on storage.objects for delete
+  using (bucket_id = 'book-covers' and public.is_admin());

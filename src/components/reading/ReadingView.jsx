@@ -1,12 +1,15 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import TextSelector from './TextSelector';
 import TextDisplay from './TextDisplay';
 import WordPopup from './WordPopup';
 import CardCreator from './CardCreator';
-import AudioTransport from './AudioTransport';
+import ToolSetSelector from './ToolSetSelector';
+import ListenReadStrip from './ListenReadStrip';
+import ShadowReadStrip from './ShadowReadStrip';
+import RecordReviewStrip from './RecordReviewStrip';
+import TimedReadStrip from './TimedReadStrip';
 import AssignmentChecklist from './AssignmentChecklist';
-import TimedReadingBanner from './TimedReadingBanner';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
 import { sampleTexts } from '../../data/sampleTexts';
 import { supabase } from '../../lib/supabase';
@@ -18,6 +21,7 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function ReadingView() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [curatedTexts, setCuratedTexts] = useState([]);
 
@@ -29,6 +33,23 @@ export default function ReadingView() {
     return [...sampleTexts, ...curated];
   }, [curatedTexts]);
 
+  const chapterNav = useMemo(() => {
+    const text = allTexts.find(t => t.id === selectedTextId);
+    if (!text?.book_id) return null;
+    const siblings = allTexts
+      .filter(t => t.book_id === text.book_id)
+      .sort((a, b) => (a.chapter_order ?? 0) - (b.chapter_order ?? 0));
+    const idx = siblings.findIndex(t => t.id === selectedTextId);
+    if (idx === -1) return null;
+    return {
+      prev: idx > 0 ? siblings[idx - 1] : null,
+      next: idx < siblings.length - 1 ? siblings[idx + 1] : null,
+      current: idx + 1,
+      total: siblings.length,
+      bookId: text.book_id,
+    };
+  }, [allTexts, selectedTextId]);
+
   const [selectedTextId, setSelectedTextId] = useState(null);
   const [popup, setPopup] = useState(null);
   const [cardCreator, setCardCreator] = useState(null);
@@ -36,6 +57,9 @@ export default function ReadingView() {
   const [checklistKey, setChecklistKey] = useState(0);
   const selectedTextIdRef = useRef(selectedTextId);
   selectedTextIdRef.current = selectedTextId;
+
+  // Tool set state — resets on text change
+  const [toolSet, setToolSet] = useState('listen');
 
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -46,7 +70,7 @@ export default function ReadingView() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Full-text recording
+  // Full-text recording (Record & Review tool set)
   const recorder = useAudioRecorder();
   const [recordingMode, setRecordingMode] = useState('idle');
   const [recordingElapsed, setRecordingElapsed] = useState(0);
@@ -55,13 +79,13 @@ export default function ReadingView() {
   const elapsedTimerRef = useRef(null);
   const playbackRef = useRef(null);
 
-  // Sentence-loop ephemeral recording
+  // Sentence-loop ephemeral recording (Shadow Read tool set)
   const loopRecorder = useAudioRecorder();
   const [loopRecordingMode, setLoopRecordingMode] = useState('idle');
   const loopPlaybackRef = useRef(null);
 
   // Timed reading
-  const [timedMode, setTimedMode] = useState('idle'); // idle | pending | active | result
+  const [timedMode, setTimedMode] = useState('idle');
   const [timedStart, setTimedStart] = useState(null);
   const [timedElapsed, setTimedElapsed] = useState(0);
   const [timedResult, setTimedResult] = useState(null);
@@ -76,6 +100,7 @@ export default function ReadingView() {
     return detectSentences(selectedText.body, hasAudio ? selectedText.audioTimestamps : null);
   }, [selectedText, hasAudio]);
 
+  // Reset state on text change
   useEffect(() => {
     setIsPlaying(false);
     setCurrentWordIdx(-1);
@@ -84,24 +109,44 @@ export default function ReadingView() {
     setCurrentTime(0);
     setDuration(0);
     setPopup(null);
+    setToolSet('listen');
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-    // Discard any in-progress recording on text change
     if (recordingMode !== 'idle') {
       recorder.stopRecording();
       recorder.clearRecording();
       setRecordingMode('idle');
       if (elapsedTimerRef.current) { clearInterval(elapsedTimerRef.current); elapsedTimerRef.current = null; }
     }
-    // Reset timed reading on text change
     if (timedIntervalRef.current) { clearInterval(timedIntervalRef.current); timedIntervalRef.current = null; }
     setTimedMode('idle');
     setTimedStart(null);
     setTimedElapsed(0);
     setTimedResult(null);
   }, [selectedTextId]);
+
+  // Reset tool-specific state when switching tool sets
+  useEffect(() => {
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+    setLoopSentenceIdx(null);
+    if (recordingMode !== 'idle') {
+      recorder.stopRecording();
+      recorder.clearRecording();
+      setRecordingMode('idle');
+      if (elapsedTimerRef.current) { clearInterval(elapsedTimerRef.current); elapsedTimerRef.current = null; }
+    }
+    if (timedMode !== 'idle' && timedMode !== 'result') {
+      if (timedIntervalRef.current) { clearInterval(timedIntervalRef.current); timedIntervalRef.current = null; }
+      setTimedMode('idle');
+      setTimedStart(null);
+      setTimedElapsed(0);
+    }
+  }, [toolSet]);
 
   useEffect(() => {
     const requestedId = searchParams.get('text');
@@ -147,8 +192,8 @@ export default function ReadingView() {
           cefr: t.cefr_estimate,
           audioUrl,
           audioTimestamps: t.audio_timestamps,
-          series_id: t.series_id,
-          series_order: t.series_order,
+          book_id: t.book_id,
+          chapter_order: t.chapter_order,
         };
       }));
 
@@ -225,6 +270,8 @@ export default function ReadingView() {
       }));
     } catch {}
   }
+
+  // ── Audio playback ────────────────────────────────────────────────────────────
 
   function handleTimeUpdate() {
     const audio = audioRef.current;
@@ -311,7 +358,7 @@ export default function ReadingView() {
     setLoopSentenceIdx(null);
   }
 
-  // ── Full-text recording controls ──────────────────────────────────────────────
+  // ── Full-text recording controls (Record & Review) ────────────────────────────
 
   async function handleStartRecording() {
     setSaveError(null);
@@ -389,7 +436,7 @@ export default function ReadingView() {
     setSaveError(null);
   }
 
-  // ── Sentence-loop ephemeral recording ─────────────────────────────────────────
+  // ── Sentence-loop ephemeral recording (Shadow Read) ───────────────────────────
 
   async function handleStartLoopRecording() {
     await loopRecorder.startRecording();
@@ -411,29 +458,23 @@ export default function ReadingView() {
     }
   }
 
-  // Clear ephemeral recording when loop changes or clears
   useEffect(() => {
     if (loopPlaybackRef.current) { loopPlaybackRef.current.pause(); loopPlaybackRef.current = null; }
     loopRecorder.clearRecording();
     setLoopRecordingMode('idle');
   }, [loopSentenceIdx]);
 
-  // ── Timed reading controls ─────────────────────────────────────────────────────
+  // ── Timed reading controls ────────────────────────────────────────────────────
 
   function countWords(text) {
     return (text.match(/[a-zA-ZÀ-ÿ'''-]+/g) || []).length;
   }
 
-  function handleTimedPending() {
-    // Pause audio if playing
+  function handleTimedStart() {
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
       setIsPlaying(false);
     }
-    setTimedMode('pending');
-  }
-
-  function handleTimedStart() {
     setTimedStart(Date.now());
     setTimedElapsed(0);
     setTimedMode('active');
@@ -471,7 +512,6 @@ export default function ReadingView() {
       await completeTaskForText(user.id, timedResult.textId, 'timedReading').catch(() => {});
       setChecklistKey(k => k + 1);
     }
-    // Refresh WPM history
     const sessions = await getFluencySessionsForText(timedResult.textId);
     setWpmHistory(sessions.map(s => s.wpm));
     handleTimedCancel();
@@ -484,8 +524,7 @@ export default function ReadingView() {
   // ── Word click / popup ────────────────────────────────────────────────────────
 
   const handleWordClick = useCallback((token, position) => {
-    // During timed reading, clicking a word ends the session at that position
-    if (timedMode === 'active') {
+    if (toolSet === 'timed' && timedMode === 'active') {
       handleTimedDone(token.wordIdx + 1);
       return;
     }
@@ -498,7 +537,7 @@ export default function ReadingView() {
     }
     setPopup({ token, position });
     recordEncounter(token);
-  }, [hasAudio, sentences, timedMode]);
+  }, [hasAudio, sentences, toolSet, timedMode]);
 
   function handleResumeAudio() {
     setPopup(null);
@@ -520,6 +559,91 @@ export default function ReadingView() {
     setPopup(null);
   }
 
+  // ── Render control strip for active tool set ──────────────────────────────────
+
+  function renderControlStrip() {
+    if (toolSet === 'listen' && hasAudio) {
+      return (
+        <ListenReadStrip
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={duration}
+          playbackRate={playbackRate}
+          onPlayPause={handlePlayPause}
+          onSeek={handleSeek}
+          onSpeedChange={handleSpeedChange}
+        />
+      );
+    }
+
+    if (toolSet === 'shadow' && hasAudio) {
+      return (
+        <ShadowReadStrip
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={duration}
+          playbackRate={playbackRate}
+          loopSentenceIdx={loopSentenceIdx}
+          sentences={sentences}
+          onPlayPause={handlePlayPause}
+          onSeek={handleSeek}
+          onSpeedChange={handleSpeedChange}
+          onLoopSentence={handleLoopByIndex}
+          onClearLoop={handleClearLoop}
+          loopRecordingMode={loopRecordingMode}
+          loopRecorderAudioUrl={loopRecorder.audioUrl}
+          onStartLoopRecording={handleStartLoopRecording}
+          onStopLoopRecording={handleStopLoopRecording}
+          onPlayLoopRecording={handlePlayLoopRecording}
+        />
+      );
+    }
+
+    if (toolSet === 'record') {
+      return (
+        <RecordReviewStrip
+          recordingMode={recordingMode}
+          recordingElapsed={recordingElapsed}
+          onStartRecording={handleStartRecording}
+          onStopRecording={handleStopRecording}
+          onListenBack={handleListenBack}
+          onSaveRecording={handleSaveRecording}
+          onDiscardRecording={handleDiscardRecording}
+          saving={saving}
+          saveError={saveError}
+          recorderError={recorder.error}
+        />
+      );
+    }
+
+    if (toolSet === 'timed') {
+      return (
+        <TimedReadStrip
+          mode={timedMode}
+          elapsed={timedElapsed}
+          result={timedResult}
+          wpmHistory={wpmHistory}
+          onStart={handleTimedStart}
+          onCancel={handleTimedCancel}
+          onDone={() => handleTimedDone()}
+          onSave={handleTimedSave}
+          onDiscard={handleTimedDiscard}
+        />
+      );
+    }
+
+    if (!hasAudio) {
+      return (
+        <div className="border-t border-gray-100 px-4 py-2 flex items-center justify-between text-xs text-gray-400">
+          <span>{Object.keys(encounters).length} words encountered</span>
+          <span>Click any word to look it up</span>
+        </div>
+      );
+    }
+
+    return null;
+  }
+
   return (
     <div className="flex flex-col h-full">
       <TextSelector
@@ -533,18 +657,6 @@ export default function ReadingView() {
         encounters={encounters}
         refreshKey={checklistKey}
         onSelectText={(id) => { setSelectedTextId(id); setPopup(null); }}
-      />
-
-      <TimedReadingBanner
-        mode={timedMode}
-        elapsed={timedElapsed}
-        result={timedResult}
-        wpmHistory={wpmHistory}
-        onStart={handleTimedStart}
-        onCancel={handleTimedCancel}
-        onDone={() => handleTimedDone()}
-        onSave={handleTimedSave}
-        onDiscard={handleTimedDiscard}
       />
 
       <div className="flex-1 overflow-y-auto">
@@ -565,21 +677,11 @@ export default function ReadingView() {
                     )}
                   </p>
                 </div>
-                {timedMode === 'idle' && (
-                  <button
-                    onClick={handleTimedPending}
-                    className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 active:bg-gray-100 transition-colors flex-shrink-0 self-start"
-                    title="Time your reading"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <circle cx="8" cy="9" r="6" />
-                      <line x1="8" y1="9" x2="8" y2="6" />
-                      <line x1="8" y1="1" x2="8" y2="3" />
-                      <line x1="6" y1="1" x2="10" y2="1" />
-                    </svg>
-                    Timed read
-                  </button>
-                )}
+                <ToolSetSelector
+                  active={toolSet}
+                  onSelect={setToolSet}
+                  hasAudio={hasAudio}
+                />
               </div>
 
               <TextDisplay
@@ -591,66 +693,73 @@ export default function ReadingView() {
                 loopSentenceIdx={loopSentenceIdx}
                 sentences={sentences}
               />
+
+              {chapterNav && (
+                <div className="mt-8 pt-6 border-t border-gray-200 flex items-center justify-between">
+                  <div>
+                    {chapterNav.prev ? (
+                      <button
+                        onClick={() => { setSelectedTextId(chapterNav.prev.id); setPopup(null); window.scrollTo(0, 0); }}
+                        className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1"
+                      >
+                        <span>&larr;</span> {chapterNav.prev.title}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => navigate(`/book/${chapterNav.bookId}`)}
+                        className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1"
+                      >
+                        <span>&larr;</span> All chapters
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-400">
+                    {chapterNav.current} / {chapterNav.total}
+                  </span>
+                  <div>
+                    {chapterNav.next ? (
+                      <button
+                        onClick={() => { setSelectedTextId(chapterNav.next.id); setPopup(null); window.scrollTo(0, 0); }}
+                        className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1"
+                      >
+                        {chapterNav.next.title} <span>&rarr;</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => navigate(`/book/${chapterNav.bookId}`)}
+                        className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1"
+                      >
+                        All chapters <span>&rarr;</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
       </div>
 
       {hasAudio && (
-        <>
-          <audio
-            ref={audioRef}
-            src={selectedText.audioUrl}
-            onTimeUpdate={handleTimeUpdate}
-            onEnded={() => {
-              setIsPlaying(false);
-              setCurrentWordIdx(-1);
-              setCurrentSentenceIdx(-1);
-              if (user?.id && selectedTextIdRef.current) {
-                completeTaskForText(user.id, selectedTextIdRef.current, 'readingPass')
-                  .then(() => setChecklistKey(k => k + 1));
-              }
-            }}
-            onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
-            preload="auto"
-          />
-          <AudioTransport
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            duration={duration}
-            playbackRate={playbackRate}
-            loopSentenceIdx={loopSentenceIdx}
-            sentences={sentences}
-            onPlayPause={handlePlayPause}
-            onSeek={handleSeek}
-            onSpeedChange={handleSpeedChange}
-            onClearLoop={handleClearLoop}
-            onLoopSentence={handleLoopByIndex}
-            recordingMode={recordingMode}
-            recordingElapsed={recordingElapsed}
-            onStartRecording={handleStartRecording}
-            onStopRecording={handleStopRecording}
-            onListenBack={handleListenBack}
-            onSaveRecording={handleSaveRecording}
-            onDiscardRecording={handleDiscardRecording}
-            saving={saving}
-            saveError={saveError}
-            recorderError={recorder.error}
-            loopRecordingMode={loopRecordingMode}
-            loopRecorderAudioUrl={loopRecorder.audioUrl}
-            onStartLoopRecording={handleStartLoopRecording}
-            onStopLoopRecording={handleStopLoopRecording}
-            onPlayLoopRecording={handlePlayLoopRecording}
-          />
-        </>
+        <audio
+          ref={audioRef}
+          src={selectedText.audioUrl}
+          onTimeUpdate={handleTimeUpdate}
+          onEnded={() => {
+            setIsPlaying(false);
+            setCurrentWordIdx(-1);
+            setCurrentSentenceIdx(-1);
+            if (user?.id && selectedTextIdRef.current) {
+              completeTaskForText(user.id, selectedTextIdRef.current, 'readingPass')
+                .then(() => setChecklistKey(k => k + 1));
+            }
+          }}
+          onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
+          preload="auto"
+        />
       )}
 
-      {!hasAudio && (
-        <div className="border-t border-gray-100 px-4 py-2 flex items-center justify-between text-xs text-gray-400">
-          <span>{Object.keys(encounters).length} words encountered</span>
-          <span>Click any word to look it up</span>
-        </div>
-      )}
+      {renderControlStrip()}
 
       {popup && (
         <WordPopup
