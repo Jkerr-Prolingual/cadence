@@ -1,16 +1,12 @@
-import { formatTime } from '../../lib/audioUtils';
-
 const SPEEDS = [0.5, 0.75, 1.0, 1.25];
 
 export default function ShadowReadStrip({
   isPlaying,
-  currentTime,
-  duration,
   playbackRate,
   loopSentenceIdx,
+  currentSentenceIdx,
   sentences,
   onPlayPause,
-  onSeek,
   onSpeedChange,
   onLoopSentence,
   onClearLoop,
@@ -21,33 +17,35 @@ export default function ShadowReadStrip({
   onPlayLoopRecording,
 }) {
   const totalSentences = sentences?.length || 0;
-  const currentIdx = loopSentenceIdx ?? 0;
+  const isLooping = loopSentenceIdx != null;
+  const activeIdx = isLooping ? loopSentenceIdx : Math.max(0, currentSentenceIdx);
 
   function handlePrev() {
-    if (!sentences?.length || !onLoopSentence) return;
-    onLoopSentence(Math.max(0, currentIdx - 1));
+    if (!totalSentences) return;
+    onLoopSentence(Math.max(0, activeIdx - 1));
   }
 
   function handleNext() {
-    if (!sentences?.length || !onLoopSentence) return;
-    onLoopSentence(Math.min(sentences.length - 1, currentIdx + 1));
+    if (!totalSentences) return;
+    onLoopSentence(Math.min(totalSentences - 1, activeIdx + 1));
+  }
+
+  function handleLoopToggle() {
+    if (isLooping) {
+      onClearLoop();
+    } else {
+      onLoopSentence(Math.max(0, currentSentenceIdx));
+    }
   }
 
   return (
     <div className="border-t border-gray-200 bg-white px-4 py-2 sm:py-3">
       <div className="max-w-2xl mx-auto space-y-2">
-        {/* Instructions */}
-        {loopSentenceIdx == null && (
-          <p className="text-xs text-gray-500 text-center">
-            Listen to each sentence, then repeat. Use the arrows to navigate and the mic to record yourself.
-          </p>
-        )}
-
-        {/* Row 1: Sentence navigation — large and central */}
+        {/* Row 1: prev, play/pause, next, loop toggle, sentence counter */}
         <div className="flex items-center justify-center gap-2">
           <button
             onClick={handlePrev}
-            disabled={currentIdx <= 0}
+            disabled={activeIdx <= 0}
             className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-30"
             title="Previous sentence"
           >
@@ -74,7 +72,7 @@ export default function ShadowReadStrip({
 
           <button
             onClick={handleNext}
-            disabled={currentIdx >= totalSentences - 1}
+            disabled={activeIdx >= totalSentences - 1}
             className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-30"
             title="Next sentence"
           >
@@ -83,15 +81,30 @@ export default function ShadowReadStrip({
             </svg>
           </button>
 
-          {/* Loop indicator */}
-          {loopSentenceIdx != null && (
+          <button
+            onClick={handleLoopToggle}
+            className={`w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border-2 transition-all ${
+              isLooping
+                ? 'bg-amber-50 border-amber-400 text-amber-500'
+                : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'
+            }`}
+            title={isLooping ? 'Exit sentence loop' : 'Loop current sentence'}
+          >
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M2 8a6 6 0 0 1 10.5-4M14 8a6 6 0 0 1-10.5 4" />
+              <path d="M12.5 1v3h-3" />
+              <path d="M3.5 15v-3h3" />
+            </svg>
+          </button>
+
+          {isLooping && (
             <span className="ml-1 px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full tabular-nums">
               {loopSentenceIdx + 1} / {totalSentences}
             </span>
           )}
         </div>
 
-        {/* Row 2: Speed + Ephemeral mic */}
+        {/* Row 2: Speed + ephemeral mic */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-0.5 sm:gap-1">
             {SPEEDS.map(speed => (
@@ -110,15 +123,6 @@ export default function ShadowReadStrip({
           </div>
 
           <div className="flex items-center gap-1">
-            {loopSentenceIdx != null && (
-              <button
-                onClick={onClearLoop}
-                className="px-2 py-1.5 sm:py-1 text-xs text-gray-400 hover:text-gray-600 active:text-gray-800 transition-colors min-h-[36px] sm:min-h-0"
-              >
-                Exit loop
-              </button>
-            )}
-
             {loopRecordingMode === 'idle' && (
               <button
                 onClick={onStartLoopRecording}

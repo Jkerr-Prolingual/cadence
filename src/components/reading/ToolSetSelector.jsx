@@ -1,5 +1,3 @@
-import { useState, useRef, useEffect } from 'react';
-
 const TOOL_SETS = [
   { id: 'listen', label: 'Listen & Read', icon: 'headphones' },
   { id: 'shadow', label: 'Shadow Read', icon: 'loop' },
@@ -41,55 +39,32 @@ const ICONS = {
 };
 
 export default function ToolSetSelector({ active, onSelect, hasAudio }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    if (open) document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
-
   const available = hasAudio
     ? TOOL_SETS
     : TOOL_SETS.filter(t => t.id === 'timed');
 
-  const current = TOOL_SETS.find(t => t.id === active) || TOOL_SETS[0];
+  if (available.length <= 1) return null;
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 active:bg-gray-100 transition-colors"
-      >
-        {ICONS[current.icon]}
-        <span className="hidden sm:inline">{current.label}</span>
-        <span className="sm:hidden">{current.label.split(' ')[0]}</span>
-        <svg className="w-3 h-3 ml-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-40">
-          {available.map(tool => (
-            <button
-              key={tool.id}
-              onClick={() => { onSelect(tool.id); setOpen(false); }}
-              className={`w-full flex items-center gap-2 px-3 py-2.5 sm:py-2 text-sm text-left transition-colors ${
-                active === tool.id
-                  ? 'bg-gray-50 text-gray-900 font-medium'
-                  : 'text-gray-600 hover:bg-gray-50 active:bg-gray-100'
-              }`}
-            >
-              {ICONS[tool.icon]}
-              {tool.label}
-            </button>
-          ))}
-        </div>
-      )}
+    <div className="inline-flex rounded-lg border border-gray-200 bg-gray-100/80 p-0.5 gap-0.5">
+      {available.map(tool => {
+        const isActive = active === tool.id;
+        return (
+          <button
+            key={tool.id}
+            onClick={() => onSelect(tool.id)}
+            title={tool.label}
+            className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+              isActive
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {ICONS[tool.icon]}
+            <span>{tool.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

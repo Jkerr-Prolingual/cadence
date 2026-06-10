@@ -580,10 +580,9 @@ export default function ReadingView() {
       return (
         <ShadowReadStrip
           isPlaying={isPlaying}
-          currentTime={currentTime}
-          duration={duration}
           playbackRate={playbackRate}
           loopSentenceIdx={loopSentenceIdx}
+          currentSentenceIdx={currentSentenceIdx}
           sentences={sentences}
           onPlayPause={handlePlayPause}
           onSeek={handleSeek}

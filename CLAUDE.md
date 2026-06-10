@@ -306,7 +306,10 @@ actual EFL textbook corpora — no intermediate band-to-tier mapping needed.
 - `lemmaMap.js` — 34,466 inflected form → headword mappings extracted from
   BNC/COCA wordData.js. Used to resolve surface forms (e.g. "running" → "run")
   before EFLLex lookup.
-- `es_dictionary.js` — ~37k Spanish definitions
+- `es_dictionary.js` — ~3k Spanish definitions (NGSL + AWL focused).
+  Only covers ~28% of EFLLex words — insufficient on its own. Serves as
+  the static fallback layer; series vocabulary manifests are the primary
+  translation source for curated content.
 - `en_dictionary.js` — ~3,400 learner-friendly English definitions
 
 ### Lookup chain (`lookupCefr()` in wordUtils.js)
@@ -364,6 +367,32 @@ Cadence does not use NGSL bands, BNC/COCA frequency tiers, or the
 BAND_TIER_MAP system from VocabFrontier. The `lemmaMap.js` file was
 extracted from wordData.js for its inflection-to-headword mappings only;
 the frequency data was discarded.
+
+### Spanish Translation Lookup Order
+1. **Series vocabulary manifest** (override layer) — sense-disambiguated
+   translations, multi-word particles, and pedagogical notes generated
+   per-series during graded reader production. Only includes entries where
+   the base dictionary translation is insufficient: wrong sense in context,
+   phrasal verbs that don't exist as units in the base dictionary, false
+   friend warnings, or story-specific notes. Typically 20–50 entries per
+   series, not a full dictionary.
+2. Bundled `es_dictionary.js` — base translations for all single words.
+   Covers EFLLex vocabulary plus common content words. The manifest
+   overrides this when a series-specific sense or note is needed.
+3. *(Future)* API fallback for native/uncurated content — translation
+   API or LLM call with sentence context, cached to IndexedDB
+
+The manifest is produced during graded reader authoring, not at ingestion
+time. The LLM has full text context during production, so translations
+are sense-disambiguated (e.g., "watch" → "observar" not "reloj" in a
+story about observing people). Manifests are reviewed and version-controlled
+in the graded reader project alongside chapter text and vocabulary
+inventories.
+
+For non-curated or native content without a manifest, the lookup falls
+through to the static dictionary and eventually to an API layer. This
+ensures coverage scales beyond EFLLex's ~10k ceiling as students advance
+to B2+ material.
 
 ### English Definition Lookup Order
 1. IndexedDB cache (`enDefinitions` store)
@@ -515,6 +544,10 @@ Each graded reader series produces:
 - A vocabulary inventory (`series/<slug>/vocabulary_inventory.md`) with
   particles tiered as Core/Thematic/Peripheral, encounter counts, and
   chapter spread
+- A **vocabulary manifest** (`series/<slug>/vocabulary_manifest.json`) —
+  override file with sense-disambiguated translations, multi-word particles,
+  and pedagogical notes. Only entries where the base dictionary is
+  insufficient. Schema and details below in "Vocabulary Manifest Schema."
 - A constraint specification (`series/<slug>/constraint_spec.md`) with
   CEFR target, sentence constraints, and compliance rules
 - L1 transfer adjustments (`series/<slug>/l1_adjustments.md`) with
@@ -530,7 +563,10 @@ When a graded reader chapter is ingested into Cadence as a `curated_text`:
 - **Particle span annotations** — character positions marking every
   multi-word particle occurrence in the text
 - **Per-particle metadata** — CEFR level, compositionality, tier,
-  Spanish translation, constituent words
+  constituent words
+- **Vocabulary manifest** — context-aware Spanish translations for all
+  words and particles in the text, ingested from the series
+  `vocabulary_manifest.json` file produced during content authoring
 - Audio (ElevenLabs TTS with word-level timestamps)
 - L1 adjustments (cognate/false-friend effective CEFR overrides)
 
@@ -543,6 +579,7 @@ graded_readers/                          cadence/
   data/observed_chunks.json ──────────→ particle lookup table
   series/<slug>/chapters/ch*.md ──────→ curated_texts (Supabase + IndexedDB)
   series/<slug>/vocabulary_inventory ─→ per-text particle metadata
+  series/<slug>/vocabulary_manifest ──→ per-text Spanish translations
   series/<slug>/l1_adjustments.md ────→ effective CEFR overrides
 ```
 
@@ -557,6 +594,122 @@ The PHRASE List (`data/phrase_list.json`, 506 entries) is the canonical
 source for non-compositional classification. Cadence should bundle or
 reference this data for particle identification during ingestion and
 for compositionality-aware encounter crediting.
+
+---
+
+## Vocabulary Manifest Schema
+
+The vocabulary manifest (`vocabulary_manifest.json`) is an **override file**
+produced per-series during graded reader authoring. It does NOT duplicate
+the base dictionary (`es_dictionary.js`). It contains only entries where
+the base dictionary is insufficient: sense disambiguation, multi-word
+particles, false friend warnings, and pedagogical notes. Typically 20–50
+entries per series.
+
+The file is reviewed and version-controlled in the graded reader project,
+then ingested into Cadence alongside the chapter text.
+
+### When an entry belongs in the manifest
+
+Include an entry only when one or more of these conditions apply:
+
+1. **Sense disambiguation** — the word has multiple common translations and
+   the series uses a specific sense (e.g., "watch" → "observar" not "reloj")
+2. **Multi-word particle** — phrasal verbs and chunks that don't exist as
+   units in the base dictionary (e.g., "put on", "pick up", "of course")
+3. **False friend** — flagged in `l1_adjustments.md`; `note` MUST include
+   the warning
+4. **Pedagogical note** — story significance, cognate flag, cultural
+   context, or L1 transfer hazard worth surfacing
+
+If the base dictionary translation is correct for the series context and
+no note is needed, do not include the word.
+
+### Schema
+
+```json
+{
+  "series": "the_cookie",
+  "target_cefr": "A1",
+  "generated": "2026-06-09",
+  "entries": {
+    "watch": {
+      "type": "word",
+      "pos": "v",
+      "cefr": "A1",
+      "spanish": "observar",
+      "note": "Used as 'observe people' throughout, not as noun (reloj)"
+    },
+    "library": {
+      "type": "word",
+      "pos": "n",
+      "cefr": "A2",
+      "spanish": "biblioteca",
+      "note": "False friend — 'library' ≠ librería (bookstore)"
+    },
+    "apron": {
+      "type": "word",
+      "pos": "n",
+      "cefr": "B1",
+      "spanish": "delantal",
+      "note": "Key story symbol — narrator's apron"
+    },
+    "put on": {
+      "type": "particle",
+      "compositionality": "non-compositional",
+      "cefr": "A2",
+      "spanish": "ponerse (ropa)",
+      "note": "Used for clothing — 'I put on my apron'"
+    },
+    "pick up": {
+      "type": "particle",
+      "compositionality": "non-compositional",
+      "cefr": "B1",
+      "spanish": "recoger / levantar"
+    }
+  }
+}
+```
+
+### Field reference
+
+| Field | Required | Description |
+|---|---|---|
+| `series` | yes | Series slug, matches directory name |
+| `target_cefr` | yes | Series CEFR target range (e.g., "A1") |
+| `generated` | yes | Date manifest was generated (YYYY-MM-DD) |
+| `entries` | yes | Map of lemma/phrase → entry object |
+| `entries.*.type` | yes | `"word"` or `"particle"` |
+| `entries.*.pos` | yes (words) | Part of speech: n, v, adj, adv, n/v, etc. |
+| `entries.*.cefr` | yes | CEFR level (from EFLLex for words; chunk-meaning principle for non-compositional particles; constituent ceiling for compositional particles) |
+| `entries.*.spanish` | yes | Context-aware Spanish translation for the sense used in this series. Multiple senses separated by ` / `. |
+| `entries.*.compositionality` | yes (particles) | `"compositional"` or `"non-compositional"` |
+| `entries.*.constituents` | yes (compositional) | Map of constituent word → Spanish translation. Omitted for non-compositional particles (parts don't sum to meaning). |
+| `entries.*.note` | no | Pedagogical note — false friends, cultural context, story significance, etc. |
+
+### Design decisions
+
+**Override-only, not a full dictionary.** The manifest is deliberately
+small. Words where the base dictionary translation is correct and no
+pedagogical note is needed are not included.
+
+**One file per series, keyed by lemma/phrase.** Graded readers use
+controlled vocabulary, so a word generally carries one sense throughout
+a series. Polysemy handling (multiple senses per word within a series)
+is deferred until needed.
+
+**`cefr` is included even though `cefrLookup` has it.** Makes the
+manifest self-contained for review. For particles, CEFR comes from the
+vocabulary inventory (chunk-meaning principle), not from `cefrLookup`.
+
+**`constituents` only on compositional particles.** Non-compositional
+chunks don't show constituent translations in the popup — displaying them
+would imply the meaning is derivable from parts, which it isn't.
+
+**`note` is the pedagogical annotation field.** Intended for content
+authors reviewing the manifest and potentially surfaced in teacher-facing
+views. Use for: false friends ("actually ≠ actualmente"), cultural context,
+story-specific significance, or L1 transfer hazards.
 
 ---
 

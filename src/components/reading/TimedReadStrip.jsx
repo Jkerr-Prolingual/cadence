@@ -70,12 +70,17 @@ export default function TimedReadStrip({
   }
 
   if (mode === 'result' && result) {
+    const tooFast = result.wpm > 500;
     return (
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
         <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm sm:mx-4 overflow-hidden">
           <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4">
             <h3 className="text-lg font-semibold text-gray-900">Reading complete</h3>
-            <p className="text-sm text-gray-500 mt-1">Save this session to your fluency record?</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {tooFast
+                ? 'That seems too fast to be a real reading — try again?'
+                : 'Save this session to your fluency record?'}
+            </p>
           </div>
 
           <div className="grid grid-cols-3 gap-3 sm:gap-4 px-4 sm:px-6 py-4 bg-gray-50">
@@ -92,7 +97,7 @@ export default function TimedReadStrip({
               <p className="text-xs text-gray-500 mt-0.5">Words</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900 tabular-nums">
+              <p className={`text-2xl font-bold tabular-nums ${tooFast ? 'text-red-600' : 'text-gray-900'}`}>
                 {result.wpm}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">WPM</p>
@@ -132,14 +137,16 @@ export default function TimedReadStrip({
               onClick={onDiscard}
               className="flex-1 px-4 py-2.5 sm:py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
             >
-              Discard
+              {tooFast ? 'Dismiss' : 'Discard'}
             </button>
-            <button
-              onClick={onSave}
-              className="flex-1 px-4 py-2.5 sm:py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
-            >
-              Save session
-            </button>
+            {!tooFast && (
+              <button
+                onClick={onSave}
+                className="flex-1 px-4 py-2.5 sm:py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
+              >
+                Save session
+              </button>
+            )}
           </div>
         </div>
       </div>
