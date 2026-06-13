@@ -50,7 +50,7 @@ export function titleToSlug(title) {
 export function buildAnalysisPrompt(title, text, cefrEstimate) {
   const truncated = text.split(/\s+/).slice(0, 4500).join(' ');
 
-  return `You are a vocabulary analyst for Cadence, an ESL reading app targeting A2–B2 Spanish-speaking learners (primarily adolescent and young adult long-term English learners).
+  return `You are a vocabulary analyst for Relato, an ESL reading app targeting A2–B2 Spanish-speaking learners (primarily adolescent and young adult long-term English learners).
 
 Analyze the following text and return a JSON object with the fields specified below.
 

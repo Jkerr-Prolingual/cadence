@@ -1,5 +1,5 @@
 -- ================================================================
--- Cadence: Full Supabase Schema
+-- Relato: Full Supabase Schema
 -- Paste this into the Supabase SQL Editor and run.
 --
 -- Structure: all tables first, then RLS + policies, then

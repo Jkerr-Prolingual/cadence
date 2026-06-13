@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { sampleTexts } from '../../data/sampleTexts';
@@ -19,6 +19,8 @@ export default function TeacherDashboard() {
   const [books, setBooks] = useState([]);
   const [studentRecordings, setStudentRecordings] = useState([]);
   const [fluencySessions, setFluencySessions] = useState([]);
+  const [srsCards, setSrsCards] = useState([]);
+  const [reviewLogs, setReviewLogs] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [showCreateAssignment, setShowCreateAssignment] = useState(false);
@@ -66,10 +68,12 @@ export default function TeacherDashboard() {
 
       const studentIds = [...new Set(enrollData.map(e => e.student_id))];
       if (studentIds.length > 0) {
-        const [profilesRes, recordingsRes, fluencyRes] = await Promise.all([
+        const [profilesRes, recordingsRes, fluencyRes, cardsRes, reviewsRes] = await Promise.all([
           supabase.from('profiles').select('id, display_name, email').in('id', studentIds),
           supabase.from('student_recordings').select('*').in('user_id', studentIds),
           supabase.from('fluency_sessions').select('*').in('user_id', studentIds).order('session_date', { ascending: true }),
+          supabase.from('srs_cards').select('user_id, word, text_id, leitner_box, card_type, cefr, added_date, last_review_date').in('user_id', studentIds),
+          supabase.from('review_log').select('user_id, word, correct, reviewed_at').in('user_id', studentIds),
         ]);
         if (profilesRes.error) console.error('Profiles fetch error:', profilesRes.error);
         const map = {};
@@ -77,6 +81,8 @@ export default function TeacherDashboard() {
         setStudentProfiles(map);
         setStudentRecordings(recordingsRes.data || []);
         setFluencySessions(fluencyRes.data || []);
+        setSrsCards(cardsRes.data || []);
+        setReviewLogs(reviewsRes.data || []);
       }
     }
   }
@@ -214,6 +220,8 @@ export default function TeacherDashboard() {
                 progress={progress}
                 studentRecordings={studentRecordings}
                 fluencySessions={fluencySessions}
+                srsCards={srsCards}
+                reviewLogs={reviewLogs}
                 classId={selectedClassId}
                 showCreate={showCreateAssignment}
                 onShowCreate={setShowCreateAssignment}
@@ -281,7 +289,7 @@ function ClassInfoPanel({ cls, students, onRemoveStudent, onDeleteClass }) {
   );
 }
 
-function AssignmentsPanel({ assignments, allTexts, books, students, progress, studentRecordings, fluencySessions, classId, showCreate, onShowCreate, onCreated, onDeleted }) {
+function AssignmentsPanel({ assignments, allTexts, books, students, progress, studentRecordings, fluencySessions, srsCards, reviewLogs, classId, showCreate, onShowCreate, onCreated, onDeleted }) {
   const [showArchived, setShowArchived] = useState(false);
 
   const activeAssignments = assignments.filter(a => !a.archivedAt);
@@ -336,6 +344,8 @@ function AssignmentsPanel({ assignments, allTexts, books, students, progress, st
             progress={progress.filter(p => p.assignmentId === a.id)}
             studentRecordings={studentRecordings.filter(r => r.text_id === a.textId)}
             fluencySessions={fluencySessions.filter(f => f.text_id === a.textId)}
+            srsCards={srsCards.filter(c => c.text_id === a.textId)}
+            reviewLogs={reviewLogs}
             onChanged={onDeleted}
           />
         ))}
@@ -535,16 +545,19 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
   );
 }
 
-function AssignmentCard({ assignment, allTexts, students, progress, studentRecordings, fluencySessions, onChanged }) {
+function AssignmentCard({ assignment, allTexts, students, progress, studentRecordings, fluencySessions, srsCards, reviewLogs, onChanged }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [playingStudentId, setPlayingStudentId] = useState(null);
   const [audioUrls, setAudioUrls] = useState({});
+  const [expandedFlashcardStudent, setExpandedFlashcardStudent] = useState(null);
   const audioElRef = useRef(null);
   const text = allTexts.find(t => t.id === assignment.textId);
   const taskList = Object.entries(assignment.tasks).filter(([, v]) => v);
   const isArchived = !!assignment.archivedAt;
   const hasRecordTask = !!assignment.tasks.recordAudio;
   const hasTimedTask = !!assignment.tasks.timedReading;
+  const hasFlashcardTask = !!assignment.tasks.flashcards;
+  const hasShadowTask = !!assignment.tasks.shadowReading;
 
   function getStudentCompletion(studentId) {
     const p = progress.find(p => p.studentId === studentId);
@@ -560,6 +573,14 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
     return fluencySessions
       .filter(f => f.student_id === studentId)
       .map(f => f.wpm);
+  }
+
+  function getStudentCards(studentId) {
+    return (srsCards || []).filter(c => c.user_id === studentId);
+  }
+
+  function getStudentReviews(studentId, cardWords) {
+    return (reviewLogs || []).filter(r => r.user_id === studentId && cardWords.has(r.word));
   }
 
   async function handlePlayRecording(studentId) {
@@ -679,6 +700,16 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
 
       {students.length > 0 && !isArchived && (
         <div className="border-t border-gray-100 px-4 py-2">
+          {(hasShadowTask || hasFlashcardTask) && (
+            <div className="flex items-center gap-3 mb-1.5 text-[10px] text-gray-400">
+              {hasShadowTask && (
+                <span>Shadow: sentences looped/total &mdash; <span className="text-green-600">green</span> &ge;75%, <span className="text-amber-600">amber</span> &lt;75%</span>
+              )}
+              {hasFlashcardTask && (
+                <span>Flashcards: <span className="text-green-600">green</span> = reviewed, <span className="text-amber-600">amber</span> = not yet reviewed. Click for details.</span>
+              )}
+            </div>
+          )}
           <table className="w-full">
             <thead>
               <tr className="text-xs text-gray-400">
@@ -696,46 +727,70 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
               {students.map(s => {
                 const completed = getStudentCompletion(s.id);
                 const rec = getStudentRecording(s.id);
+                const cards = getStudentCards(s.id);
+                const cardWords = new Set(cards.map(c => c.word));
+                const reviews = getStudentReviews(s.id, cardWords);
                 return (
-                  <tr key={s.id} className="border-t border-gray-50">
-                    <td className="text-sm text-gray-700 py-1.5">{s.name}</td>
-                    {taskList.map(([key]) => (
-                      <td key={key} className="text-center py-1.5">
-                        {completed[key] ? (
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-600 text-xs">
-                            ✓
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-300 text-xs">
-                            —
-                          </span>
-                        )}
-                      </td>
-                    ))}
-                    {hasRecordTask && (
-                      <td className="text-center py-1.5">
-                        {rec ? (
-                          <button
-                            onClick={() => handlePlayRecording(s.id)}
-                            className={`text-xs px-2 py-1 rounded transition-colors ${
-                              playingStudentId === s.id
-                                ? 'bg-gray-900 text-white'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                          >
-                            {playingStudentId === s.id ? 'Stop' : 'Play'}
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-300">—</span>
-                        )}
-                      </td>
+                  <React.Fragment key={s.id}>
+                    <tr className="border-t border-gray-50">
+                      <td className="text-sm text-gray-700 py-1.5">{s.name}</td>
+                      {taskList.map(([key]) => (
+                        <td key={key} className="text-center py-1.5">
+                          {key === 'shadowReading' ? (
+                            <ShadowStatus value={completed[key]} />
+                          ) : key === 'flashcards' ? (
+                            <FlashcardStatus
+                              cards={cards}
+                              reviews={reviews}
+                              completed={completed[key]}
+                              expanded={expandedFlashcardStudent === s.id}
+                              onToggleExpand={() => setExpandedFlashcardStudent(
+                                expandedFlashcardStudent === s.id ? null : s.id
+                              )}
+                            />
+                          ) : completed[key] ? (
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-600 text-xs">
+                              ✓
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-300 text-xs">
+                              —
+                            </span>
+                          )}
+                        </td>
+                      ))}
+                      {hasRecordTask && (
+                        <td className="text-center py-1.5">
+                          {rec ? (
+                            <button
+                              onClick={() => handlePlayRecording(s.id)}
+                              className={`text-xs px-2 py-1 rounded transition-colors ${
+                                playingStudentId === s.id
+                                  ? 'bg-gray-900 text-white'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              {playingStudentId === s.id ? 'Stop' : 'Play'}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
+                        </td>
+                      )}
+                      {hasTimedTask && (
+                        <td className="py-1.5">
+                          <WpmTimeline readings={getStudentWpmHistory(s.id)} />
+                        </td>
+                      )}
+                    </tr>
+                    {expandedFlashcardStudent === s.id && hasFlashcardTask && (
+                      <tr>
+                        <td colSpan={taskList.length + 1 + (hasRecordTask ? 1 : 0) + (hasTimedTask ? 1 : 0)}>
+                          <FlashcardDetail cards={cards} reviews={reviews} />
+                        </td>
+                      </tr>
                     )}
-                    {hasTimedTask && (
-                      <td className="py-1.5">
-                        <WpmTimeline readings={getStudentWpmHistory(s.id)} />
-                      </td>
-                    )}
-                  </tr>
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -744,6 +799,155 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
       )}
     </div>
   );
+}
+
+function ShadowStatus({ value }) {
+  if (!value) {
+    return (
+      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-300 text-xs">
+        —
+      </span>
+    );
+  }
+  if (value === true) {
+    return (
+      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-600 text-xs">
+        ✓
+      </span>
+    );
+  }
+  const { sentencesLooped = 0, totalSentences = 0 } = value;
+  const ratio = totalSentences > 0 ? sentencesLooped / totalSentences : 0;
+  const colorClass = ratio >= 0.75
+    ? 'bg-green-100 text-green-700'
+    : 'bg-amber-100 text-amber-700';
+  return (
+    <span className={`inline-flex items-center justify-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums ${colorClass}`}>
+      {sentencesLooped}/{totalSentences}
+    </span>
+  );
+}
+
+function FlashcardStatus({ cards, reviews, completed, expanded, onToggleExpand }) {
+  if (cards.length === 0 && !completed) {
+    return (
+      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-300 text-xs">
+        —
+      </span>
+    );
+  }
+  if (cards.length === 0 && completed) {
+    return (
+      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-600 text-xs">
+        ✓
+      </span>
+    );
+  }
+  const hasReviews = reviews.length > 0;
+  const colorClass = hasReviews
+    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+    : 'bg-amber-100 text-amber-700 hover:bg-amber-200';
+  return (
+    <button
+      onClick={onToggleExpand}
+      className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full transition-colors ${colorClass}`}
+    >
+      {cards.length} {cards.length === 1 ? 'card' : 'cards'}
+      <span className="text-[8px]">{expanded ? '▾' : '▸'}</span>
+    </button>
+  );
+}
+
+function FlashcardDetail({ cards, reviews }) {
+  const reviewsByWord = {};
+  for (const r of reviews) {
+    if (!reviewsByWord[r.word]) reviewsByWord[r.word] = [];
+    reviewsByWord[r.word].push(r);
+  }
+
+  const totalReviews = reviews.length;
+  const correctReviews = reviews.filter(r => r.correct).length;
+
+  return (
+    <div className="bg-gray-50 rounded-lg mx-2 mb-2 p-3">
+      {totalReviews > 0 && (
+        <p className="text-[10px] text-gray-500 mb-2">
+          {totalReviews} review{totalReviews !== 1 ? 's' : ''}, {correctReviews} correct ({totalReviews > 0 ? Math.round((correctReviews / totalReviews) * 100) : 0}%)
+        </p>
+      )}
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-gray-400">
+            <th className="text-left font-medium py-0.5">Word</th>
+            <th className="text-center font-medium py-0.5 w-12">CEFR</th>
+            <th className="text-center font-medium py-0.5 w-12">Box</th>
+            <th className="text-center font-medium py-0.5 w-16">Reviews</th>
+            <th className="text-left font-medium py-0.5">Last Review</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cards.map(card => {
+            const wordReviews = reviewsByWord[card.word] || [];
+            const lastReview = wordReviews.length > 0
+              ? wordReviews.reduce((latest, r) => r.reviewed_at > latest.reviewed_at ? r : latest)
+              : null;
+            return (
+              <tr key={card.word} className="border-t border-gray-200">
+                <td className="py-1 text-gray-700 font-medium">{card.word}</td>
+                <td className="py-1 text-center">
+                  {card.cefr && (
+                    <span
+                      className="text-[10px] font-bold px-1 py-0.5 rounded"
+                      style={{ backgroundColor: cefrColor(card.cefr) + '20', color: cefrColor(card.cefr) }}
+                    >
+                      {card.cefr}
+                    </span>
+                  )}
+                </td>
+                <td className="py-1 text-center">
+                  <LeitnerBox box={card.leitner_box} />
+                </td>
+                <td className="py-1 text-center text-gray-500">
+                  {wordReviews.length || '—'}
+                </td>
+                <td className="py-1 text-gray-400">
+                  {lastReview ? formatRelativeDate(lastReview.reviewed_at) : 'never'}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LeitnerBox({ box }) {
+  if (!box) return <span className="text-gray-300">—</span>;
+  const colors = {
+    1: 'bg-red-100 text-red-700',
+    2: 'bg-orange-100 text-orange-700',
+    3: 'bg-amber-100 text-amber-700',
+    4: 'bg-green-100 text-green-700',
+    5: 'bg-emerald-100 text-emerald-700',
+  };
+  return (
+    <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${colors[box] || 'bg-gray-100 text-gray-500'}`}>
+      {box}
+    </span>
+  );
+}
+
+function formatRelativeDate(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return date.toLocaleDateString();
 }
 
 function WpmTimeline({ readings }) {

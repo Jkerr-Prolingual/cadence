@@ -43,7 +43,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="w-full max-w-sm text-center">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 mb-2">Cadence</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 mb-2">Relato</h1>
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <p className="text-sm text-gray-700 font-medium">Check your email</p>
             <p className="text-sm text-gray-500 mt-2">
@@ -66,8 +66,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Cadence</h1>
-          <p className="text-sm text-gray-500 mt-1">extensive reading, intensive practice</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Relato</h1>
+          <p className="text-sm text-gray-500 mt-1">leer, escuchar, y aprender inglés</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">

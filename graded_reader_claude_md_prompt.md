@@ -30,7 +30,7 @@ After reading, create a CLAUDE.md at the project root that covers:
 ### Project identity
 - This is a graded reader authoring project, not a software project. There is no application code, no build system, no deployment. The project is a structured content production pipeline that uses AI (Claude Code) as a co-author within strict methodological constraints.
 - Primary audience: Spanish L1 adolescent and adult ESL learners (A0–B2).
-- The project produces content for **Cadence** (`C:\Users\User\cadence`), an ESL reading and vocabulary acquisition app. Cadence is the consumption platform; this project is the content production pipeline. Changes to the vocabulary framework here have downstream implications for Cadence's vocabulary tracking, reading view, and depth model.
+- The project produces content for **Relato** (`C:\Users\User\cadence`), an ESL reading and vocabulary acquisition app. Relato is the consumption platform; this project is the content production pipeline. Changes to the vocabulary framework here have downstream implications for Relato's vocabulary tracking, reading view, and depth model.
 
 ### The particle model
 - Define the particle as the unit of vocabulary accounting (not the headword). Reference vocabulary_framework.md §2.
@@ -47,9 +47,9 @@ After reading, create a CLAUDE.md at the project root that covers:
 - Provenance tags: `efllex`, `compositional_ceiling`, `chunk_meaning`.
 
 ### Data artifacts
-- `data/efllex.json` — 15,281 entries, Rule C applied. This is also the canonical source for Cadence's `cefrLookup.js`.
-- `data/phrase_list.json` — 506 non-compositional multi-word expressions from Martinez & Schmitt (2012). Also used by Cadence for particle identification.
-- `data/observed_chunks.json` — compositionality decisions accumulated across all series. Shared across series. Also consumed by Cadence during content ingestion.
+- `data/efllex.json` — 15,281 entries, Rule C applied. This is also the canonical source for Relato's `cefrLookup.js`.
+- `data/phrase_list.json` — 506 non-compositional multi-word expressions from Martinez & Schmitt (2012). Also used by Relato for particle identification.
+- `data/observed_chunks.json` — compositionality decisions accumulated across all series. Shared across series. Also consumed by Relato during content ingestion.
 - `data/efllex_data.js` — raw EFLLex data in JS format.
 
 ### Series structure
@@ -66,16 +66,16 @@ Document the end-to-end pipeline from kickoff to finished chapters:
 5. Lexical compression — iterative reduction of unique lemmas and hapax legomena through author-guided revision
 6. Final compliance re-run
 
-### Relationship to Cadence
+### Relationship to Relato
 This is critical. Include a section that explicitly describes:
 
-- **Cadence** (`C:\Users\User\cadence`) is the ESL reading and vocabulary acquisition app that consumes graded reader content produced here.
-- Cadence uses the same EFLLex data and Rule C algorithm for CEFR classification.
-- Cadence's reading view renders particles as clickable multi-word spans with Pleco-style drill-down navigation (tap particle → see unit meaning → decompose to constituent words → navigate back).
-- Cadence's depth model uses compositionality to determine encounter crediting: compositional chunk encounters credit constituents; non-compositional chunk encounters do NOT credit constituents.
-- When a graded reader chapter is ingested into Cadence, it needs: the chapter text, particle span annotations (character positions of every multi-word particle), per-particle metadata (CEFR, compositionality, tier, Spanish translation, constituents), audio with word-level timestamps, and L1 adjustments.
-- Shared data artifacts: `efllex.json` is canonical for both projects; `phrase_list.json` and `observed_chunks.json` are consumed by Cadence during ingestion.
-- Changes to the vocabulary framework (e.g., the chunk-meaning principle, pre-known threshold, encounter crediting rules) require corresponding updates to Cadence's CLAUDE.md and particle model implementation.
+- **Relato** (`C:\Users\User\cadence`) is the ESL reading and vocabulary acquisition app that consumes graded reader content produced here.
+- Relato uses the same EFLLex data and Rule C algorithm for CEFR classification.
+- Relato's reading view renders particles as clickable multi-word spans with Pleco-style drill-down navigation (tap particle → see unit meaning → decompose to constituent words → navigate back).
+- Relato's depth model uses compositionality to determine encounter crediting: compositional chunk encounters credit constituents; non-compositional chunk encounters do NOT credit constituents.
+- When a graded reader chapter is ingested into Relato, it needs: the chapter text, particle span annotations (character positions of every multi-word particle), per-particle metadata (CEFR, compositionality, tier, Spanish translation, constituents), audio with word-level timestamps, and L1 adjustments.
+- Shared data artifacts: `efllex.json` is canonical for both projects; `phrase_list.json` and `observed_chunks.json` are consumed by Relato during ingestion.
+- Changes to the vocabulary framework (e.g., the chunk-meaning principle, pre-known threshold, encounter crediting rules) require corresponding updates to Relato's CLAUDE.md and particle model implementation.
 
 ### Active series
 List each series under `series/` with its status:
@@ -90,8 +90,8 @@ List each series under `series/` with its status:
 ### What this project is NOT
 - It is not a software project. There is no code to run, test, or deploy.
 - It is not a dictionary or corpus linguistics tool. It produces graded reading content.
-- It does not contain Cadence's source code. Cadence is a separate project at `C:\Users\User\cadence`.
-- It does not produce audio. Audio generation happens in Cadence's admin panel via ElevenLabs TTS.
+- It does not contain Relato's source code. Relato is a separate project at `C:\Users\User\cadence`.
+- It does not produce audio. Audio generation happens in Relato's admin panel via ElevenLabs TTS.
 
 ### Observed chunks status note
 The current `data/observed_chunks.json` entries were created before the chunk-meaning principle was adopted. Most entries have `cefr_derivation: "constituent_ceiling"` — these need to be reviewed and reclassified using the chunk-meaning principle per vocabulary_framework.md §5. This is a known gap, not a bug.

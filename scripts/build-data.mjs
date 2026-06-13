@@ -1,5 +1,5 @@
 /**
- * Build script: generates optimized data files for Cadence from source data.
+ * Build script: generates optimized data files for Relato from source data.
  *
  * Outputs:
  *   src/data/cefrLookup.js   — word → CEFR level map from EFLLex

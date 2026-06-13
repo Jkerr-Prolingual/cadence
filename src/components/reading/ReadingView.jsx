@@ -84,6 +84,9 @@ export default function ReadingView() {
   const [loopRecordingMode, setLoopRecordingMode] = useState('idle');
   const loopPlaybackRef = useRef(null);
 
+  // Shadow reading sentence tracking
+  const shadowedSentencesRef = useRef(new Set());
+
   // Timed reading
   const [timedMode, setTimedMode] = useState('idle');
   const [timedStart, setTimedStart] = useState(null);
@@ -102,6 +105,7 @@ export default function ReadingView() {
 
   // Reset state on text change
   useEffect(() => {
+    shadowedSentencesRef.current = new Set();
     setIsPlaying(false);
     setCurrentWordIdx(-1);
     setCurrentSentenceIdx(-1);
@@ -129,6 +133,7 @@ export default function ReadingView() {
 
   // Reset tool-specific state when switching tool sets
   useEffect(() => {
+    shadowedSentencesRef.current = new Set();
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -285,7 +290,7 @@ export default function ReadingView() {
 
     if (loopSentenceIdx != null) {
       const sentence = sentences[loopSentenceIdx];
-      const loopEnd = sentence.endTime + 0.25;
+      const loopEnd = sentence.endTime + 0.05;
       if (sentence?.endTime != null && ct >= loopEnd) {
         audio.currentTime = getLoopStart(loopSentenceIdx);
       }
@@ -317,7 +322,21 @@ export default function ReadingView() {
 
   function getLoopStart(sentenceIdx) {
     const sentence = sentences[sentenceIdx];
-    return Math.max(0, sentence.startTime - 0.15);
+    return Math.max(0, sentence.startTime - 0.05);
+  }
+
+  function trackShadowedSentence(sentenceIdx) {
+    if (toolSet !== 'shadow') return;
+    if (shadowedSentencesRef.current.has(sentenceIdx)) return;
+    shadowedSentencesRef.current.add(sentenceIdx);
+    if (user?.id && selectedTextIdRef.current) {
+      completeTaskForText(user.id, selectedTextIdRef.current, 'shadowReading', {
+        done: true,
+        sentencesLooped: shadowedSentencesRef.current.size,
+        totalSentences: sentences.length,
+      }).catch(() => {});
+      setChecklistKey(k => k + 1);
+    }
   }
 
   function handleSentenceLoop(wordIdx) {
@@ -327,6 +346,7 @@ export default function ReadingView() {
     if (loopSentenceIdx === sentence.sentenceIdx) {
       setLoopSentenceIdx(null);
     } else {
+      trackShadowedSentence(sentence.sentenceIdx);
       setLoopSentenceIdx(sentence.sentenceIdx);
       const audio = audioRef.current;
       if (audio) {
@@ -344,6 +364,7 @@ export default function ReadingView() {
     if (loopSentenceIdx === sentenceIdx) {
       setLoopSentenceIdx(null);
     } else {
+      trackShadowedSentence(sentenceIdx);
       setLoopSentenceIdx(sentenceIdx);
       const audio = audioRef.current;
       if (audio) {
@@ -531,7 +552,7 @@ export default function ReadingView() {
     if (audioRef.current && !audioRef.current.paused && hasAudio) {
       const sentence = findSentenceForWord(sentences, token.wordIdx);
       if (sentence) {
-        audioRef.current.currentTime = Math.max(0, sentence.startTime - 0.15);
+        audioRef.current.currentTime = Math.max(0, sentence.startTime - 0.05);
       }
       return;
     }
@@ -771,6 +792,7 @@ export default function ReadingView() {
           onAddFlashcard={handleOpenCardCreator}
           hasAudio={hasAudio}
           onResume={handleResumeAudio}
+          particle={popup.token.particle || null}
           onLoopSentence={() => {
             if (popup.token.wordIdx != null) {
               handleSentenceLoop(popup.token.wordIdx);

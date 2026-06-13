@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(DEV_MODE ? { id: 'dev-user', email: 'dev@cadence.local' } : null);
+  const [user, setUser] = useState(DEV_MODE ? { id: 'dev-user', email: 'dev@relato.local' } : null);
   const [profile, setProfile] = useState(DEV_MODE ? { role: 'admin', display_name: 'Dev User' } : null);
   const [loading, setLoading] = useState(!DEV_MODE);
 
@@ -50,11 +50,16 @@ export function AuthProvider({ children }) {
     setProfile(null);
   }
 
+  async function refreshProfile() {
+    if (user?.id) await fetchProfile(user.id);
+  }
+
   const value = {
     user,
     profile,
     loading,
     signOut,
+    refreshProfile,
     isTeacher: profile?.role === 'teacher' || profile?.role === 'admin',
     isAdmin: profile?.role === 'admin',
     isStudent: profile?.role === 'student',

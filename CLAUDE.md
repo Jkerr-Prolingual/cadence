@@ -1,10 +1,10 @@
-# Cadence — Project Context
+# Relato — Project Context
 
-*Extensive reading, intensive practice.*
+*Leer, escuchar, y aprender inglés.*
 
 ## What This App Is
 
-Cadence is a React (Vite) ESL reading and vocabulary acquisition app for
+Relato is a React (Vite) ESL reading and vocabulary acquisition app for
 Spanish-speaking A2–B2 English learners, with emphasis on adolescent and
 young adult long-term English learners (LTEL) in K-12 settings.
 
@@ -12,7 +12,7 @@ Core loop: Read extensively → Encounter vocabulary → Track depth of
 knowledge through a 5-level fluency model → Practice via flashcards
 and shadow reading → Re-read to build fluency → Repeat.
 
-Cadence is a redesign of VocabFrontier (`C:\Users\User\vocab-reader-app`).
+Relato is a redesign of VocabFrontier (`C:\Users\User\vocab-reader-app`).
 It keeps the reading, lookup, flashcard, shadow reading, story workshop,
 and teacher control features but drops the frontier-based profiling,
 island/hex map metaphor, development scores, and terrain states.
@@ -33,7 +33,7 @@ island/hex map metaphor, development scores, and terrain states.
 
 ## Relationship to VocabFrontier
 
-Cadence reuses and adapts code from VocabFrontier where appropriate.
+Relato reuses and adapts code from VocabFrontier where appropriate.
 Key reusable pieces:
 
 **Direct reuse:**
@@ -66,7 +66,7 @@ Key reusable pieces:
 
 ## 5-Level Vocabulary Depth Model
 
-Cadence measures word knowledge through a fluency development lens.
+Relato measures word knowledge through a fluency development lens.
 The five levels are independent flags per student per headword — not a
 strict staircase. Each can be set in any order. A word's depth score is
 an aggregation of which levels have been achieved.
@@ -250,7 +250,7 @@ from quiz results, not auto-added.
 
 ### Story Workshop
 Guided writing with vocabulary scaffolding. Will be redesigned for
-Cadence (carried over from VocabFrontier as a concept, not as code).
+Relato (carried over from VocabFrontier as a concept, not as code).
 
 ### Teacher Controls
 Class creation with join codes. Student roster. Reading progress
@@ -294,7 +294,7 @@ join (`classes.teacher_id = auth.uid()`). Admins read/write all rows.
 
 ## Vocabulary Classification: EFLLex
 
-Cadence uses **EFLLex** (EFL Lexicon) as its sole vocabulary classification
+Relato uses **EFLLex** (EFL Lexicon) as its sole vocabulary classification
 backbone. EFLLex assigns CEFR levels directly based on word frequency in
 actual EFL textbook corpora — no intermediate band-to-tier mapping needed.
 
@@ -352,9 +352,9 @@ If no level meets threshold:
 ```
 
 Rule C is defined in `C:\Users\User\graded_readers\methodology\vocabulary_framework.md`
-§5. Cadence's `cefrLookup.js` (10,019 entries) is a subset of the graded
+§5. Relato's `cefrLookup.js` (10,019 entries) is a subset of the graded
 reader project's `efllex.json` (15,281 entries with Rule C applied).
-Cadence should adopt the full Rule C dataset; `build-data.mjs` should
+Relato should adopt the full Rule C dataset; `build-data.mjs` should
 regenerate from the graded reader's `efllex.json` as the canonical source.
 
 ### AWL (Academic Word List) — Not Used
@@ -363,7 +363,7 @@ in EFLLex naturally (mostly at B1–C1). The remaining 18% are tracked as
 unclassified when encountered.
 
 ### NGSL / BNC/COCA — Not Used
-Cadence does not use NGSL bands, BNC/COCA frequency tiers, or the
+Relato does not use NGSL bands, BNC/COCA frequency tiers, or the
 BAND_TIER_MAP system from VocabFrontier. The `lemmaMap.js` file was
 extracted from wordData.js for its inflection-to-headword mappings only;
 the frequency data was discarded.
@@ -408,7 +408,7 @@ from source files. Run `node scripts/build-data.mjs` if source data changes.
 
 ## The Particle Model
 
-Cadence adopts the **particle** as the unit of vocabulary tracking for
+Relato adopts the **particle** as the unit of vocabulary tracking for
 multi-word expressions. A particle is a vocabulary item the learner
 processes as a single cognitive unit — either a single word (*house*,
 *eventually*) or a multi-word chunk (*of course*, *pick up*, *a lot of*).
@@ -416,9 +416,9 @@ processes as a single cognitive unit — either a single word (*house*,
 The particle model is defined in the graded reader project's vocabulary
 framework (`C:\Users\User\graded_readers\methodology\vocabulary_framework.md`).
 Graded reader content produced under that framework is ingested into
-Cadence; the particle model must be consistent across both projects.
+Relato; the particle model must be consistent across both projects.
 
-### Why particles matter for Cadence
+### Why particles matter for Relato
 
 Traditional word-level tracking inflates apparent cognitive load. A student
 who reads "of course" and looks it up gets an encounter event for "of",
@@ -502,7 +502,7 @@ Both sources produce **span annotations** per text: character positions
 marking where each particle occurs. These spans drive clickable rendering
 in the reading view.
 
-### Relationship to existing Cadence concepts
+### Relationship to existing Relato concepts
 
 The particle model unifies three previously separate multi-word concepts:
 
@@ -531,11 +531,11 @@ content consumption.
 
 ## Content Pipeline: Graded Readers
 
-Cadence consumes graded reader content produced in the graded reader
+Relato consumes graded reader content produced in the graded reader
 project (`C:\Users\User\graded_readers`). The two projects share the
 same EFLLex data source and vocabulary framework. Changes to the
 vocabulary framework in the graded reader project have downstream
-implications for Cadence's vocabulary tracking and reading view.
+implications for Relato's vocabulary tracking and reading view.
 
 ### What the graded reader project produces
 
@@ -556,9 +556,9 @@ Each graded reader series produces:
   decisions accumulated across all series, with PHRASE List source,
   compositionality classification, and encounter data
 
-### What Cadence needs from ingested content
+### What Relato needs from ingested content
 
-When a graded reader chapter is ingested into Cadence as a `curated_text`:
+When a graded reader chapter is ingested into Relato as a `curated_text`:
 - The chapter text
 - **Particle span annotations** — character positions marking every
   multi-word particle occurrence in the text
@@ -587,11 +587,11 @@ graded_readers/                          cadence/
 
 Both projects use EFLLex as the CEFR classification backbone. The graded
 reader project's `data/efllex.json` (15,281 entries, Rule C applied) is
-the canonical source. Cadence's `cefrLookup.js` should be regenerated
+the canonical source. Relato's `cefrLookup.js` should be regenerated
 from this file.
 
 The PHRASE List (`data/phrase_list.json`, 506 entries) is the canonical
-source for non-compositional classification. Cadence should bundle or
+source for non-compositional classification. Relato should bundle or
 reference this data for particle identification during ingestion and
 for compositionality-aware encounter crediting.
 
@@ -607,7 +607,7 @@ particles, false friend warnings, and pedagogical notes. Typically 20–50
 entries per series.
 
 The file is reviewed and version-controlled in the graded reader project,
-then ingested into Cadence alongside the chapter text.
+then ingested into Relato alongside the chapter text.
 
 ### When an entry belongs in the manifest
 

@@ -20,7 +20,7 @@ export async function getProgress(studentId) {
   return (data || []).map(fromSupabaseProgress);
 }
 
-export async function markTaskComplete(studentId, assignmentId, taskKey) {
+export async function markTaskComplete(studentId, assignmentId, taskKey, value = true) {
   const id = `${studentId}_${assignmentId}`;
   const { data: existing } = await supabase
     .from('assignment_progress')
@@ -29,13 +29,13 @@ export async function markTaskComplete(studentId, assignmentId, taskKey) {
     .single();
 
   const completed = existing?.completed || {};
-  if (completed[taskKey]) return fromSupabaseProgress(existing);
+  if (completed[taskKey] === true && value === true) return fromSupabaseProgress(existing);
 
   const row = {
     id,
     assignment_id: assignmentId,
     student_id: studentId,
-    completed: { ...completed, [taskKey]: true },
+    completed: { ...completed, [taskKey]: value },
     updated_at: new Date().toISOString(),
   };
 
@@ -104,7 +104,7 @@ export async function deleteAssignment(assignmentId) {
   if (error) throw error;
 }
 
-export async function completeTaskForText(studentId, textId, taskKey) {
+export async function completeTaskForText(studentId, textId, taskKey, value = true) {
   const { data: assignments } = await supabase
     .from('assignments')
     .select('*')
@@ -113,7 +113,7 @@ export async function completeTaskForText(studentId, textId, taskKey) {
   const matching = (assignments || []).filter(a => a.tasks?.[taskKey]);
   const results = [];
   for (const a of matching) {
-    const result = await markTaskComplete(studentId, a.id, taskKey);
+    const result = await markTaskComplete(studentId, a.id, taskKey, value);
     results.push(result);
   }
   return results;

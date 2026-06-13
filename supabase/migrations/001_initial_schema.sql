@@ -1,4 +1,4 @@
--- Cadence: initial schema
+-- Relato: initial schema
 -- Tables: profiles, classes, class_enrollments, curated_texts,
 --          user_progress, reading_sessions, recordings, transcriptions,
 --          flag_events, student_recordings, fluency_sessions, srs_cards

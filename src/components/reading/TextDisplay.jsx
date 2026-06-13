@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { lookupCefr, cefrColor, cleanToken } from '../../lib/wordUtils';
+import { findParticles } from '../../lib/particleUtils';
 
 const SHOW_CEFR_UNDERLINES = false;
 
@@ -27,6 +28,7 @@ export default function TextDisplay({
   currentSentenceIdx = -1,
   loopSentenceIdx = null,
   sentences = [],
+  manifest = null,
 }) {
   const paragraphs = useMemo(() => {
     if (!text) return [];
@@ -47,6 +49,28 @@ export default function TextDisplay({
       return tokens;
     });
   }, [text]);
+
+  const particleMap = useMemo(() => {
+    const all = new Map();
+    for (const tokens of paragraphs) {
+      const wordTokens = tokens.filter(t => t.type === 'word');
+      const pMap = findParticles(wordTokens, manifest);
+      for (const [idx, group] of pMap) {
+        all.set(idx, group);
+      }
+    }
+    return all;
+  }, [paragraphs, manifest]);
+
+  const wordsByIdx = useMemo(() => {
+    const map = {};
+    for (const tokens of paragraphs) {
+      for (const t of tokens) {
+        if (t.type === 'word') map[t.wordIdx] = t;
+      }
+    }
+    return map;
+  }, [paragraphs]);
 
   const wordToSentence = useMemo(() => {
     const map = {};
@@ -69,59 +93,115 @@ export default function TextDisplay({
     const rect = e.target.getBoundingClientRect();
     const para = paragraphs[pIdx];
     const sentence = extractSentence(para, tIdx);
-    onWordClick({ ...token, sentence }, { x: rect.left, y: rect.bottom + 4 });
-  }, [onWordClick, paragraphs]);
+    const particleGroup = particleMap.get(token.wordIdx);
+    let particle = null;
+    if (particleGroup) {
+      particle = {
+        ...particleGroup,
+        constituents: particleGroup.wordIndices
+          .map(idx => wordsByIdx[idx])
+          .filter(Boolean),
+      };
+    }
+    onWordClick({ ...token, sentence, particle }, { x: rect.left, y: rect.bottom + 4 });
+  }, [onWordClick, paragraphs, particleMap, wordsByIdx]);
+
+  const sentenceGroups = useMemo(() => {
+    return paragraphs.map(tokens => {
+      const groups = [];
+      let current = { sentenceIdx: null, tokens: [] };
+
+      for (let tIdx = 0; tIdx < tokens.length; tIdx++) {
+        const token = tokens[tIdx];
+        const sIdx = token.type === 'word' ? (wordToSentence[token.wordIdx] ?? null) : null;
+
+        if (token.type === 'word' && sIdx !== current.sentenceIdx) {
+          if (current.tokens.length > 0) groups.push(current);
+          current = { sentenceIdx: sIdx, tokens: [{ ...token, tIdx }] };
+        } else {
+          current.tokens.push({ ...token, tIdx });
+        }
+      }
+      if (current.tokens.length > 0) groups.push(current);
+      return groups;
+    });
+  }, [paragraphs, wordToSentence]);
+
+  const markStyle = {
+    backgroundColor: 'rgba(217,119,6,0.15)',
+    boxDecorationBreak: 'clone',
+    WebkitBoxDecorationBreak: 'clone',
+    borderRadius: '3px',
+    padding: '2px 0',
+  };
+  const loopMarkStyle = {
+    backgroundColor: 'rgba(217,119,6,0.08)',
+    boxDecorationBreak: 'clone',
+    WebkitBoxDecorationBreak: 'clone',
+    borderRadius: '3px',
+    padding: '2px 0',
+  };
 
   return (
     <div className="leading-7 sm:leading-8 text-base sm:text-lg text-gray-900">
-      {paragraphs.map((tokens, pIdx) => (
+      {sentenceGroups.map((groups, pIdx) => (
         <p key={pIdx} className="mb-3 sm:mb-4">
-          {tokens.map((token, tIdx) => {
-            if (token.type === 'punct') {
-              return <span key={tIdx}>{token.raw}</span>;
+          {groups.map((group, gIdx) => {
+            const isActive = group.sentenceIdx === currentSentenceIdx && currentSentenceIdx >= 0;
+            const isLoop = !isActive && loopWordRange && group.sentenceIdx != null
+              && sentences[group.sentenceIdx]
+              && sentences[group.sentenceIdx].firstWordIdx >= loopWordRange.first
+              && sentences[group.sentenceIdx].lastWordIdx <= loopWordRange.last;
+
+            const wrapStyle = isActive ? markStyle : isLoop ? loopMarkStyle : null;
+
+            const inner = group.tokens.map((token) => {
+              if (token.type === 'punct') {
+                return <span key={token.tIdx}>{token.raw}</span>;
+              }
+
+              const cleaned = cleanToken(token.raw);
+              const encounterCount = encounters?.[token.lemma || cleaned] || 0;
+              const color = cefrColor(token.cefr);
+              const isA1 = token.cefr === 'A1';
+
+              const particleGroup = particleMap.get(token.wordIdx);
+
+              let wordStyle = SHOW_CEFR_UNDERLINES
+                ? { borderBottom: isA1 ? 'none' : `2px solid ${color}`, paddingBottom: isA1 ? 0 : '1px' }
+                : {};
+
+              if (particleGroup) {
+                const pColor = cefrColor(particleGroup.cefr);
+                wordStyle.borderBottom = `2px dashed ${pColor}`;
+                wordStyle.paddingBottom = '1px';
+              }
+
+              return (
+                <span
+                  key={token.tIdx}
+                  data-widx={token.wordIdx}
+                  {...(sentences[wordToSentence[token.wordIdx]]?.firstWordIdx === token.wordIdx ? { 'data-sidx': wordToSentence[token.wordIdx] } : {})}
+                  onClick={(e) => handleWordClick(e, token, pIdx, token.tIdx)}
+                  className="cursor-pointer hover:bg-gray-100 rounded-sm transition-colors relative inline-block"
+                  style={wordStyle}
+                  title={token.cefr ? `${token.cefr} (${token.via})` : 'unclassified'}
+                >
+                  {token.raw}
+                  {encounterCount > 0 && !isA1 && !isActive && (
+                    <span
+                      className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                  )}
+                </span>
+              );
+            });
+
+            if (wrapStyle) {
+              return <mark key={gIdx} style={wrapStyle}>{inner}</mark>;
             }
-
-            const cleaned = cleanToken(token.raw);
-            const encounterCount = encounters?.[token.lemma || cleaned] || 0;
-            const color = cefrColor(token.cefr);
-            const isA1 = token.cefr === 'A1';
-
-            const isInActiveSentence = wordToSentence[token.wordIdx] === currentSentenceIdx && currentSentenceIdx >= 0;
-            const isInLoop = loopWordRange
-              && token.wordIdx >= loopWordRange.first
-              && token.wordIdx <= loopWordRange.last;
-
-            let wordStyle = SHOW_CEFR_UNDERLINES
-              ? { borderBottom: isA1 ? 'none' : `2px solid ${color}`, paddingBottom: isA1 ? 0 : '1px' }
-              : {};
-
-            if (isInActiveSentence) {
-              wordStyle.backgroundColor = 'rgba(217,119,6,0.15)';
-              wordStyle.borderRadius = '2px';
-            } else if (isInLoop) {
-              wordStyle.backgroundColor = 'rgba(217,119,6,0.08)';
-              wordStyle.borderRadius = '2px';
-            }
-
-            return (
-              <span
-                key={tIdx}
-                data-widx={token.wordIdx}
-                {...(sentences[wordToSentence[token.wordIdx]]?.firstWordIdx === token.wordIdx ? { 'data-sidx': wordToSentence[token.wordIdx] } : {})}
-                onClick={(e) => handleWordClick(e, token, pIdx, tIdx)}
-                className="cursor-pointer hover:bg-gray-100 rounded-sm transition-colors relative inline-block"
-                style={wordStyle}
-                title={token.cefr ? `${token.cefr} (${token.via})` : 'unclassified'}
-              >
-                {token.raw}
-                {encounterCount > 0 && !isA1 && !isInActiveSentence && (
-                  <span
-                    className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full"
-                    style={{ backgroundColor: color }}
-                  />
-                )}
-              </span>
-            );
+            return <span key={gIdx}>{inner}</span>;
           })}
         </p>
       ))}

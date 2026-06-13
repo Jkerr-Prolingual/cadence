@@ -1,4 +1,4 @@
-const DB_NAME = 'cadence';
+const DB_NAME = 'relato';
 const DB_VERSION = 3;
 
 const STORES = {

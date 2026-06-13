@@ -14,7 +14,7 @@ export function findCurrentSentence(sentences, time) {
   if (!sentences?.length) return -1;
   for (const s of sentences) {
     if (s.startTime != null && s.endTime != null) {
-      if (time >= s.startTime - 0.1 && time <= s.endTime + 0.3) {
+      if (time >= s.startTime - 0.05 && time <= s.endTime + 0.05) {
         return s.sentenceIdx;
       }
     }

@@ -1,8 +1,8 @@
-# Cadence — Supabase Integration Handoff
+# Relato — Supabase Integration Handoff
 
 ## Goal
 
-Wire Cadence up to Supabase for real multi-user auth, data sync, and
+Wire Relato up to Supabase for real multi-user auth, data sync, and
 teacher-student class management. Currently everything runs on IndexedDB
 with mock auth (dev mode). After this work, teachers and students will
 log in with real accounts and share data.
