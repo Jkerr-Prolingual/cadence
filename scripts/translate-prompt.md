@@ -66,6 +66,5 @@ Return a JSON object in the **exact same grouped format**:
 
 ## Ready
 
-I will paste the words in my next message. There may be a lot — if I need
-to split across messages, I'll indicate which CEFR levels are included in
-each batch.
+I will paste the words in my next message. There may be a lot — if you believe I need
+to split across messages, please suggest how to split.
