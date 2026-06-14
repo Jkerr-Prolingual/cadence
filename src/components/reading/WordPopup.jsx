@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cefrColor, lookupCefr } from '../../lib/wordUtils';
 import { spanishDict } from '../../data/es_dictionary';
 
-export default function WordPopup({ word, cefr, lemma, via, position, onClose, onAddFlashcard, hasAudio, onResume, onLoopSentence, particle }) {
+export default function WordPopup({ word, cefr, lemma, via, position, onClose, onAddFlashcard, hasAudio, onResume, onLoopSentence, particle, manifest }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
   const [view, setView] = useState(particle ? 'particle' : 'word');
@@ -50,7 +50,8 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   }, [position, view]);
 
   const lookupKey = lemma || word.toLowerCase();
-  const wordSpanish = spanishDict[lookupKey] || spanishDict[word.toLowerCase()];
+  const manifestEntry = manifest?.entries?.[lookupKey] || manifest?.entries?.[word.toLowerCase()];
+  const wordSpanish = manifestEntry?.spanish || spanishDict[lookupKey] || spanishDict[word.toLowerCase()];
   const wordLevel = cefr || 'unclassified';
   const wordColor = cefrColor(wordLevel);
 
@@ -139,6 +140,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           </div>
         ) : (
           <p className="text-sm text-gray-400 italic">No translation available</p>
+        )}
+
+        {manifestEntry?.note && (
+          <p className="text-xs text-gray-500 italic mb-2">{manifestEntry.note}</p>
         )}
 
         {showBackLink && particle.constituents && particle.constituents.length > 1 && (

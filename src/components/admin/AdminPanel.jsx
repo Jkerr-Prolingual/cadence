@@ -179,6 +179,7 @@ export default function AdminPanel() {
   const [bookCefr, setBookCefr] = useState('B1');
   const [bookCoverFile, setBookCoverFile] = useState(null);
   const [bookCoverPreview, setBookCoverPreview] = useState(null);
+  const [bookManifestJson, setBookManifestJson] = useState('');
   const [savingBook, setSavingBook] = useState(false);
   const [bookError, setBookError] = useState(null);
 
@@ -263,6 +264,7 @@ export default function AdminPanel() {
     setBookCefr('B1');
     setBookCoverFile(null);
     setBookCoverPreview(null);
+    setBookManifestJson('');
     setBookError(null);
   }
 
@@ -287,6 +289,17 @@ export default function AdminPanel() {
         const { data: urlData } = supabase.storage.from('book-covers').getPublicUrl(coverPath);
         coverImageUrl = urlData.publicUrl;
       }
+      let parsedManifest = null;
+      if (bookManifestJson.trim()) {
+        try {
+          parsedManifest = JSON.parse(bookManifestJson);
+          if (!parsedManifest.entries || typeof parsedManifest.entries !== 'object') {
+            throw new Error('Manifest must have an "entries" object');
+          }
+        } catch (parseErr) {
+          throw new Error(`Invalid manifest JSON: ${parseErr.message}`);
+        }
+      }
       const record = {
         id,
         title: bookTitle,
@@ -294,6 +307,7 @@ export default function AdminPanel() {
         description: bookDescription || null,
         cefr_estimate: bookCefr,
         cover_image_url: coverImageUrl,
+        vocabulary_manifest: parsedManifest,
         status: 'published',
       };
       const { error } = await supabase.from('books').upsert(record, { onConflict: 'id' });
@@ -324,6 +338,7 @@ export default function AdminPanel() {
     setBookCefr(book.cefr_estimate || 'B1');
     setBookCoverFile(null);
     setBookCoverPreview(book.cover_image_url || null);
+    setBookManifestJson(book.vocabulary_manifest ? JSON.stringify(book.vocabulary_manifest, null, 2) : '');
     setShowBookForm(true);
   }
 
@@ -605,6 +620,25 @@ export default function AdminPanel() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-y"
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Vocabulary Manifest (JSON)</label>
+              <textarea
+                value={bookManifestJson}
+                onChange={(e) => setBookManifestJson(e.target.value)}
+                placeholder='Paste vocabulary_manifest.json from the graded readers project...'
+                rows={4}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-gray-900 resize-y"
+              />
+              {bookManifestJson.trim() && (() => {
+                try {
+                  const parsed = JSON.parse(bookManifestJson);
+                  const count = Object.keys(parsed.entries || {}).length;
+                  return <p className="text-xs text-green-600 mt-1">{count} entries</p>;
+                } catch {
+                  return <p className="text-xs text-red-500 mt-1">Invalid JSON</p>;
+                }
+              })()}
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSaveBook}
@@ -649,6 +683,9 @@ export default function AdminPanel() {
                     <span className="text-sm font-medium text-gray-900">{book.title}</span>
                     {book.author && <span className="text-xs text-gray-400">{book.author}</span>}
                     <span className="text-xs text-gray-400">({chapterCount} ch.)</span>
+                    {book.vocabulary_manifest && (
+                      <span className="text-xs text-green-600" title={`${Object.keys(book.vocabulary_manifest.entries || {}).length} manifest entries`}>manifest</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => handleEditBook(book)} className="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</button>

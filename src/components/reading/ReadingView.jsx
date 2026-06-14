@@ -54,6 +54,7 @@ export default function ReadingView() {
   const [popup, setPopup] = useState(null);
   const [cardCreator, setCardCreator] = useState(null);
   const [encounters, setEncounters] = useState({});
+  const [bookManifest, setBookManifest] = useState(null);
   const [checklistKey, setChecklistKey] = useState(0);
   const selectedTextIdRef = useRef(selectedTextId);
   selectedTextIdRef.current = selectedTextId;
@@ -207,6 +208,21 @@ export default function ReadingView() {
       console.warn('Failed to load curated texts', e);
     }
   }
+
+  const currentBookId = selectedText?.book_id;
+  useEffect(() => {
+    if (!currentBookId) { setBookManifest(null); return; }
+    let cancelled = false;
+    supabase
+      .from('books')
+      .select('vocabulary_manifest')
+      .eq('id', currentBookId)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled) setBookManifest(data?.vocabulary_manifest || null);
+      });
+    return () => { cancelled = true; };
+  }, [currentBookId]);
 
   // Timed reading: tick every second while active
   useEffect(() => {
@@ -712,6 +728,7 @@ export default function ReadingView() {
                 currentSentenceIdx={currentSentenceIdx}
                 loopSentenceIdx={loopSentenceIdx}
                 sentences={sentences}
+                manifest={bookManifest}
               />
 
               {chapterNav && (
@@ -793,6 +810,7 @@ export default function ReadingView() {
           hasAudio={hasAudio}
           onResume={handleResumeAudio}
           particle={popup.token.particle || null}
+          manifest={bookManifest}
           onLoopSentence={() => {
             if (popup.token.wordIdx != null) {
               handleSentenceLoop(popup.token.wordIdx);

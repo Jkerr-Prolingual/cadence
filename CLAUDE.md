@@ -270,7 +270,8 @@ provenance). Series/sequence support for multi-chapter works.
 - `profiles` — user identity, roles (student/teacher/admin), L1, CEFR
 - `classes` — teacher-owned class containers with join codes
 - `class_enrollments` — student ↔ class mapping
-- `curated_texts` — admin-managed corpus texts (authoritative store)
+- `books` — book containers grouping curated_texts, with `vocabulary_manifest` JSONB
+- `curated_texts` — admin-managed corpus texts (authoritative store), linked to books via `book_id`
 - `user_progress` — per-user JSONB for userWords and wordEncounters
 - `reading_sessions` — per-pass records (silent/oral/shadow mode)
 - `recordings` — oral read-aloud audio files
@@ -369,16 +370,17 @@ extracted from wordData.js for its inflection-to-headword mappings only;
 the frequency data was discarded.
 
 ### Spanish Translation Lookup Order
-1. **Series vocabulary manifest** (override layer) — sense-disambiguated
+1. **Book vocabulary manifest** (override layer) — sense-disambiguated
    translations, multi-word particles, and pedagogical notes generated
-   per-series during graded reader production. Only includes entries where
-   the base dictionary translation is insufficient: wrong sense in context,
-   phrasal verbs that don't exist as units in the base dictionary, false
-   friend warnings, or story-specific notes. Typically 20–50 entries per
-   series, not a full dictionary.
+   per-book during graded reader production. Stored as JSONB on the
+   `books` table (`vocabulary_manifest` column). Only includes entries
+   where the base dictionary translation is insufficient: wrong sense in
+   context, phrasal verbs that don't exist as units in the base dictionary,
+   false friend warnings, or story-specific notes. Typically 20–50 entries
+   per book, not a full dictionary.
 2. Bundled `es_dictionary.js` — base translations for all single words.
    Covers EFLLex vocabulary plus common content words. The manifest
-   overrides this when a series-specific sense or note is needed.
+   overrides this when a book-specific sense or note is needed.
 3. *(Future)* API fallback for native/uncurated content — translation
    API or LLM call with sentence context, cached to IndexedDB
 
@@ -565,8 +567,9 @@ When a graded reader chapter is ingested into Relato as a `curated_text`:
 - **Per-particle metadata** — CEFR level, compositionality, tier,
   constituent words
 - **Vocabulary manifest** — context-aware Spanish translations for all
-  words and particles in the text, ingested from the series
-  `vocabulary_manifest.json` file produced during content authoring
+  words and particles in the text, stored as JSONB on the `books` table
+  (`vocabulary_manifest` column), ingested from the graded reader
+  project's `vocabulary_manifest.json` via AdminPanel
 - Audio (ElevenLabs TTS with word-level timestamps)
 - L1 adjustments (cognate/false-friend effective CEFR overrides)
 
@@ -579,7 +582,7 @@ graded_readers/                          cadence/
   data/observed_chunks.json ──────────→ particle lookup table
   series/<slug>/chapters/ch*.md ──────→ curated_texts (Supabase + IndexedDB)
   series/<slug>/vocabulary_inventory ─→ per-text particle metadata
-  series/<slug>/vocabulary_manifest ──→ per-text Spanish translations
+  series/<slug>/vocabulary_manifest ──→ books.vocabulary_manifest (JSONB)
   series/<slug>/l1_adjustments.md ────→ effective CEFR overrides
 ```
 
@@ -599,22 +602,27 @@ for compositionality-aware encounter crediting.
 
 ## Vocabulary Manifest Schema
 
-The vocabulary manifest (`vocabulary_manifest.json`) is an **override file**
-produced per-series during graded reader authoring. It does NOT duplicate
-the base dictionary (`es_dictionary.js`). It contains only entries where
-the base dictionary is insufficient: sense disambiguation, multi-word
-particles, false friend warnings, and pedagogical notes. Typically 20–50
-entries per series.
+The vocabulary manifest is an **override file** produced per-series during
+graded reader authoring and stored **per-book** in Relato as a JSONB column
+on the `books` table (`vocabulary_manifest`). It does NOT duplicate the
+base dictionary (`es_dictionary.js`). It contains only entries where the
+base dictionary is insufficient: sense disambiguation, multi-word particles,
+false friend warnings, and pedagogical notes. Typically 20–50 entries per
+book.
 
-The file is reviewed and version-controlled in the graded reader project,
-then ingested into Relato alongside the chapter text.
+The graded reader project produces the manifest as
+`series/<slug>/vocabulary_manifest.json`. At ingestion time, it is pasted
+into AdminPanel's book form and stored on the `books` row. ReadingView
+fetches the manifest for the current book and passes it to TextDisplay
+(for particle detection) and WordPopup (for single-word translation
+overrides).
 
 ### When an entry belongs in the manifest
 
 Include an entry only when one or more of these conditions apply:
 
 1. **Sense disambiguation** — the word has multiple common translations and
-   the series uses a specific sense (e.g., "watch" → "observar" not "reloj")
+   the book uses a specific sense (e.g., "watch" → "observar" not "reloj")
 2. **Multi-word particle** — phrasal verbs and chunks that don't exist as
    units in the base dictionary (e.g., "put on", "pick up", "of course")
 3. **False friend** — flagged in `l1_adjustments.md`; `note` MUST include
@@ -622,14 +630,14 @@ Include an entry only when one or more of these conditions apply:
 4. **Pedagogical note** — story significance, cognate flag, cultural
    context, or L1 transfer hazard worth surfacing
 
-If the base dictionary translation is correct for the series context and
+If the base dictionary translation is correct for the book's context and
 no note is needed, do not include the word.
 
 ### Schema
 
 ```json
 {
-  "series": "the_cookie",
+  "book": "the_cookie",
   "target_cefr": "A1",
   "generated": "2026-06-09",
   "entries": {
@@ -675,14 +683,14 @@ no note is needed, do not include the word.
 
 | Field | Required | Description |
 |---|---|---|
-| `series` | yes | Series slug, matches directory name |
-| `target_cefr` | yes | Series CEFR target range (e.g., "A1") |
+| `book` | yes | Book slug, matches `books.id` in Relato |
+| `target_cefr` | yes | Book CEFR target range (e.g., "A1") |
 | `generated` | yes | Date manifest was generated (YYYY-MM-DD) |
 | `entries` | yes | Map of lemma/phrase → entry object |
 | `entries.*.type` | yes | `"word"` or `"particle"` |
 | `entries.*.pos` | yes (words) | Part of speech: n, v, adj, adv, n/v, etc. |
 | `entries.*.cefr` | yes | CEFR level (from EFLLex for words; chunk-meaning principle for non-compositional particles; constituent ceiling for compositional particles) |
-| `entries.*.spanish` | yes | Context-aware Spanish translation for the sense used in this series. Multiple senses separated by ` / `. |
+| `entries.*.spanish` | yes | Context-aware Spanish translation for the sense used in this book. Multiple senses separated by ` / `. |
 | `entries.*.compositionality` | yes (particles) | `"compositional"` or `"non-compositional"` |
 | `entries.*.constituents` | yes (compositional) | Map of constituent word → Spanish translation. Omitted for non-compositional particles (parts don't sum to meaning). |
 | `entries.*.note` | no | Pedagogical note — false friends, cultural context, story significance, etc. |
@@ -693,10 +701,10 @@ no note is needed, do not include the word.
 small. Words where the base dictionary translation is correct and no
 pedagogical note is needed are not included.
 
-**One file per series, keyed by lemma/phrase.** Graded readers use
+**One manifest per book, keyed by lemma/phrase.** Graded readers use
 controlled vocabulary, so a word generally carries one sense throughout
-a series. Polysemy handling (multiple senses per word within a series)
-is deferred until needed.
+a book. Stored as JSONB on `books.vocabulary_manifest`. Polysemy handling
+(multiple senses per word within a book) is deferred until needed.
 
 **`cefr` is included even though `cefrLookup` has it.** Makes the
 manifest self-contained for review. For particles, CEFR comes from the
