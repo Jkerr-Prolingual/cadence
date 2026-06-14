@@ -155,27 +155,15 @@ export default function TextDisplay({
 
             const wrapStyle = isActive ? markStyle : isLoop ? loopMarkStyle : null;
 
-            const inner = group.tokens.map((token) => {
-              if (token.type === 'punct') {
-                return <span key={token.tIdx}>{token.raw}</span>;
-              }
-
+            const renderWord = (token, inParticle) => {
               const cleaned = cleanToken(token.raw);
               const encounterCount = encounters?.[token.lemma || cleaned] || 0;
               const color = cefrColor(token.cefr);
               const isA1 = token.cefr === 'A1';
 
-              const particleGroup = particleMap.get(token.wordIdx);
-
-              let wordStyle = SHOW_CEFR_UNDERLINES
+              let wordStyle = !inParticle && SHOW_CEFR_UNDERLINES
                 ? { borderBottom: isA1 ? 'none' : `2px solid ${color}`, paddingBottom: isA1 ? 0 : '1px' }
                 : {};
-
-              if (particleGroup) {
-                const pColor = cefrColor(particleGroup.cefr);
-                wordStyle.borderBottom = `2px dashed ${pColor}`;
-                wordStyle.paddingBottom = '1px';
-              }
 
               return (
                 <span
@@ -188,7 +176,7 @@ export default function TextDisplay({
                   title={token.cefr ? `${token.cefr} (${token.via})` : 'unclassified'}
                 >
                   {token.raw}
-                  {encounterCount > 0 && !isA1 && !isActive && (
+                  {false && encounterCount > 0 && !isA1 && !isActive && (
                     <span
                       className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full"
                       style={{ backgroundColor: color }}
@@ -196,7 +184,54 @@ export default function TextDisplay({
                   )}
                 </span>
               );
-            });
+            };
+
+            const inner = [];
+            let ti = 0;
+            while (ti < group.tokens.length) {
+              const token = group.tokens[ti];
+              if (token.type === 'punct') {
+                inner.push(<span key={token.tIdx}>{token.raw}</span>);
+                ti++;
+                continue;
+              }
+
+              const pg = particleMap.get(token.wordIdx);
+              if (pg && token.wordIdx === pg.wordIndices[0]) {
+                const remaining = new Set(pg.wordIndices);
+                const run = [];
+                while (ti < group.tokens.length && remaining.size > 0) {
+                  const t = group.tokens[ti];
+                  if (t.type === 'word' && remaining.has(t.wordIdx)) {
+                    run.push(t);
+                    remaining.delete(t.wordIdx);
+                    ti++;
+                  } else if (t.type === 'punct') {
+                    run.push(t);
+                    ti++;
+                  } else {
+                    break;
+                  }
+                }
+                const pColor = cefrColor(pg.cefr);
+                inner.push(
+                  <span
+                    key={`p-${pg.wordIndices[0]}`}
+                    className="rounded-sm"
+                    style={{ borderBottom: `2px dashed ${pColor}`, paddingBottom: '1px' }}
+                  >
+                    {run.map(t =>
+                      t.type === 'punct'
+                        ? <span key={t.tIdx}>{t.raw}</span>
+                        : renderWord(t, true)
+                    )}
+                  </span>
+                );
+              } else {
+                inner.push(renderWord(token, false));
+                ti++;
+              }
+            }
 
             if (wrapStyle) {
               return <mark key={gIdx} style={wrapStyle}>{inner}</mark>;

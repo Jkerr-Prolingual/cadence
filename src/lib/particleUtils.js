@@ -63,6 +63,7 @@ export function findParticles(wordTokens, manifest = null) {
         compositionality: match.compositionality || null,
         spanish: match.spanish || null,
         note: match.note || null,
+        constituents_es: match.constituents || null,
         wordIndices: [],
       };
       for (let j = 0; j < match.words.length; j++) {

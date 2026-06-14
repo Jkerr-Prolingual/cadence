@@ -674,6 +674,16 @@ no note is needed, do not include the word.
       "compositionality": "non-compositional",
       "cefr": "B1",
       "spanish": "recoger / levantar"
+    },
+    "take off": {
+      "type": "particle",
+      "compositionality": "compositional",
+      "cefr": "A2",
+      "spanish": "quitarse (ropa)",
+      "constituents": {
+        "take": "quitar",
+        "off": "de encima"
+      }
     }
   }
 }
@@ -692,7 +702,7 @@ no note is needed, do not include the word.
 | `entries.*.cefr` | yes | CEFR level (from EFLLex for words; chunk-meaning principle for non-compositional particles; constituent ceiling for compositional particles) |
 | `entries.*.spanish` | yes | Context-aware Spanish translation for the sense used in this book. Multiple senses separated by ` / `. |
 | `entries.*.compositionality` | yes (particles) | `"compositional"` or `"non-compositional"` |
-| `entries.*.constituents` | yes (compositional) | Map of constituent word → Spanish translation. Omitted for non-compositional particles (parts don't sum to meaning). |
+| `entries.*.constituents` | yes (compositional) | Map of constituent word (lemma) → sense-disambiguated Spanish translation for that word's contribution to the phrase. Must reflect the sense used *in this particle*, not the word's default dictionary entry (e.g., "off" in "take off" → "de encima" not "apagado"). Omitted for non-compositional particles (parts don't sum to meaning). |
 | `entries.*.note` | no | Pedagogical note — false friends, cultural context, story significance, etc. |
 
 ### Design decisions
@@ -710,9 +720,13 @@ a book. Stored as JSONB on `books.vocabulary_manifest`. Polysemy handling
 manifest self-contained for review. For particles, CEFR comes from the
 vocabulary inventory (chunk-meaning principle), not from `cefrLookup`.
 
-**`constituents` only on compositional particles.** Non-compositional
-chunks don't show constituent translations in the popup — displaying them
-would imply the meaning is derivable from parts, which it isn't.
+**`constituents` only on compositional particles, sense-disambiguated.**
+Non-compositional chunks don't show constituent translations in the popup
+— displaying them would imply the meaning is derivable from parts, which
+it isn't. For compositional particles, each constituent's translation must
+reflect its sense *within the phrase*, not its default dictionary entry.
+WordPopup prefers `constituents` translations over `es_dictionary` when
+drilling down into a particle.
 
 **`note` is the pedagogical annotation field.** Intended for content
 authors reviewing the manifest and potentially surfaced in teacher-facing

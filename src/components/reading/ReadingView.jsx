@@ -807,16 +807,8 @@ export default function ReadingView() {
           position={popup.position}
           onClose={() => setPopup(null)}
           onAddFlashcard={handleOpenCardCreator}
-          hasAudio={hasAudio}
-          onResume={handleResumeAudio}
           particle={popup.token.particle || null}
           manifest={bookManifest}
-          onLoopSentence={() => {
-            if (popup.token.wordIdx != null) {
-              handleSentenceLoop(popup.token.wordIdx);
-            }
-            setPopup(null);
-          }}
         />
       )}
 

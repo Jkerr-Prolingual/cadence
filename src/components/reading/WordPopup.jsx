@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cefrColor, lookupCefr } from '../../lib/wordUtils';
 import { spanishDict } from '../../data/es_dictionary';
 
-export default function WordPopup({ word, cefr, lemma, via, position, onClose, onAddFlashcard, hasAudio, onResume, onLoopSentence, particle, manifest }) {
+export default function WordPopup({ word, cefr, lemma, via, position, onClose, onAddFlashcard, particle, manifest }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
   const [view, setView] = useState(particle ? 'particle' : 'word');
@@ -59,6 +59,15 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   const particleColor = cefrColor(particleLevel);
   const particleSpanish = particle?.spanish;
 
+  function constituentSpanish(token) {
+    const key = token.lemma || token.raw.toLowerCase();
+    if (particle?.constituents_es?.[key]) return particle.constituents_es[key];
+    if (particle?.constituents_es?.[token.raw.toLowerCase()]) return particle.constituents_es[token.raw.toLowerCase()];
+    const mEntry = manifest?.entries?.[key] || manifest?.entries?.[token.raw.toLowerCase()];
+    if (mEntry?.spanish) return mEntry.spanish;
+    return spanishDict[key] || spanishDict[token.raw.toLowerCase()] || null;
+  }
+
   function renderParticleView() {
     return (
       <>
@@ -106,6 +115,52 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   function renderWordView() {
     const showBackLink = !!particle;
 
+    if (showBackLink && particle.constituents && particle.constituents.length > 1) {
+      return (
+        <>
+          <button
+            onClick={() => setView('particle')}
+            className="text-xs text-blue-500 hover:text-blue-700 mb-2 flex items-center gap-1"
+          >
+            &uarr; {particle.phrase}
+          </button>
+
+          <div className="space-y-2">
+            {particle.constituents.map((c, i) => {
+              const cLookup = lookupCefr(c.raw);
+              const cLevel = cLookup.cefr || 'unclassified';
+              const cColor = cefrColor(cLevel);
+              const cSpanish = constituentSpanish(c);
+
+              return (
+                <div key={i} className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-semibold text-gray-900">{c.raw}</span>
+                      <span
+                        className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0"
+                        style={{ backgroundColor: cColor + '20', color: cColor }}
+                      >
+                        {cLevel === 'unclassified' ? '—' : cLevel}
+                      </span>
+                    </div>
+                    {cLookup.lemma && cLookup.lemma !== c.raw.toLowerCase() && (
+                      <span className="text-xs text-gray-400">→ {cLookup.lemma}</span>
+                    )}
+                    {cSpanish ? (
+                      <p className="text-sm text-gray-700 mt-0.5">{cSpanish}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic mt-0.5">No translation</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      );
+    }
+
     return (
       <>
         {showBackLink && (
@@ -145,27 +200,6 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         {manifestEntry?.note && (
           <p className="text-xs text-gray-500 italic mb-2">{manifestEntry.note}</p>
         )}
-
-        {showBackLink && particle.constituents && particle.constituents.length > 1 && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <p className="text-xs text-gray-400 mb-1">Other words in this phrase:</p>
-            <div className="flex flex-wrap gap-1">
-              {particle.constituents
-                .filter(c => c.wordIdx !== (particle.constituents.find(t => t.raw.toLowerCase() === word.toLowerCase())?.wordIdx ?? -1))
-                .map((c, i) => {
-                  const cLookup = lookupCefr(c.raw);
-                  const cSpanish = spanishDict[cLookup.lemma] || spanishDict[c.raw.toLowerCase()];
-                  const cColor = cefrColor(cLookup.cefr);
-                  return (
-                    <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-gray-50 text-gray-600">
-                      <span style={{ color: cColor }}>{c.raw}</span>
-                      {cSpanish && <span className="text-gray-400 ml-1">· {cSpanish}</span>}
-                    </span>
-                  );
-                })}
-            </div>
-          </div>
-        )}
       </>
     );
   }
@@ -180,38 +214,18 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
       {view === 'word' && renderWordView()}
 
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={onAddFlashcard}
-            className="text-xs text-blue-600 hover:text-blue-800 active:text-blue-900 font-medium px-2 py-2 -mx-2 min-h-[44px] flex items-center"
-          >
-            + Flashcard
-          </button>
-          {hasAudio && onLoopSentence && (
-            <button
-              onClick={onLoopSentence}
-              className="text-xs text-amber-600 hover:text-amber-800 active:text-amber-900 font-medium px-2 py-2 min-h-[44px] flex items-center"
-            >
-              Loop sentence
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          {hasAudio && onResume && (
-            <button
-              onClick={onResume}
-              className="text-xs text-green-600 hover:text-green-800 active:text-green-900 font-medium px-2 py-2 min-h-[44px] flex items-center"
-            >
-              Resume
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="text-xs text-gray-400 hover:text-gray-600 active:text-gray-800 px-2 py-2 -mr-2 min-h-[44px] flex items-center"
-          >
-            Close
-          </button>
-        </div>
+        <button
+          onClick={onAddFlashcard}
+          className="text-xs text-blue-600 hover:text-blue-800 active:text-blue-900 font-medium px-2 py-2 -mx-2 min-h-[44px] flex items-center"
+        >
+          + Flashcard
+        </button>
+        <button
+          onClick={onClose}
+          className="text-xs text-gray-400 hover:text-gray-600 active:text-gray-800 px-2 py-2 -mr-2 min-h-[44px] flex items-center"
+        >
+          Close
+        </button>
       </div>
     </div>
   );
