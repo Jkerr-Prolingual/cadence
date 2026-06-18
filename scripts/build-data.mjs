@@ -4,11 +4,14 @@
  * Outputs:
  *   src/data/cefrLookup.js   — word → CEFR level map from EFLLex
  *   src/data/lemmaMap.js     — inflected form → headword from wordData.js
+ *   src/data/egpLookup.js    — EGP construct ID → grammar structure data
  *
  * Run: node scripts/build-data.mjs
  */
 
 import { readFileSync, writeFileSync } from 'fs';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
 const CEFR_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1'];
 
@@ -129,8 +132,98 @@ function buildLemmaMap() {
   console.log(`Non-identity mappings:   ${Object.keys(lemmaMap).length}`);
 }
 
+// ── Step 3: EGP XLSX → egpLookup ────────────────────────────────────────────
+
+function buildEgpLookup() {
+  const XLSX = require('xlsx');
+  const wb = XLSX.readFile('scripts/egpo.xlsx');
+  const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+
+  const TARGET_LEVELS = new Set(['A1', 'A2', 'B1', 'B2']);
+  const entries = {};
+  let skipped = 0;
+
+  for (const row of data) {
+    const level = row.Level;
+    if (!TARGET_LEVELS.has(level)) { skipped++; continue; }
+
+    const id = row['#'];
+    entries[id] = {
+      superCategory: row.SuperCategory,
+      subCategory: row.SubCategory,
+      level,
+      guideword: row.guideword?.trim() || '',
+      canDo: row['Can-do statement']?.trim() || '',
+      example: (row.Example || '').split('\n')[0].trim(),
+    };
+  }
+
+  const lines = [
+    '// English Grammar Profile — construct ID → grammar structure data',
+    `// Source: englishprofile.org (O'Keeffe & Mark, Cambridge Learner Corpus)`,
+    `// Generated: ${new Date().toISOString().slice(0, 10)}`,
+    `// Entries: ${Object.keys(entries).length} (A1–B2 only, ${skipped} C1/C2 entries omitted)`,
+    '',
+    'export const egpLookup = {',
+  ];
+
+  const sorted = Object.entries(entries).sort((a, b) => Number(a[0]) - Number(b[0]));
+  for (const [id, entry] of sorted) {
+    lines.push(`${id}:${JSON.stringify(entry)},`);
+  }
+  lines.push('};');
+  lines.push('');
+
+  writeFileSync('src/data/egpLookup.js', lines.join('\n'), 'utf-8');
+
+  const counts = {};
+  for (const level of ['A1', 'A2', 'B1', 'B2']) {
+    counts[level] = Object.values(entries).filter(e => e.level === level).length;
+  }
+
+  console.log('\n=== egpLookup.js ===');
+  console.log(`Entries (A1–B2): ${Object.keys(entries).length}`);
+  console.log(`Skipped (C1/C2): ${skipped}`);
+  console.log('CEFR distribution:');
+  for (const lvl of ['A1', 'A2', 'B1', 'B2']) {
+    console.log(`  ${lvl}: ${counts[lvl]}`);
+  }
+}
+
+// ── Step 4: EGP Spanish overlay ─────────────────────────────────────────────
+
+function buildEgpSpanishOverlay() {
+  const overlayPath = 'C:/Users/User/graded_readers/data/egp_spanish_overlay.json';
+  let overlay;
+  try {
+    overlay = JSON.parse(readFileSync(overlayPath, 'utf-8'));
+  } catch {
+    console.log('\n=== egpSpanishOverlay.js ===');
+    console.log('Source not found — skipping (placeholder unchanged)');
+    return;
+  }
+
+  const count = Object.keys(overlay).length;
+  const lines = [
+    '// L1 Spanish overlay for EGP grammar constructs',
+    `// Source: graded_readers/data/egp_spanish_overlay.json`,
+    `// Generated: ${new Date().toISOString().slice(0, 10)}`,
+    `// Entries: ${count}`,
+    '',
+    `export const egpSpanishOverlay = ${JSON.stringify(overlay, null, 2)};`,
+    '',
+  ];
+
+  writeFileSync('src/data/egpSpanishOverlay.js', lines.join('\n'), 'utf-8');
+
+  console.log('\n=== egpSpanishOverlay.js ===');
+  console.log(`Entries: ${count}`);
+}
+
 // ── Run ──────────────────────────────────────────────────────────────────────
 
 buildCefrLookup();
 buildLemmaMap();
+buildEgpLookup();
+buildEgpSpanishOverlay();
 console.log('\nDone.');

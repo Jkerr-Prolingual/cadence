@@ -1,6 +1,8 @@
 import { useMemo, useCallback } from 'react';
 import { lookupCefr, cefrColor, cleanToken } from '../../lib/wordUtils';
 import { findParticles } from '../../lib/particleUtils';
+import { findStructures } from '../../lib/structureUtils';
+import { egpLookup } from '../../data/egpLookup';
 
 const SHOW_CEFR_UNDERLINES = false;
 
@@ -29,6 +31,7 @@ export default function TextDisplay({
   loopSentenceIdx = null,
   sentences = [],
   manifest = null,
+  showStructures = false,
 }) {
   const paragraphs = useMemo(() => {
     if (!text) return [];
@@ -61,6 +64,19 @@ export default function TextDisplay({
     }
     return all;
   }, [paragraphs, manifest]);
+
+  const structureMap = useMemo(() => {
+    if (!showStructures) return new Map();
+    const all = new Map();
+    for (const tokens of paragraphs) {
+      const wordTokens = tokens.filter(t => t.type === 'word');
+      const sMap = findStructures(wordTokens, manifest, particleMap);
+      for (const [idx, group] of sMap) {
+        all.set(idx, group);
+      }
+    }
+    return all;
+  }, [paragraphs, manifest, particleMap, showStructures]);
 
   const wordsByIdx = useMemo(() => {
     const map = {};
@@ -103,8 +119,14 @@ export default function TextDisplay({
           .filter(Boolean),
       };
     }
-    onWordClick({ ...token, sentence, particle }, { x: rect.left, y: rect.bottom + 4 });
-  }, [onWordClick, paragraphs, particleMap, wordsByIdx]);
+    const structureGroup = structureMap.get(token.wordIdx);
+    let structure = null;
+    if (structureGroup) {
+      const egp = egpLookup[structureGroup.egp_id];
+      structure = { ...structureGroup, egp: egp || null };
+    }
+    onWordClick({ ...token, sentence, particle, structure }, { x: rect.left, y: rect.bottom + 4 });
+  }, [onWordClick, paragraphs, particleMap, structureMap, wordsByIdx]);
 
   const sentenceGroups = useMemo(() => {
     return paragraphs.map(tokens => {
@@ -227,6 +249,21 @@ export default function TextDisplay({
                     )}
                   </span>
                 );
+              } else if (showStructures && structureMap.has(token.wordIdx)) {
+                const sg = structureMap.get(token.wordIdx);
+                const sLevel = sg.override_cefr || egpLookup[sg.egp_id]?.level;
+                const sColor = cefrColor(sLevel);
+                inner.push(
+                  <span
+                    key={`s-${token.wordIdx}`}
+                    className="rounded-sm"
+                    style={{ borderBottom: `2px dotted ${sColor}`, paddingBottom: '1px' }}
+                    data-egp={sg.egp_id}
+                  >
+                    {renderWord(token, true)}
+                  </span>
+                );
+                ti++;
               } else {
                 inner.push(renderWord(token, false));
                 ti++;

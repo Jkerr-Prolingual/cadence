@@ -1,5 +1,5 @@
 // EFLLex CEFR lookup — word → lowest CEFR level across POS tags
-// Generated: 2026-05-24
+// Generated: 2026-06-18
 // Single words: 10019 | Multi-word: 3852
 
 export const cefrLookup = {

@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { cefrColor, lookupCefr } from '../../lib/wordUtils';
 import { spanishDict } from '../../data/es_dictionary';
+import { egpLookup } from '../../data/egpLookup';
+import { egpSpanishOverlay } from '../../data/egpSpanishOverlay';
 
-export default function WordPopup({ word, cefr, lemma, via, position, onClose, onAddFlashcard, particle, manifest }) {
+export default function WordPopup({ word, cefr, lemma, via, position, onClose, onAddFlashcard, particle, manifest, structure }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
-  const [view, setView] = useState(particle ? 'particle' : 'word');
+  const [view, setView] = useState(particle ? 'particle' : structure ? 'structure' : 'word');
+  const [structureDrillDown, setStructureDrillDown] = useState(false);
 
   useEffect(() => {
-    setView(particle ? 'particle' : 'word');
-  }, [word, particle]);
+    setView(particle ? 'particle' : structure ? 'structure' : 'word');
+    setStructureDrillDown(false);
+  }, [word, particle, structure]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -47,7 +51,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     }
     if (y < pad) y = pad;
     setAdjusted({ x, y });
-  }, [position, view]);
+  }, [position, view, structureDrillDown]);
 
   const lookupKey = lemma || word.toLowerCase();
   const manifestEntry = manifest?.entries?.[lookupKey] || manifest?.entries?.[word.toLowerCase()];
@@ -204,13 +208,102 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     );
   }
 
+  function renderStructureView() {
+    const egp = structure?.egp || egpLookup[structure?.egp_id];
+    if (!egp) return null;
+    const overlay = egpSpanishOverlay[String(structure.egp_id)];
+    const sLevel = structure.override_cefr || egp.level;
+    const sColor = cefrColor(sLevel);
+
+    if (structureDrillDown && overlay) {
+      return (
+        <>
+          <button
+            onClick={() => setStructureDrillDown(false)}
+            className="text-xs text-blue-500 hover:text-blue-700 mb-2 flex items-center gap-1"
+          >
+            &larr; Back
+          </button>
+
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-base font-semibold text-gray-900">{overlay.pattern}</span>
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded shrink-0"
+              style={{ backgroundColor: sColor + '20', color: sColor }}
+            >
+              {sLevel}
+            </span>
+          </div>
+
+          {overlay.explanation_es && (
+            <div className="mb-2">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Explicaci&oacute;n</span>
+              <p className="text-sm text-gray-800 mt-0.5">{overlay.explanation_es}</p>
+            </div>
+          )}
+
+          {overlay.spanish_contrast && (
+            <div className="mb-2">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">ES vs EN</span>
+              <p className="text-sm text-gray-800 mt-0.5">{overlay.spanish_contrast}</p>
+            </div>
+          )}
+
+          {overlay.examples?.length > 0 && (
+            <div className="mb-1">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Examples</span>
+              <div className="mt-1 space-y-1.5">
+                {overlay.examples.map((ex, i) => (
+                  <div key={i} className="text-xs">
+                    <p className="text-gray-800">{ex.en}</p>
+                    <p className="text-gray-500 italic">{ex.es}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
+
+    return (
+      <>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-base font-semibold text-gray-900">
+            {overlay?.pattern || egp.guideword}
+          </span>
+          <span
+            className="text-xs font-bold px-2 py-0.5 rounded shrink-0"
+            style={{ backgroundColor: sColor + '20', color: sColor }}
+          >
+            {sLevel}
+          </span>
+        </div>
+
+        {!overlay && (
+          <p className="text-sm text-gray-700 mb-2">{egp.canDo}</p>
+        )}
+
+        {overlay && (
+          <button
+            onClick={() => setStructureDrillDown(true)}
+            className="text-xs text-blue-500 hover:text-blue-700 mb-1"
+          >
+            Learn more &rsaquo;
+          </button>
+        )}
+      </>
+    );
+  }
+
   return (
     <div
       ref={popupRef}
-      className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-[calc(100vw-16px)] sm:w-72"
-      style={{ left: `${adjusted.x}px`, top: `${adjusted.y}px` }}
+      className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-[calc(100vw-16px)] sm:w-72 overflow-y-auto"
+      style={{ left: `${adjusted.x}px`, top: `${adjusted.y}px`, maxHeight: 'calc(100vh - 16px)' }}
     >
       {view === 'particle' && renderParticleView()}
+      {view === 'structure' && renderStructureView()}
       {view === 'word' && renderWordView()}
 
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
@@ -218,7 +311,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           onClick={onAddFlashcard}
           className="text-xs text-blue-600 hover:text-blue-800 active:text-blue-900 font-medium px-2 py-2 -mx-2 min-h-[44px] flex items-center"
         >
-          + Flashcard
+          {view === 'structure' ? '+ Cloze card' : '+ Flashcard'}
         </button>
         <button
           onClick={onClose}

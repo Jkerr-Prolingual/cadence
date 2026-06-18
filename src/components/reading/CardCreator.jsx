@@ -101,11 +101,11 @@ function ImagePicker({ initialQuery, selectedUrl, onSelect }) {
   );
 }
 
-export default function CardCreator({ word, lemma, cefr, sentence, textId, textTitle, onClose, onCreated }) {
-  const [step, setStep] = useState('type');
-  const [cardType, setCardType] = useState(null);
+export default function CardCreator({ word, lemma, cefr, sentence, textId, textTitle, onClose, onCreated, isStructure = false, structureData = null }) {
+  const [step, setStep] = useState(isStructure ? 'build' : 'type');
+  const [cardType, setCardType] = useState(isStructure ? 'cloze' : null);
   const [front, setFront] = useState('');
-  const [back, setBack] = useState('');
+  const [back, setBack] = useState(isStructure && structureData ? structureData.phrase : '');
   const [imageUrl, setImageUrl] = useState(null);
   const [imageAttribution, setImageAttribution] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -139,26 +139,35 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
     const wordCount = selected.split(/\s+/).filter(Boolean).length;
     if (wordCount < 3) { setSelectionError('Select at least 3 words.'); return; }
     if (wordCount > 15) { setSelectionError('Keep it under 15 words.'); return; }
-    if (!selected.toLowerCase().includes(word.toLowerCase())) {
+    if (!isStructure && !selected.toLowerCase().includes(word.toLowerCase())) {
       setSelectionError(`Must include "${word}".`);
       return;
     }
 
     setSelectionError('');
-    const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-    setFront(selected.replace(regex, '_____'));
+    if (isStructure) {
+      setFront(sentence.replace(selected, '_____'));
+      setBack(selected);
+      setPhraseSelection(selected);
+      sel.removeAllRanges();
+      return;
+    } else {
+      const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      setFront(selected.replace(regex, '_____'));
+    }
     setPhraseSelection(selected);
     sel.removeAllRanges();
   }
 
   async function handleSave() {
     if (!front.trim() || !back.trim()) return;
-    const srsWord = lookupKey;
+    const srsWord = isStructure && structureData ? `egp_${structureData.egp_id}` : lookupKey;
+    const srsCardType = isStructure ? 'structure_cloze' : cardType;
     await upsertSrsCard({
       word: srsWord,
       front: front.trim(),
       back: back.trim(),
-      cardType,
+      cardType: srsCardType,
       cefr,
       spanish: cardType === 'spanish' ? back.trim() : spanish,
       imageUrl,
@@ -187,12 +196,12 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
 
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            {step === 'build' && (
+            {step === 'build' && !isStructure && (
               <button onClick={() => { setStep('type'); setImageUrl(null); setImageAttribution(null); }}
                 className="text-gray-400 hover:text-gray-600 text-lg leading-none">‹</button>
             )}
             <span className="font-semibold text-sm text-gray-800">
-              Add flashcard — "{word}"
+              {isStructure ? 'Add grammar card' : `Add flashcard — "${word}"`}
             </span>
             {cefr && (
               <span className="text-xs font-bold px-1.5 py-0.5 rounded"
@@ -276,7 +285,10 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
             <div className="space-y-4">
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1">
-                  Highlight a phrase containing <strong className="text-gray-800">"{word}"</strong>
+                  {isStructure
+                    ? 'Highlight the part you want to blank out'
+                    : <>Highlight a phrase containing <strong className="text-gray-800">"{word}"</strong></>
+                  }
                 </p>
                 <div
                   ref={phraseRef}

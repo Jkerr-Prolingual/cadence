@@ -20,7 +20,7 @@ import { logFluencySession, getFluencySessionsForText } from '../../lib/fluency'
 import { useAuth } from '../../context/AuthContext';
 
 export default function ReadingView() {
-  const { user } = useAuth();
+  const { user, isTeacher } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [curatedTexts, setCuratedTexts] = useState([]);
@@ -55,6 +55,7 @@ export default function ReadingView() {
   const [cardCreator, setCardCreator] = useState(null);
   const [encounters, setEncounters] = useState({});
   const [bookManifest, setBookManifest] = useState(null);
+  const [showStructures, setShowStructures] = useState(false);
   const [checklistKey, setChecklistKey] = useState(0);
   const selectedTextIdRef = useRef(selectedTextId);
   selectedTextIdRef.current = selectedTextId;
@@ -223,6 +224,15 @@ export default function ReadingView() {
       });
     return () => { cancelled = true; };
   }, [currentBookId]);
+
+  const manifestHasStructures = useMemo(() => {
+    if (!bookManifest?.entries) return false;
+    return Object.values(bookManifest.entries).some(e => e.type === 'structure');
+  }, [bookManifest]);
+
+  useEffect(() => {
+    setShowStructures(isTeacher && manifestHasStructures);
+  }, [manifestHasStructures, isTeacher]);
 
   // Timed reading: tick every second while active
   useEffect(() => {
@@ -587,12 +597,24 @@ export default function ReadingView() {
   function handleOpenCardCreator() {
     if (!popup) return;
     const { token } = popup;
-    setCardCreator({
-      word: token.raw,
-      lemma: token.lemma,
-      cefr: token.cefr,
-      sentence: token.sentence || '',
-    });
+    if (token.structure) {
+      const egp = token.structure.egp || {};
+      setCardCreator({
+        word: token.raw,
+        lemma: token.lemma,
+        cefr: token.structure.override_cefr || egp.level || token.cefr,
+        sentence: token.sentence || '',
+        isStructure: true,
+        structureData: token.structure,
+      });
+    } else {
+      setCardCreator({
+        word: token.raw,
+        lemma: token.lemma,
+        cefr: token.cefr,
+        sentence: token.sentence || '',
+      });
+    }
     setPopup(null);
   }
 
@@ -713,11 +735,26 @@ export default function ReadingView() {
                     )}
                   </p>
                 </div>
-                <ToolSetSelector
-                  active={toolSet}
-                  onSelect={setToolSet}
-                  hasAudio={hasAudio}
-                />
+                <div className="flex items-center gap-2">
+                  {manifestHasStructures && (
+                    <button
+                      onClick={() => setShowStructures(s => !s)}
+                      className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                        showStructures
+                          ? 'bg-purple-50 border-purple-300 text-purple-700'
+                          : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'
+                      }`}
+                      title={showStructures ? 'Hide grammar structures' : 'Show grammar structures'}
+                    >
+                      Grammar
+                    </button>
+                  )}
+                  <ToolSetSelector
+                    active={toolSet}
+                    onSelect={setToolSet}
+                    hasAudio={hasAudio}
+                  />
+                </div>
               </div>
 
               <TextDisplay
@@ -729,6 +766,7 @@ export default function ReadingView() {
                 loopSentenceIdx={loopSentenceIdx}
                 sentences={sentences}
                 manifest={bookManifest}
+                showStructures={showStructures}
               />
 
               {chapterNav && (
@@ -808,6 +846,7 @@ export default function ReadingView() {
           onClose={() => setPopup(null)}
           onAddFlashcard={handleOpenCardCreator}
           particle={popup.token.particle || null}
+          structure={popup.token.structure || null}
           manifest={bookManifest}
         />
       )}
@@ -820,6 +859,8 @@ export default function ReadingView() {
           sentence={cardCreator.sentence}
           textId={selectedTextId}
           textTitle={selectedText?.title}
+          isStructure={cardCreator.isStructure || false}
+          structureData={cardCreator.structureData || null}
           onClose={() => setCardCreator(null)}
           onCreated={() => {
             setCardCreator(null);

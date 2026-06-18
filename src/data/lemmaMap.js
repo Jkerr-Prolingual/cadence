@@ -1,5 +1,5 @@
 // Inflected form → headword lemma map
-// Generated: 2026-05-24
+// Generated: 2026-06-18
 // Source: wordData.js (43466 forms, 34466 non-identity mappings)
 
 export const lemmaMap = {
