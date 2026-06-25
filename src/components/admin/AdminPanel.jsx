@@ -180,6 +180,7 @@ export default function AdminPanel() {
   const [bookCoverFile, setBookCoverFile] = useState(null);
   const [bookCoverPreview, setBookCoverPreview] = useState(null);
   const [bookManifestJson, setBookManifestJson] = useState('');
+  const [bookSyntaxGlossesJson, setBookSyntaxGlossesJson] = useState('');
   const [savingBook, setSavingBook] = useState(false);
   const [bookError, setBookError] = useState(null);
 
@@ -265,6 +266,7 @@ export default function AdminPanel() {
     setBookCoverFile(null);
     setBookCoverPreview(null);
     setBookManifestJson('');
+    setBookSyntaxGlossesJson('');
     setBookError(null);
   }
 
@@ -300,6 +302,17 @@ export default function AdminPanel() {
           throw new Error(`Invalid manifest JSON: ${parseErr.message}`);
         }
       }
+      let parsedSyntaxGlosses = null;
+      if (bookSyntaxGlossesJson.trim()) {
+        try {
+          parsedSyntaxGlosses = JSON.parse(bookSyntaxGlossesJson);
+          if (!parsedSyntaxGlosses.chapters || typeof parsedSyntaxGlosses.chapters !== 'object') {
+            throw new Error('Syntax glosses must have a "chapters" object');
+          }
+        } catch (parseErr) {
+          throw new Error(`Invalid syntax glosses JSON: ${parseErr.message}`);
+        }
+      }
       const record = {
         id,
         title: bookTitle,
@@ -308,6 +321,7 @@ export default function AdminPanel() {
         cefr_estimate: bookCefr,
         cover_image_url: coverImageUrl,
         vocabulary_manifest: parsedManifest,
+        syntax_glosses: parsedSyntaxGlosses,
         status: 'published',
       };
       const { error } = await supabase.from('books').upsert(record, { onConflict: 'id' });
@@ -339,6 +353,7 @@ export default function AdminPanel() {
     setBookCoverFile(null);
     setBookCoverPreview(book.cover_image_url || null);
     setBookManifestJson(book.vocabulary_manifest ? JSON.stringify(book.vocabulary_manifest, null, 2) : '');
+    setBookSyntaxGlossesJson(book.syntax_glosses ? JSON.stringify(book.syntax_glosses, null, 2) : '');
     setShowBookForm(true);
   }
 
@@ -639,6 +654,26 @@ export default function AdminPanel() {
                 }
               })()}
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Syntax Glosses (JSON)</label>
+              <textarea
+                value={bookSyntaxGlossesJson}
+                onChange={(e) => setBookSyntaxGlossesJson(e.target.value)}
+                placeholder='Paste syntax_glosses.json from the graded readers project...'
+                rows={4}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-gray-900 resize-y"
+              />
+              {bookSyntaxGlossesJson.trim() && (() => {
+                try {
+                  const parsed = JSON.parse(bookSyntaxGlossesJson);
+                  const chapterCount = Object.keys(parsed.chapters || {}).length;
+                  const glossCount = Object.values(parsed.chapters || {}).reduce((sum, ch) => sum + ch.length, 0);
+                  return <p className="text-xs text-green-600 mt-1">{glossCount} glosses across {chapterCount} chapters</p>;
+                } catch {
+                  return <p className="text-xs text-red-500 mt-1">Invalid JSON</p>;
+                }
+              })()}
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSaveBook}
@@ -685,6 +720,9 @@ export default function AdminPanel() {
                     <span className="text-xs text-gray-400">({chapterCount} ch.)</span>
                     {book.vocabulary_manifest && (
                       <span className="text-xs text-green-600" title={`${Object.keys(book.vocabulary_manifest.entries || {}).length} manifest entries`}>manifest</span>
+                    )}
+                    {book.syntax_glosses && (
+                      <span className="text-xs text-purple-600" title={`${Object.values(book.syntax_glosses.chapters || {}).reduce((s, ch) => s + ch.length, 0)} syntax glosses`}>glosses</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">

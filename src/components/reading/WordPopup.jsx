@@ -4,16 +4,16 @@ import { spanishDict } from '../../data/es_dictionary';
 import { egpLookup } from '../../data/egpLookup';
 import { egpSpanishOverlay } from '../../data/egpSpanishOverlay';
 
-export default function WordPopup({ word, cefr, lemma, via, position, onClose, onAddFlashcard, particle, manifest, structure }) {
+export default function WordPopup({ word, cefr, lemma, via, position, onClose, onAddFlashcard, particle, manifest, structure, syntaxGloss }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
-  const [view, setView] = useState(particle ? 'particle' : structure ? 'structure' : 'word');
+  const [view, setView] = useState(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
   const [structureDrillDown, setStructureDrillDown] = useState(false);
 
   useEffect(() => {
-    setView(particle ? 'particle' : structure ? 'structure' : 'word');
+    setView(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
     setStructureDrillDown(false);
-  }, [word, particle, structure]);
+  }, [word, particle, structure, syntaxGloss]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -51,7 +51,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     }
     if (y < pad) y = pad;
     setAdjusted({ x, y });
-  }, [position, view, structureDrillDown]);
+  }, [position, view, structureDrillDown, syntaxGloss]);
 
   const lookupKey = lemma || word.toLowerCase();
   const manifestEntry = manifest?.entries?.[lookupKey] || manifest?.entries?.[word.toLowerCase()];
@@ -296,12 +296,95 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     );
   }
 
+  function renderGlossView() {
+    if (!syntaxGloss) return null;
+    const isComplex = syntaxGloss.complexity === 'complex';
+    const typeLabel = syntaxGloss.type.replace(/_/g, ' ');
+
+    return (
+      <>
+        <div className="mb-2">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+              isComplex ? 'bg-blue-100 text-blue-700' : 'bg-blue-50 text-blue-500'
+            }`}>
+              {typeLabel}
+            </span>
+          </div>
+          <p className="text-sm text-gray-600 italic leading-snug">"{syntaxGloss.text}"</p>
+        </div>
+
+        <div className="mb-2">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">ES</span>
+          <p className="text-sm text-gray-800 mt-0.5">{syntaxGloss.spanish}</p>
+        </div>
+
+        {syntaxGloss.note && (
+          <p className="text-xs text-gray-500 italic mb-2">{syntaxGloss.note}</p>
+        )}
+
+        {syntaxGloss.constituents && Object.keys(syntaxGloss.constituents).length > 0 && (
+          <button
+            onClick={() => setView('gloss-constituents')}
+            className="text-xs text-blue-500 hover:text-blue-700 mb-1"
+          >
+            See individual words &darr;
+          </button>
+        )}
+      </>
+    );
+  }
+
+  function renderGlossConstituentsView() {
+    if (!syntaxGloss?.constituents) return null;
+    const textLower = syntaxGloss.text.toLowerCase();
+    const entries = Object.entries(syntaxGloss.constituents)
+      .sort((a, b) => textLower.indexOf(a[0].toLowerCase()) - textLower.indexOf(b[0].toLowerCase()));
+
+    return (
+      <>
+        <button
+          onClick={() => setView('gloss')}
+          className="text-xs text-blue-500 hover:text-blue-700 mb-2 flex items-center gap-1"
+        >
+          &uarr; Back to phrase
+        </button>
+
+        <div className="space-y-2">
+          {entries.map(([key, spanish], i) => {
+            const lookup = lookupCefr(key.split(/\s+/)[0]);
+            const level = lookup.cefr || 'unclassified';
+            const color = cefrColor(level);
+            return (
+              <div key={i} className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-semibold text-gray-900">{key}</span>
+                    <span
+                      className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0"
+                      style={{ backgroundColor: color + '20', color }}
+                    >
+                      {level === 'unclassified' ? '—' : level}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 mt-0.5">{spanish}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+
   return (
     <div
       ref={popupRef}
       className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-[calc(100vw-16px)] sm:w-72 overflow-y-auto"
       style={{ left: `${adjusted.x}px`, top: `${adjusted.y}px`, maxHeight: 'calc(100vh - 16px)' }}
     >
+      {view === 'gloss' && renderGlossView()}
+      {view === 'gloss-constituents' && renderGlossConstituentsView()}
       {view === 'particle' && renderParticleView()}
       {view === 'structure' && renderStructureView()}
       {view === 'word' && renderWordView()}

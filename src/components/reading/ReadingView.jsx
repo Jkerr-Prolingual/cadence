@@ -55,6 +55,8 @@ export default function ReadingView() {
   const [cardCreator, setCardCreator] = useState(null);
   const [encounters, setEncounters] = useState({});
   const [bookManifest, setBookManifest] = useState(null);
+  const [syntaxGlosses, setSyntaxGlosses] = useState(null);
+  const [translationMode, setTranslationMode] = useState(false);
   const [showStructures, setShowStructures] = useState(false);
   const [checklistKey, setChecklistKey] = useState(0);
   const selectedTextIdRef = useRef(selectedTextId);
@@ -212,18 +214,31 @@ export default function ReadingView() {
 
   const currentBookId = selectedText?.book_id;
   useEffect(() => {
-    if (!currentBookId) { setBookManifest(null); return; }
+    if (!currentBookId) { setBookManifest(null); setSyntaxGlosses(null); return; }
     let cancelled = false;
     supabase
       .from('books')
-      .select('vocabulary_manifest')
+      .select('vocabulary_manifest, syntax_glosses')
       .eq('id', currentBookId)
       .single()
       .then(({ data }) => {
-        if (!cancelled) setBookManifest(data?.vocabulary_manifest || null);
+        if (!cancelled) {
+          setBookManifest(data?.vocabulary_manifest || null);
+          setSyntaxGlosses(data?.syntax_glosses || null);
+        }
       });
     return () => { cancelled = true; };
   }, [currentBookId]);
+
+  const chapterGlosses = useMemo(() => {
+    if (!syntaxGlosses?.chapters || !selectedText) return null;
+    const order = selectedText.chapter_order;
+    if (order == null) return null;
+    const key = `ch${String(order).padStart(2, '0')}`;
+    return syntaxGlosses.chapters[key] || null;
+  }, [syntaxGlosses, selectedText]);
+
+  const hasSyntaxGlosses = !!chapterGlosses?.length;
 
   const manifestHasStructures = useMemo(() => {
     if (!bookManifest?.entries) return false;
@@ -736,6 +751,19 @@ export default function ReadingView() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {hasSyntaxGlosses && (
+                    <button
+                      onClick={() => setTranslationMode(m => !m)}
+                      className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                        translationMode
+                          ? 'bg-blue-50 border-blue-300 text-blue-700'
+                          : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'
+                      }`}
+                      title={translationMode ? 'Hide translations' : 'Show translations'}
+                    >
+                      Translate
+                    </button>
+                  )}
                   {manifestHasStructures && (
                     <button
                       onClick={() => setShowStructures(s => !s)}
@@ -767,6 +795,8 @@ export default function ReadingView() {
                 sentences={sentences}
                 manifest={bookManifest}
                 showStructures={showStructures}
+                syntaxGlosses={chapterGlosses}
+                translationMode={translationMode}
               />
 
               {chapterNav && (
@@ -848,6 +878,7 @@ export default function ReadingView() {
           particle={popup.token.particle || null}
           structure={popup.token.structure || null}
           manifest={bookManifest}
+          syntaxGloss={popup.token.syntaxGloss || null}
         />
       )}
 

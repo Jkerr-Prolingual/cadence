@@ -227,6 +227,15 @@ the particle as a unit (see "Particle-aware reading view" in the Particle
 Model section). Cursor-gated colored underlines by CEFR tier. Encounter
 tracking across sessions.
 
+**Translation mode (syntax glosses):** Binary toggle that overlays
+phrase-level Spanish translations on the text. Curated per-book during
+graded reader production — every sentence is segmented into contiguous
+syntax glosses with grammatical type and complexity classification.
+Complex glosses are visually flagged with a darker underline. Tapping a
+gloss shows the phrase translation with drill-down to contextually
+translated constituent words. See "Syntax Glosses" section for schema
+and design details.
+
 **Audio playback:** ElevenLabs-generated audio with word-level timestamps,
 synchronized highlighting, speed slider (0.5×–1.25×), sentence loop for
 practice. Tapping a word during playback pauses audio and shows the popup;
@@ -270,7 +279,7 @@ provenance). Series/sequence support for multi-chapter works.
 - `profiles` — user identity, roles (student/teacher/admin), L1, CEFR
 - `classes` — teacher-owned class containers with join codes
 - `class_enrollments` — student ↔ class mapping
-- `books` — book containers grouping curated_texts, with `vocabulary_manifest` JSONB
+- `books` — book containers grouping curated_texts, with `vocabulary_manifest` JSONB and `syntax_glosses` JSONB
 - `curated_texts` — admin-managed corpus texts (authoritative store), linked to books via `book_id`
 - `user_progress` — per-user JSONB for userWords and wordEncounters
 - `reading_sessions` — per-pass records (silent/oral/shadow mode)
@@ -550,6 +559,11 @@ Each graded reader series produces:
   override file with sense-disambiguated translations, multi-word particles,
   and pedagogical notes. Only entries where the base dictionary is
   insufficient. Schema and details below in "Vocabulary Manifest Schema."
+- **Syntax glosses** (`series/<slug>/syntax_glosses.json`) — full-text
+  phrase-level segmentation with Spanish translations, grammatical type,
+  complexity flags, and constituent translations. Authored during the
+  same curation pass as the vocabulary manifest. Schema and details in
+  "Syntax Glosses" section.
 - A constraint specification (`series/<slug>/constraint_spec.md`) with
   CEFR target, sentence constraints, and compliance rules
 - L1 transfer adjustments (`series/<slug>/l1_adjustments.md`) with
@@ -570,6 +584,10 @@ When a graded reader chapter is ingested into Relato as a `curated_text`:
   words and particles in the text, stored as JSONB on the `books` table
   (`vocabulary_manifest` column), ingested from the graded reader
   project's `vocabulary_manifest.json` via AdminPanel
+- **Syntax glosses** — full-text phrase-level Spanish translations with
+  grammatical type and complexity flags, stored as JSONB on the `books`
+  table (`syntax_glosses` column), ingested from the graded reader
+  project's `syntax_glosses.json` via AdminPanel
 - Audio (ElevenLabs TTS with word-level timestamps)
 - L1 adjustments (cognate/false-friend effective CEFR overrides)
 
@@ -583,6 +601,7 @@ graded_readers/                          cadence/
   series/<slug>/chapters/ch*.md ──────→ curated_texts (Supabase + IndexedDB)
   series/<slug>/vocabulary_inventory ─→ per-text particle metadata
   series/<slug>/vocabulary_manifest ──→ books.vocabulary_manifest (JSONB)
+  series/<slug>/syntax_glosses.json ──→ books.syntax_glosses (JSONB)
   series/<slug>/l1_adjustments.md ────→ effective CEFR overrides
 ```
 
@@ -735,6 +754,209 @@ story-specific significance, or L1 transfer hazards.
 
 ---
 
+## Syntax Glosses
+
+Syntax glosses provide **full-text phrase-level Spanish translations** for
+every sentence in a curated text. Where the vocabulary manifest handles
+word- and particle-level translations, syntax glosses handle the
+structures that connect them — clauses, phrases, and constructions whose
+meaning is not recoverable from individual word translations alone.
+
+### Motivation
+
+A2–B1 readers often understand every word in a sentence but cannot parse
+the syntax: relative clauses, participial phrases, conditionals, passive
+constructions. Word-level popups don't help because the problem is
+structural, not lexical. Syntax glosses provide a full interlinear-style
+translation layer the student can lean on when syntax impedes
+comprehension — analogous to the reading support common in CJK language
+learning tools.
+
+### Full-text segmentation model
+
+Syntax glosses are a **complete, contiguous segmentation** of the chapter
+text into non-overlapping phrase-level chunks. Every word in the text
+belongs to exactly one syntax gloss. This means the file covers the
+entire text, not just anticipated problem spots — the author cannot
+reliably predict where every learner will get lost, and full coverage
+lets the UI offer granularity modes.
+
+Each gloss carries a `complexity` flag (`"simple"` or `"complex"`).
+Translation mode is a binary toggle (on/off). When on, all glosses are
+shown — complex glosses are visually distinguished with a darker
+underline color so learners can see which structures are syntactically
+challenging.
+
+### Tiling contract and whitespace
+
+The tiling contract is **word-sequence equivalence**: the ordered sequence
+of words extracted from all gloss `text` fields for a chapter must match
+the ordered sequence of words in the chapter body text. Glosses are
+separated by implicit single space. Paragraph boundaries and line breaks
+in the source markdown are **not** represented in the gloss stream —
+Relato's renderer already has paragraph structure from tokenizing the
+chapter markdown; it does not need glosses to encode it.
+
+**Scope:** Gloss the body text only. Skip `# Chapter N` header lines,
+`---` horizontal rules, and any non-body markdown. Strip `*` italic
+markers from gloss text — Relato renders raw text without markdown.
+Include quotation marks and punctuation as they appear in the source.
+
+### Controlled type vocabulary
+
+Every gloss is categorized by grammatical type:
+
+| Type | Example |
+|---|---|
+| `simple clause` | "She smiled." |
+| `noun phrase` | "the old woman next door" |
+| `relative clause` | "the one she had been saving" |
+| `subordinate clause` | "even though she wasn't hungry" |
+| `prepositional phrase` | "without saying a word" |
+| `participial phrase` | "sitting by the window" |
+| `infinitive phrase` | "to make sure no one was watching" |
+| `conditional` | "if she had known earlier" |
+| `passive construction` | "was given to her by the teacher" |
+| `inverted structure` | "never had she seen anything like it" |
+| `fragment` | "No tray. No book. No Leo." / "Not yet." / "Tomorrow." |
+
+This list may grow as new patterns are encountered during curation.
+
+### Interaction with word/particle popups
+
+Syntax glosses coexist with word-level and particle-level popups. The
+layers nest: a syntax gloss span may contain particles, which may contain
+individual words. Tapping behavior in translation mode:
+
+1. **Tap a syntax gloss span** → shows the phrase-level Spanish
+   translation, grammatical type, and complexity flag
+2. **Drill down** → shows constituent words with contextually appropriate
+   translations from the gloss's `constituents` map
+3. **Individual word/particle popups** remain available within the
+   drill-down — CEFR level, definitions, encounter data
+
+Constituent translations in the syntax gloss override `es_dictionary`
+and the vocabulary manifest for words within that gloss, ensuring the
+translation reflects the word's sense *in that specific phrase*.
+
+### File format and storage
+
+The syntax glosses file is a **separate JSON file** produced per-book
+during graded reader curation, stored alongside the vocabulary manifest.
+Stored as a `syntax_glosses` JSONB column on the `books` table, ingested
+via AdminPanel alongside the vocabulary manifest.
+
+### Schema
+
+```json
+{
+  "book": "the_cookie",
+  "target_cefr": "A1",
+  "generated": "2026-06-24",
+  "chapters": {
+    "ch01": [
+      {
+        "text": "I work at the college cafeteria.",
+        "spanish": "Yo trabajo en la cafetería de la universidad.",
+        "type": "simple clause",
+        "complexity": "simple",
+        "constituents": {
+          "I": "yo",
+          "work": "trabajo",
+          "at the college cafeteria": "en la cafetería de la universidad"
+        }
+      },
+      {
+        "text": "the one she had been saving",
+        "spanish": "la que había estado guardando",
+        "type": "relative clause",
+        "complexity": "complex",
+        "constituents": {
+          "the one": "la que",
+          "she had been saving": "había estado guardando"
+        },
+        "note": "past perfect progressive — complex tense for A1 readers"
+      },
+      {
+        "text": "Not yet.",
+        "spanish": "Todavía no.",
+        "type": "fragment",
+        "complexity": "simple",
+        "constituents": {
+          "Not yet": "todavía no"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Field reference
+
+| Field | Required | Description |
+|---|---|---|
+| `book` | yes | Book slug, matches `books.id` in Relato |
+| `target_cefr` | yes | Book CEFR target range |
+| `generated` | yes | Date glosses were generated (YYYY-MM-DD) |
+| `chapters` | yes | Map of chapter key → ordered array of gloss objects |
+| `chapters.*.text` | yes | Exact text from the chapter that this gloss covers. Matched by normalized string, not character offset — survives minor text edits. Glosses must tile the chapter text contiguously with no gaps or overlaps. |
+| `chapters.*.spanish` | yes | Full Spanish translation of the phrase |
+| `chapters.*.type` | yes | Grammatical type from the controlled vocabulary |
+| `chapters.*.complexity` | yes | `"simple"` or `"complex"` — drives UI filtering |
+| `chapters.*.constituents` | yes | Map of word or sub-phrase (as it appears in `text`) → contextually appropriate Spanish translation. Prefer **sub-phrase keys** that translate as semantic units (`"at the college cafeteria"` → `"en la cafetería de la universidad"`) over atomic word-by-word keys — the purpose is comprehension support, not a dictionary. Translations are **gloss-local and conjugated** to match the phrase (`"work"` → `"trabajo"` in first person, `"trabaja"` in third person). These are not vocabulary lookup entries; word-level dictionary lookup is handled by the manifest and `es_dictionary`. |
+| `chapters.*.note` | no | Pedagogical note — grammatical explanation, L1 transfer hazard, tense complexity, etc. |
+
+### Design decisions
+
+**Full-text segmentation, not problem-spot annotation.** Every word is
+covered. The `complexity` flag lets the UI filter to just the hard
+structures when a student wants scaffolded (not full) support. Authoring
+the simple glosses is fast; the value of full coverage is that no student
+hits an untranslated gap.
+
+**String-keyed, not offset-keyed.** Glosses are matched by normalized
+text string, not character positions. This survives text edits (typo
+fixes, minor rewording) without invalidating the gloss file. Resolution
+to character positions for rendering happens at ingestion or render time
+via text matching.
+
+**Separate file from the vocabulary manifest.** The manifest is keyed by
+lemma (word-level overrides); syntax glosses are keyed by text span
+(phrase-level segmentation). Different shape, different authoring
+workflow, different storage column (`syntax_glosses` vs
+`vocabulary_manifest` on `books`).
+
+**Constituents on every gloss.** Each gloss carries its own constituent
+translations rather than falling through to the vocabulary manifest or
+`es_dictionary`. This gives the author full control over per-phrase sense
+disambiguation and avoids the problem of a word having a manifest entry
+for one context but appearing in a different sense within a syntax gloss.
+
+**Sub-phrase keys over atomic keys.** Constituent keys should be semantic
+units that translate naturally together (`"at the college cafeteria"` →
+`"en la cafetería de la universidad"`), not one-word-per-key breakdowns.
+Atomic keys for function words (`"the"` → `"la"`) are noise. Word-level
+interactivity is already handled by the word/particle popup layer.
+
+**Conjugated, gloss-local translations.** Constituent translations are
+conjugated to match the phrase context (`"work"` → `"trabajo"` in first
+person, `"trabaja"` in third). This means the same English word may map
+to different Spanish across glosses. This is intentional — constituents
+serve reading comprehension, not vocabulary lookup.
+
+**Ordered array per chapter.** Glosses are ordered sequentially as they
+appear in the text. The array order IS the segmentation — adjacent glosses
+tile the chapter text from beginning to end.
+
+**Vocabulary manifest stays book-level; syntax glosses are chapter-level.**
+The manifest is lemma-keyed — a word carries one sense throughout the book
+(by design in controlled vocabulary writing). Syntax glosses tile a
+specific chapter's text and are meaningless without that chapter's exact
+word sequence. Different granularity, different shape, both correct for
+what they do.
+
+---
+
 ## Project Structure
 
 ```
@@ -774,3 +996,233 @@ VITE_ELEVENLABS_VOICE_IDS
 VITE_AZURE_SPEECH_KEY
 VITE_AZURE_SPEECH_REGION
 ```
+
+---
+
+## AI Pronunciation Assessment Pipeline
+
+### Overview
+
+Students record oral read-alouds in ReadingView (saved to Supabase Storage
+as webm/opus). The pronunciation assessment pipeline transcribes the
+recording, diffs the transcript against the reference text, obtains
+per-word accuracy scores, generates AI flag events, and surfaces results
+in the reading view.
+
+### Architecture: Client-Orchestrated Two-Function Pipeline
+
+The pipeline uses two separate Netlify functions (compatible with the free
+tier), orchestrated by the client:
+
+```
+Student saves recording (existing flow)
+  → Recording uploaded to Supabase Storage (existing)
+  → Client sets assessment_status = 'pending'
+  → Client calls Netlify fn: transcribe-whisper
+      → Downloads audio from Supabase Storage (service role key)
+      → Sends to Groq Whisper API
+      → Returns transcript + word-level timestamps
+  → Client runs word alignment locally (edit distance, pure JS)
+  → Client calls Netlify fn: assess-pronunciation
+      → Downloads audio from Supabase Storage
+      → Sends to Azure PA with reference text
+      → Returns per-word accuracy, fluency, prosody, completeness
+  → Client merges results: alignment + Azure scores → flag events
+  → Client writes pronunciation_assessments row + flag_events to Supabase
+  → Client sets assessment_status = 'complete'
+  → TextDisplay renders assessment overlay
+```
+
+Each Netlify function handles one API call, keeping execution time within
+the ~10–26s window. The diff/alignment is pure computation — runs
+client-side instantly.
+
+### Whisper Transcription (Groq)
+
+Groq's Whisper API (`whisper-large-v3`) provides near-real-time
+transcription with word-level timestamps. It accepts webm/opus directly.
+The Netlify function `transcribe-whisper.js` downloads the recording from
+Supabase Storage using the service role key, sends it to Groq, and returns
+the transcript + word timestamps.
+
+Server-side env vars: `GROQ_API_KEY`, `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`.
+
+### Word Alignment (Client-Side)
+
+After receiving the Whisper transcript, the client runs a word-level edit
+distance alignment (Wagner-Fischer) between the spoken words and the
+reference text words. This produces an alignment array:
+
+```json
+[
+  { "type": "match",        "refWord": "the", "refIdx": 0, "spokenWord": "the", "spokenIdx": 0, "timestampMs": 120 },
+  { "type": "substitution", "refWord": "cat", "refIdx": 1, "spokenWord": "cut", "spokenIdx": 1, "timestampMs": 450 },
+  { "type": "omission",     "refWord": "sat", "refIdx": 2, "spokenWord": null,  "spokenIdx": null, "timestampMs": null },
+  { "type": "insertion",    "refWord": null,   "refIdx": null, "spokenWord": "um", "spokenIdx": 2, "timestampMs": 780 }
+]
+```
+
+Word normalization: lowercase, strip punctuation, expand contractions
+(reuses `CONTRACTIONS` from `wordUtils.js`).
+
+### Azure Pronunciation Assessment
+
+The Netlify function `assess-pronunciation.js` downloads the recording
+from Supabase Storage and sends it to Azure Speech with Pronunciation
+Assessment config (referenceText, granularity=Word, dimension=
+Comprehensive, enableMiscue=true). Returns per-word accuracy scores
+(0–100), fluency, prosody, and completeness scores.
+
+Server-side env vars: `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`,
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+
+**Audio format:** Azure prefers WAV. If webm/opus is rejected, conversion
+via Web Audio API on the client (decode to PCM, encode as WAV) before
+triggering the Azure function.
+
+**L2 accent calibration:** Accuracy threshold set at < 60 (not Azure's
+default ~80). Words scoring 60–80 are "accented but intelligible" — they
+get yellow UI treatment but no flag event. Words < 60 are flagged.
+
+### Database Schema
+
+**New columns on `student_recordings`:**
+- `assessment_status` text (null | 'pending' | 'processing' | 'complete'
+  | 'error')
+- `assessment_error` text (nullable)
+
+**New table `pronunciation_assessments`:**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `user_id` | uuid FK → profiles | |
+| `text_id` | text FK → curated_texts | |
+| `whisper_transcript` | text | Full Whisper transcript |
+| `whisper_word_timestamps` | jsonb | `[{word, start, end}]` |
+| `alignment` | jsonb | `[{type, refWord, refIdx, spokenWord, spokenIdx, timestampMs}]` |
+| `azure_word_scores` | jsonb | `[{word, accuracy, errorType}]` |
+| `azure_fluency_score` | float | |
+| `azure_prosody_score` | float | |
+| `azure_completeness_score` | float | |
+| `overall_accuracy` | float | Computed mean of matched word scores |
+| `processed_at` | timestamptz | |
+
+Unique constraint on (user_id, text_id). RLS: students read own, teachers
+read enrolled students' (same pattern as `student_recordings`).
+
+Uses the existing `flag_events` table with `source = 'ai'`.
+
+### Flag Event Generation
+
+From the merged Whisper alignment + Azure scores, `flag_events` rows are
+generated with `source = 'ai'`:
+
+| Condition | flag_type | severity |
+|---|---|---|
+| Word omitted (skip) | `skip` | 3 |
+| Word substituted | `mispronunciation` | 3 |
+| Azure accuracy < 30 | `mispronunciation` | 5 |
+| Azure accuracy 30–45 | `mispronunciation` | 4 |
+| Azure accuracy 45–55 | `mispronunciation` | 3 |
+| Azure accuracy 55–60 | `mispronunciation` | 2 |
+| Azure hesitation detected | `hesitation` | 2 |
+
+### UI Integration
+
+**RecordReviewStrip:** After save, shows "Analyzing pronunciation..."
+spinner during processing. On complete, shows summary bar with overall
+accuracy % and count of words needing work. Error state with retry button.
+
+**TextDisplay:** Accepts `wordAssessmentMap` prop. Renders colored
+underlines on assessed words (additive — does not replace CEFR underlines
+or sentence highlighting):
+- Green: accuracy 80+ (fluent)
+- Yellow: accuracy 60–80 (accented but intelligible, not flagged)
+- Orange: accuracy 40–60 (flagged)
+- Red: accuracy < 40 or omitted (flagged, high severity)
+
+**WordPopup:** Accepts `assessmentInfo` prop. Shows pronunciation section:
+- Accuracy score
+- For substitutions: "You said: [X] — Expected: [Y]"
+- For omissions: "This word was skipped"
+- Phoneme details from Azure data
+
+### Files
+
+**New files:**
+- `supabase/migrations/009_pronunciation_assessments.sql`
+- `src/lib/alignment.js` — word-level edit distance (Wagner-Fischer)
+- `src/lib/pronunciation.js` — client-side pipeline orchestrator
+- `netlify/functions/transcribe-whisper.js` — Groq Whisper proxy
+- `netlify/functions/assess-pronunciation.js` — Azure PA proxy
+
+**Modified files:**
+- `src/components/reading/ReadingView.jsx` — trigger assessment after
+  save, manage assessment state, pass data to child components
+- `src/components/reading/RecordReviewStrip.jsx` — assessment
+  status/summary UI
+- `src/components/reading/TextDisplay.jsx` — assessment overlay rendering
+- `src/components/reading/WordPopup.jsx` — pronunciation details section
+
+### Cost Estimates
+
+Groq Whisper: ~$0.11/hour of audio. Azure PA: ~$1/hour. For a class of
+30 students doing 2 recordings/week, each 3 minutes: ~$3.33/week.
+
+### Future: Chunk-Level Pronunciation Feedback
+
+Word-level assessment is the foundation, but much A2–B1 pronunciation
+difficulty is suprasegmental — linking, phrasal stress, and chunking live
+between words, not inside them. Deferred for now; document the design so
+it can be layered on without schema changes.
+
+**The problem:** A student who says every word correctly but pauses between
+each one ("I... put... on... my... apron") scores fine per-word but sounds
+non-fluent. Word-level scores also miss linking failures ("pick_it_up" as
+one phonological phrase) and phrasal stress shifts that change meaning.
+
+**What the existing data supports:** Whisper word-level timestamps already
+contain inter-word pause duration. At render time, particle spans and
+syntax gloss spans can group word-level timestamps and scores into
+chunk-level feedback — no additional API call needed.
+
+**Chunk-level signals (computable from existing data):**
+- Max inter-word pause within a particle or syntax gloss span (threshold
+  TBD empirically, ~300ms starting point). Flags "choppy" delivery of
+  phrases that should flow as one breath group.
+- Mean word accuracy within a chunk vs. individual word accuracy — catches
+  words that are accurate in isolation but degrade in connected speech.
+- Azure's global fluency and prosody scores, correlated with chunk
+  boundaries, may reveal which phrase types cause the most disfluency.
+
+**What it doesn't support (would need new data):** Phonological linking
+quality, phrasal stress placement, and intonation contour within a chunk
+require features Azure PA doesn't localize to phrases. These would need
+either a more granular ASR model or teacher annotation.
+
+**UI approach (when built):** Surface chunk-level feedback alongside
+word-level — e.g., a syntax gloss span highlighted as "choppy" with a
+tap target that says "Try saying this phrase as one breath group." Teacher
+view would show which chunk types (relative clauses, phrasal verbs) a
+student consistently fragments.
+
+**Why defer:** Word-level feedback is concrete, API-supported, and
+sufficient for the teacher review workflow. Chunk-level analysis is a
+computation over data already being captured, grouped by spans already
+defined in the reading view. It can be added without schema changes once
+there's real word-level usage data to calibrate thresholds against.
+
+### Known Risks
+
+- **Netlify timeout:** If Groq or Azure responses exceed 10s, functions
+  will time out. Groq Whisper is near-real-time (~5–8s for 5-min audio).
+  Mitigations: set function timeout to 26s in config, compress audio
+  client-side, or move to Supabase Edge Functions.
+- **Azure webm/opus format:** If rejected, client-side conversion via
+  Web Audio API (decode to PCM, encode as WAV) before triggering the
+  Azure function.
+- **L2 accent over-flagging:** Threshold at < 60 (not default ~80).
+  Future: change-over-time analysis (compare accuracy across recordings
+  for the same word).
