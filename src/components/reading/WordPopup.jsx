@@ -4,7 +4,7 @@ import { spanishDict } from '../../data/es_dictionary';
 import { egpLookup } from '../../data/egpLookup';
 import { egpSpanishOverlay } from '../../data/egpSpanishOverlay';
 
-export default function WordPopup({ word, cefr, lemma, via, position, onClose, onAddFlashcard, particle, manifest, structure, syntaxGloss }) {
+export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
   const [view, setView] = useState(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
@@ -396,12 +396,22 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         >
           {view === 'structure' ? '+ Cloze card' : '+ Flashcard'}
         </button>
-        <button
-          onClick={onClose}
-          className="text-xs text-gray-400 hover:text-gray-600 active:text-gray-800 px-2 py-2 -mr-2 min-h-[44px] flex items-center"
-        >
-          Close
-        </button>
+        <div className="flex items-center gap-1">
+          {onResumeAudio && (
+            <button
+              onClick={onResumeAudio}
+              className="text-xs text-green-600 hover:text-green-800 active:text-green-900 font-medium px-2 py-2 min-h-[44px] flex items-center"
+            >
+              Resume ▶
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="text-xs text-gray-400 hover:text-gray-600 active:text-gray-800 px-2 py-2 -mr-2 min-h-[44px] flex items-center"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );

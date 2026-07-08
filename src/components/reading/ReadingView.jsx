@@ -592,11 +592,8 @@ export default function ReadingView() {
       return;
     }
     if (audioRef.current && !audioRef.current.paused && hasAudio) {
-      const sentence = findSentenceForWord(sentences, token.wordIdx);
-      if (sentence) {
-        audioRef.current.currentTime = Math.max(0, sentence.startTime - 0.05);
-      }
-      return;
+      audioRef.current.pause();
+      setIsPlaying(false);
     }
     setPopup({ token, position });
     recordEncounter(token);
@@ -876,6 +873,7 @@ export default function ReadingView() {
           via={popup.token.via}
           position={popup.position}
           onClose={() => setPopup(null)}
+          onResumeAudio={hasAudio && audioRef.current && audioRef.current.paused ? handleResumeAudio : null}
           onAddFlashcard={handleOpenCardCreator}
           particle={popup.token.particle || null}
           structure={popup.token.structure || null}

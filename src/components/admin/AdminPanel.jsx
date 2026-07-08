@@ -203,11 +203,29 @@ export default function AdminPanel() {
 
   // Corpus list
   const [corpusTexts, setCorpusTexts] = useState([]);
+  const [showWizard, setShowWizard] = useState(false);
 
   const voices = useMemo(() => getVoiceOptions(), []);
   const { cleanBody, images: parsedImages } = useMemo(() => extractImages(rawText), [rawText]);
   const analysis = useMemo(() => analyzeText(cleanBody), [cleanBody]);
   const textId = useMemo(() => titleToSlug(title), [title]);
+  const [expandedBookId, setExpandedBookId] = useState(null);
+  const editingExisting = useMemo(() => corpusTexts.find(t => t.id === textId), [corpusTexts, textId]);
+
+  const bookChapters = useMemo(() => {
+    const map = {};
+    books.forEach(b => { map[b.id] = []; });
+    const standalone = [];
+    corpusTexts.forEach(t => {
+      if (t.bookId && map[t.bookId]) {
+        map[t.bookId].push(t);
+      } else {
+        standalone.push(t);
+      }
+    });
+    Object.values(map).forEach(chs => chs.sort((a, b) => (a.chapterOrder || 0) - (b.chapterOrder || 0)));
+    return { map, standalone };
+  }, [books, corpusTexts]);
 
   useEffect(() => {
     loadCorpus();
@@ -341,9 +359,16 @@ export default function AdminPanel() {
   }
 
   async function handleDeleteBook(id) {
+    const book = books.find(b => b.id === id);
+    const chapterCount = corpusTexts.filter(t => t.bookId === id).length;
+    const msg = chapterCount > 0
+      ? `Delete book "${book?.title || id}"?\n\n${chapterCount} chapter(s) will be unlinked (not deleted). This cannot be undone.`
+      : `Delete book "${book?.title || id}"?\n\nThis cannot be undone.`;
+    if (!window.confirm(msg)) return;
     try {
       await supabase.from('curated_texts').update({ book_id: null, chapter_order: null }).eq('book_id', id);
       await supabase.from('books').delete().eq('id', id);
+      if (expandedBookId === id) setExpandedBookId(null);
       await loadBooks();
       await loadCorpus();
     } catch {}
@@ -528,10 +553,16 @@ export default function AdminPanel() {
     setGenerateError(null);
     setPublished(false);
     setStep(1);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setShowWizard(true);
+    setTimeout(() => document.getElementById('chapter-wizard')?.scrollIntoView({ behavior: 'smooth' }), 50);
   }
 
   async function handleDeleteText(id) {
+    const text = corpusTexts.find(t => t.id === id);
+    const msg = text?.hasAudio
+      ? `Delete "${text?.title || id}"?\n\nThe associated audio file will also be deleted. This cannot be undone.`
+      : `Delete "${text?.title || id}"?\n\nThis cannot be undone.`;
+    if (!window.confirm(msg)) return;
     try {
       await supabase.storage.from('curated-text-audio').remove([`${id}.mp3`]);
       await supabase.from('curated_texts').delete().eq('id', id);
@@ -557,6 +588,19 @@ export default function AdminPanel() {
     setAudioData(null);
     setGenerateError(null);
     setPublished(false);
+    setShowWizard(false);
+  }
+
+  function handleAddChapterToBook(book) {
+    handleReset();
+    setShowWizard(true);
+    setBookId(book.id);
+    setAuthor(book.author || '');
+    setCefrEstimate(book.cefr_estimate || 'B1');
+    const chapters = corpusTexts.filter(t => t.bookId === book.id);
+    const maxOrder = chapters.reduce((max, t) => Math.max(max, t.chapterOrder || 0), 0);
+    setChapterOrder(String(maxOrder + 1));
+    setTimeout(() => document.getElementById('chapter-wizard')?.scrollIntoView({ behavior: 'smooth' }), 50);
   }
 
   const canAdvance = title.trim() && rawText.trim();
@@ -566,41 +610,149 @@ export default function AdminPanel() {
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Admin Panel</h1>
 
-      {/* Step indicator */}
-      <div className="flex gap-1 mb-8">
-        {STEPS.map((label, i) => {
-          const s = i + 1;
-          const active = step === s;
-          return (
-            <button
-              key={s}
-              onClick={() => setStep(s)}
-              className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-                active
-                  ? 'bg-gray-900 text-white font-semibold'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              {s}. {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Books Management */}
-      <div className="mb-8 border border-gray-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-900">Books ({books.length})</h2>
+      {/* Library */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Library</h2>
           <button
-            onClick={() => { resetBookForm(); setShowBookForm(true); }}
-            className="text-xs font-medium text-blue-600 hover:text-blue-800"
+            onClick={() => { resetBookForm(); setShowBookForm(true); setTimeout(() => document.getElementById('book-form')?.scrollIntoView({ behavior: 'smooth' }), 50); }}
+            className="text-sm font-medium text-blue-600 hover:text-blue-800"
           >
             + New Book
           </button>
         </div>
 
-        {showBookForm && (
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg space-y-3">
+        {books.length > 0 && (
+          <div className="space-y-3">
+            {books.map(book => {
+              const chapters = bookChapters.map[book.id] || [];
+              const isExpanded = expandedBookId === book.id;
+              return (
+                <div key={book.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setExpandedBookId(isExpanded ? null : book.id)}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 text-left"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className="text-xs font-bold px-1.5 py-0.5 rounded"
+                        style={{
+                          backgroundColor: (CEFR_COLORS[book.cefr_estimate] || '#6b7280') + '20',
+                          color: CEFR_COLORS[book.cefr_estimate] || '#6b7280',
+                        }}
+                      >
+                        {book.cefr_estimate}
+                      </span>
+                      <span className="text-sm font-medium text-gray-900">{book.title}</span>
+                      {book.author && <span className="text-xs text-gray-400">{book.author}</span>}
+                      <span className="text-xs text-gray-400">{chapters.length} ch.</span>
+                      {book.vocabulary_manifest && (
+                        <span className="text-xs text-green-600" title={`${Object.keys(book.vocabulary_manifest.entries || {}).length} manifest entries`}>manifest</span>
+                      )}
+                      {book.syntax_glosses && (
+                        <span className="text-xs text-purple-600" title={`${Object.values(book.syntax_glosses.chapters || {}).reduce((s, ch) => s + ch.length, 0)} syntax glosses`}>glosses</span>
+                      )}
+                    </div>
+                    <span className="text-gray-400 text-xs ml-2">{isExpanded ? '▲' : '▼'}</span>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-gray-200 bg-gray-50 px-4 py-3">
+                      {chapters.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {chapters.map(text => (
+                            <div key={text.id} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400 w-6 text-right font-mono">{text.chapterOrder}.</span>
+                                <span className="text-sm text-gray-900">{text.title}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-gray-400">{text.wordCount} words</span>
+                                {text.hasAudio && <span className="text-xs text-green-600">audio</span>}
+                                {text.textAnalysis && <span className="text-xs text-blue-600">analyzed</span>}
+                                <button onClick={() => handleEditText(text)} className="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</button>
+                                <button onClick={() => handleDeleteText(text.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-400 py-2">No chapters yet</p>
+                      )}
+                      <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-200">
+                        <button
+                          onClick={() => handleAddChapterToBook(book)}
+                          className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                        >
+                          + Add Chapter
+                        </button>
+                        <span className="text-gray-300">|</span>
+                        <button
+                          onClick={() => { handleEditBook(book); setTimeout(() => document.getElementById('book-form')?.scrollIntoView({ behavior: 'smooth' }), 50); }}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Edit Book
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBook(book.id)}
+                          className="text-xs text-red-400 hover:text-red-600"
+                        >
+                          Delete Book
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {bookChapters.standalone.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Standalone Texts</h3>
+            <div className="space-y-1.5">
+              {bookChapters.standalone.map(text => (
+                <div key={text.id} className="flex items-center justify-between py-2.5 px-4 rounded-lg border border-gray-200 hover:bg-gray-50">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="text-xs font-bold px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: (CEFR_COLORS[text.cefrEstimate] || '#6b7280') + '20',
+                        color: CEFR_COLORS[text.cefrEstimate] || '#6b7280',
+                      }}
+                    >
+                      {text.cefrEstimate}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">{text.title}</span>
+                    {text.author && <span className="text-xs text-gray-400">{text.author}</span>}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-400">{text.wordCount} words</span>
+                    {text.hasAudio && <span className="text-xs text-green-600">audio</span>}
+                    {text.textAnalysis && <span className="text-xs text-blue-600">analyzed</span>}
+                    <button onClick={() => handleEditText(text)} className="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</button>
+                    <button onClick={() => handleDeleteText(text.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {books.length === 0 && bookChapters.standalone.length === 0 && (
+          <p className="text-sm text-gray-400 py-4 text-center">No content yet. Create a book to get started.</p>
+        )}
+      </div>
+
+      {/* Book form (shown when creating/editing a book — triggered from Library) */}
+      <div id="book-form">
+      {showBookForm && (
+        <div className="mb-8 border border-gray-200 rounded-lg p-4">
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">
+            {editingBookId ? 'Edit Book' : 'New Book'}
+          </h2>
+          <div className="p-4 bg-gray-50 rounded-lg space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Title</label>
@@ -730,96 +882,87 @@ export default function AdminPanel() {
               <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{bookError}</p>
             )}
           </div>
-        )}
+        </div>
+      )}
+      </div>
 
-        {books.length > 0 && (
-          <div className="space-y-1.5">
-            {books.map(book => {
-              const chapterCount = corpusTexts.filter(t => t.bookId === book.id).length;
+      {/* Chapter wizard (shown when adding/editing a chapter) */}
+      {showWizard && (
+        <div id="chapter-wizard" className="border border-gray-200 rounded-lg p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">
+              {bookId ? `Chapter — ${books.find(b => b.id === bookId)?.title || bookId}` : 'Edit Text'}
+            </h2>
+            <button
+              onClick={handleReset}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {/* Step indicator */}
+          <div className="flex gap-1 mb-6">
+            {STEPS.map((label, i) => {
+              const s = i + 1;
+              const active = step === s;
               return (
-                <div key={book.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-xs font-bold px-1.5 py-0.5 rounded"
-                      style={{
-                        backgroundColor: (CEFR_COLORS[book.cefr_estimate] || '#6b7280') + '20',
-                        color: CEFR_COLORS[book.cefr_estimate] || '#6b7280',
-                      }}
-                    >
-                      {book.cefr_estimate}
-                    </span>
-                    <span className="text-sm font-medium text-gray-900">{book.title}</span>
-                    {book.author && <span className="text-xs text-gray-400">{book.author}</span>}
-                    <span className="text-xs text-gray-400">({chapterCount} ch.)</span>
-                    {book.vocabulary_manifest && (
-                      <span className="text-xs text-green-600" title={`${Object.keys(book.vocabulary_manifest.entries || {}).length} manifest entries`}>manifest</span>
-                    )}
-                    {book.syntax_glosses && (
-                      <span className="text-xs text-purple-600" title={`${Object.values(book.syntax_glosses.chapters || {}).reduce((s, ch) => s + ch.length, 0)} syntax glosses`}>glosses</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => handleEditBook(book)} className="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</button>
-                    <button onClick={() => handleDeleteBook(book.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
-                  </div>
-                </div>
+                <button
+                  key={s}
+                  onClick={() => setStep(s)}
+                  className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                    active
+                      ? 'bg-gray-900 text-white font-semibold'
+                      : 'text-gray-500 hover:bg-gray-100'
+                  }`}
+                >
+                  {s}. {label}
+                </button>
               );
             })}
           </div>
-        )}
-      </div>
 
       {/* Step 1: Content & Metadata */}
       {step === 1 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Title</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="The Monkey's Paw — Chapter 1"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                />
-                {textId && <p className="text-xs text-gray-400 mt-1">ID: {textId}</p>}
+            {/* Book context banner */}
+            {bookId && books.find(b => b.id === bookId) && (
+              <div className="flex items-center justify-between bg-blue-50 px-4 py-3 rounded-lg">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-blue-700">Chapter in</span>
+                  <span className="font-semibold text-blue-900">{books.find(b => b.id === bookId)?.title}</span>
+                  <span className="text-blue-400">({cefrEstimate})</span>
+                </div>
+                <button
+                  onClick={() => { setBookId(''); setChapterOrder(''); }}
+                  className="text-xs text-blue-500 hover:text-blue-700"
+                >
+                  Detach from book
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Author</label>
-                <input
-                  type="text"
-                  value={author}
-                  onChange={(e) => setAuthor(e.target.value)}
-                  placeholder="Adapted from W.W. Jacobs"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                />
-              </div>
-            </div>
+            )}
 
-            <div className={`grid gap-4 ${bookId ? 'grid-cols-3' : 'grid-cols-2'}`}>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">CEFR Estimate</label>
-                <select
-                  value={cefrEstimate}
-                  onChange={(e) => setCefrEstimate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  {CEFR_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
+            {/* Audio exists banner */}
+            {editingExisting?.hasAudio && !audioData && (
+              <div className="flex items-center gap-2 bg-green-50 px-4 py-3 rounded-lg">
+                <span className="text-sm text-green-700">Audio exists for this chapter and will be preserved on publish.</span>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Book</label>
-                <select
-                  value={bookId}
-                  onChange={(e) => setBookId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  <option value="">Standalone text</option>
-                  {books.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
-                </select>
-              </div>
-              {bookId && (
+            )}
+
+            {bookId ? (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Chapter Title</label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Chapter 1 — The Beginning"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  />
+                  {textId && <p className="text-xs text-gray-400 mt-1">ID: {textId}</p>}
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Chapter Order</label>
                   <input
@@ -830,29 +973,66 @@ export default function AdminPanel() {
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                   />
                 </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Cover Image</label>
-              <div className="flex items-start gap-4">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setCoverFile(file);
-                      setCoverPreview(URL.createObjectURL(file));
-                    }
-                  }}
-                  className="text-sm text-gray-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border file:border-gray-300 file:text-sm file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                />
-                {coverPreview && (
-                  <img src={coverPreview} alt="Cover preview" className="w-20 h-28 object-cover rounded border border-gray-200" />
-                )}
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Title</label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="The Monkey's Paw — Chapter 1"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    />
+                    {textId && <p className="text-xs text-gray-400 mt-1">ID: {textId}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Author</label>
+                    <input
+                      type="text"
+                      value={author}
+                      onChange={(e) => setAuthor(e.target.value)}
+                      placeholder="Adapted from W.W. Jacobs"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">CEFR Estimate</label>
+                    <select
+                      value={cefrEstimate}
+                      onChange={(e) => setCefrEstimate(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    >
+                      {CEFR_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Cover Image</label>
+                    <div className="flex items-start gap-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setCoverFile(file);
+                            setCoverPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                        className="text-sm text-gray-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border file:border-gray-300 file:text-sm file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
+                      />
+                      {coverPreview && (
+                        <img src={coverPreview} alt="Cover preview" className="w-20 h-28 object-cover rounded border border-gray-200" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Text Body</label>
@@ -1052,7 +1232,7 @@ export default function AdminPanel() {
                 onClick={handleReset}
                 className="mt-6 px-5 py-2.5 rounded-lg text-sm font-semibold bg-gray-900 text-white hover:bg-gray-800 transition-colors"
               >
-                Ingest Another Text
+                Back to Library
               </button>
             </div>
           ) : (
@@ -1081,12 +1261,18 @@ export default function AdminPanel() {
                         className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
                           generating || !rawText
                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-gray-900 text-white hover:bg-gray-800'
+                            : editingExisting?.hasAudio && !audioData
+                              ? 'bg-amber-600 text-white hover:bg-amber-500'
+                              : 'bg-gray-900 text-white hover:bg-gray-800'
                         }`}
                       >
-                        {generating ? 'Generating...' : 'Generate Audio'}
+                        {generating ? 'Generating...' : editingExisting?.hasAudio && !audioData ? 'Replace Existing Audio' : 'Generate Audio'}
                       </button>
                     </div>
+
+                    {editingExisting?.hasAudio && !audioData && (
+                      <p className="text-xs text-amber-600">Generating new audio will replace the existing file and cost ElevenLabs credits.</p>
+                    )}
 
                     {generateError && (
                       <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{generateError}</p>
@@ -1113,7 +1299,7 @@ export default function AdminPanel() {
                   <Stat label="CEFR" value={cefrEstimate} />
                   <Stat label="Words" value={analysis?.wordCount || 0} />
                   <Stat label="Analysis" value={textAnalysis ? 'Yes' : 'None'} />
-                  <Stat label="Audio" value={audioData ? 'Yes' : 'None'} />
+                  <Stat label="Audio" value={audioData ? 'New audio' : editingExisting?.hasAudio ? 'Existing (preserved)' : 'None'} />
                   <Stat label="Images" value={parsedImages.length || existingImages.length || 0} />
                 </div>
               </Section>
@@ -1130,7 +1316,7 @@ export default function AdminPanel() {
                 >
                   {publishing ? 'Publishing...' : 'Publish to Corpus'}
                 </button>
-                {!audioData && !corpusTexts.find(t => t.id === textId)?.hasAudio && (
+                {!audioData && !editingExisting?.hasAudio && (
                   <span className="text-xs text-gray-400">Publishing without audio — you can generate it later</span>
                 )}
               </div>
@@ -1139,48 +1325,6 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Published texts */}
-      {corpusTexts.length > 0 && (
-        <div className="mt-12 border-t border-gray-200 pt-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Published Texts ({corpusTexts.length})</h2>
-          <div className="space-y-2">
-            {corpusTexts.map(text => (
-              <div key={text.id} className="flex items-center justify-between py-3 px-4 rounded-lg border border-gray-200 hover:bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <span
-                    className="text-xs font-bold px-2 py-0.5 rounded"
-                    style={{
-                      backgroundColor: (CEFR_COLORS[text.cefrEstimate] || '#6b7280') + '20',
-                      color: CEFR_COLORS[text.cefrEstimate] || '#6b7280',
-                    }}
-                  >
-                    {text.cefrEstimate}
-                  </span>
-                  <div>
-                    <span className="text-sm font-medium text-gray-900">{text.title}</span>
-                    <span className="text-xs text-gray-400 ml-2">{text.author}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400">{text.wordCount} words</span>
-                  {text.hasAudio && <span className="text-xs text-green-600">audio</span>}
-                  {text.textAnalysis && <span className="text-xs text-blue-600">analyzed</span>}
-                  <button
-                    onClick={() => handleEditText(text)}
-                    className="text-xs text-blue-500 hover:text-blue-700 font-medium"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteText(text.id)}
-                    className="text-xs text-red-400 hover:text-red-600"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </div>
