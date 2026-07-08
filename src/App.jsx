@@ -10,6 +10,7 @@ import WorkshopView from './components/workshop/WorkshopView';
 import LibraryPage from './components/library/LibraryPage';
 import BookChaptersPage from './components/library/BookChaptersPage';
 import LoginPage from './components/shared/LoginPage';
+import LandingPage from './components/landing/LandingPage';
 
 function ProtectedRoute({ children, requireTeacher, requireAdmin }) {
   const { user, loading, isTeacher, isAdmin } = useAuth();
@@ -33,15 +34,19 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <LoginPage />} />
 
-      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route index element={<LibraryPage />} />
-        <Route path="book/:bookId" element={<BookChaptersPage />} />
-        <Route path="read" element={<ReadingView />} />
-        <Route path="flashcards" element={<FlashcardPage />} />
-        <Route path="workshop" element={<WorkshopView />} />
-        <Route path="teacher" element={<TeacherDashboard />} />
-        <Route path="admin" element={<ProtectedRoute requireAdmin><AdminPanel /></ProtectedRoute>} />
-      </Route>
+      {user ? (
+        <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          <Route index element={<LibraryPage />} />
+          <Route path="book/:bookId" element={<BookChaptersPage />} />
+          <Route path="read" element={<ReadingView />} />
+          <Route path="flashcards" element={<FlashcardPage />} />
+          <Route path="workshop" element={<WorkshopView />} />
+          <Route path="teacher" element={<TeacherDashboard />} />
+          <Route path="admin" element={<ProtectedRoute requireAdmin><AdminPanel /></ProtectedRoute>} />
+        </Route>
+      ) : (
+        <Route index element={<LandingPage />} />
+      )}
 
       <Route path="/shadow/:textId" element={
         <ProtectedRoute><ShadowingView /></ProtectedRoute>

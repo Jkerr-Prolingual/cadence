@@ -4,6 +4,9 @@
  * (separated by blank lines), not inline within paragraphs.
  *
  * Markdown format: ![alt text](filename.png)
+ *
+ * Non-image paragraph content is preserved exactly as-is (no trimming)
+ * to avoid misaligning audio timestamps generated from the original text.
  */
 export function extractImages(rawText) {
   if (!rawText) return { cleanBody: '', images: [] };
@@ -24,7 +27,7 @@ export function extractImages(rawText) {
         afterParagraph: paragraphIndex - 1,
       });
     } else {
-      cleanParagraphs.push(trimmed);
+      cleanParagraphs.push(block);
       paragraphIndex++;
     }
   }

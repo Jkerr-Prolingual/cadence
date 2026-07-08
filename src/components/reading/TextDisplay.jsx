@@ -1,4 +1,4 @@
-import { useMemo, useCallback, Fragment } from 'react';
+import { useMemo, useCallback } from 'react';
 import { lookupCefr, cefrColor, cleanToken } from '../../lib/wordUtils';
 import { findParticles } from '../../lib/particleUtils';
 import { findStructures } from '../../lib/structureUtils';
@@ -225,14 +225,19 @@ export default function TextDisplay({
 
   return (
     <div className="leading-7 sm:leading-8 text-base sm:text-lg text-gray-900">
-      {sentenceGroups.map((groups, pIdx) => (
-        <Fragment key={pIdx}>
-          {pIdx === 0 && imagesByPosition[-1]?.map((img, i) => (
-            <figure key={`img-pre-${i}`} className="my-6 flex justify-center" style={{ overflowAnchor: 'none' }}>
-              <img src={img.publicUrl} alt={img.alt} className="rounded-lg max-w-full h-auto" />
-            </figure>
-          ))}
-          <p className="mb-3 sm:mb-4">
+      {sentenceGroups.flatMap((groups, pIdx) => {
+        const elements = [];
+        if (pIdx === 0 && imagesByPosition[-1]) {
+          imagesByPosition[-1].forEach((img, i) => {
+            elements.push(
+              <figure key={`img-pre-${i}`} className="my-6 flex justify-center">
+                <img src={img.publicUrl} alt={img.alt} className="rounded-lg max-w-full h-auto" />
+              </figure>
+            );
+          });
+        }
+        elements.push(
+          <p key={pIdx} className="mb-3 sm:mb-4">
           {groups.map((group, gIdx) => {
             const isActive = group.sentenceIdx === currentSentenceIdx && currentSentenceIdx >= 0;
             const isLoop = !isActive && loopWordRange && group.sentenceIdx != null
@@ -388,16 +393,24 @@ export default function TextDisplay({
             }
             flushGloss();
 
-            return <span key={gIdx} style={wrapStyle || undefined}>{inner}</span>;
+            if (wrapStyle) {
+              return <mark key={gIdx} style={wrapStyle}>{inner}</mark>;
+            }
+            return <span key={gIdx}>{inner}</span>;
           })}
           </p>
-          {imagesByPosition[pIdx]?.map((img, i) => (
-            <figure key={`img-${pIdx}-${i}`} className="my-6 flex justify-center" style={{ overflowAnchor: 'none' }}>
-              <img src={img.publicUrl} alt={img.alt} className="rounded-lg max-w-full h-auto" />
-            </figure>
-          ))}
-        </Fragment>
-      ))}
+        );
+        if (imagesByPosition[pIdx]) {
+          imagesByPosition[pIdx].forEach((img, i) => {
+            elements.push(
+              <figure key={`img-${pIdx}-${i}`} className="my-6 flex justify-center">
+                <img src={img.publicUrl} alt={img.alt} className="rounded-lg max-w-full h-auto" />
+              </figure>
+            );
+          });
+        }
+        return elements;
+      })}
     </div>
   );
 }
