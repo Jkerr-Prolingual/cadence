@@ -388,10 +388,7 @@ export default function TextDisplay({
             }
             flushGloss();
 
-            if (wrapStyle) {
-              return <mark key={gIdx} style={wrapStyle}>{inner}</mark>;
-            }
-            return <span key={gIdx}>{inner}</span>;
+            return <span key={gIdx} style={wrapStyle || undefined}>{inner}</span>;
           })}
           </p>
           {imagesByPosition[pIdx]?.map((img, i) => (
