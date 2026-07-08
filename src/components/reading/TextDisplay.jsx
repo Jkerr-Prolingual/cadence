@@ -228,7 +228,7 @@ export default function TextDisplay({
       {sentenceGroups.map((groups, pIdx) => (
         <Fragment key={pIdx}>
           {pIdx === 0 && imagesByPosition[-1]?.map((img, i) => (
-            <figure key={`img-pre-${i}`} className="my-6 flex justify-center">
+            <figure key={`img-pre-${i}`} className="my-6 flex justify-center" style={{ overflowAnchor: 'none' }}>
               <img src={img.publicUrl} alt={img.alt} className="rounded-lg max-w-full h-auto" />
             </figure>
           ))}
@@ -395,7 +395,7 @@ export default function TextDisplay({
           })}
           </p>
           {imagesByPosition[pIdx]?.map((img, i) => (
-            <figure key={`img-${pIdx}-${i}`} className="my-6 flex justify-center">
+            <figure key={`img-${pIdx}-${i}`} className="my-6 flex justify-center" style={{ overflowAnchor: 'none' }}>
               <img src={img.publicUrl} alt={img.alt} className="rounded-lg max-w-full h-auto" />
             </figure>
           ))}

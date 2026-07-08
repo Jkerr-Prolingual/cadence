@@ -1130,7 +1130,7 @@ export default function AdminPanel() {
                 >
                   {publishing ? 'Publishing...' : 'Publish to Corpus'}
                 </button>
-                {!audioData && (
+                {!audioData && !corpusTexts.find(t => t.id === textId)?.hasAudio && (
                   <span className="text-xs text-gray-400">Publishing without audio — you can generate it later</span>
                 )}
               </div>
