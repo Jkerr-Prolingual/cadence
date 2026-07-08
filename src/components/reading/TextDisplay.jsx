@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, Fragment } from 'react';
 import { lookupCefr, cefrColor, cleanToken } from '../../lib/wordUtils';
 import { findParticles } from '../../lib/particleUtils';
 import { findStructures } from '../../lib/structureUtils';
@@ -34,6 +34,7 @@ export default function TextDisplay({
   showStructures = false,
   syntaxGlosses = null,
   translationMode = false,
+  images = [],
 }) {
   const paragraphs = useMemo(() => {
     if (!text) return [];
@@ -152,6 +153,15 @@ export default function TextDisplay({
     return { first: s.firstWordIdx, last: s.lastWordIdx };
   }, [loopSentenceIdx, sentences]);
 
+  const imagesByPosition = useMemo(() => {
+    if (!images?.length) return {};
+    const map = {};
+    for (const img of images) {
+      (map[img.afterParagraph] ??= []).push(img);
+    }
+    return map;
+  }, [images]);
+
   const handleWordClick = useCallback((e, token, pIdx, tIdx) => {
     const rect = e.target.getBoundingClientRect();
     const para = paragraphs[pIdx];
@@ -216,7 +226,13 @@ export default function TextDisplay({
   return (
     <div className="leading-7 sm:leading-8 text-base sm:text-lg text-gray-900">
       {sentenceGroups.map((groups, pIdx) => (
-        <p key={pIdx} className="mb-3 sm:mb-4">
+        <Fragment key={pIdx}>
+          {pIdx === 0 && imagesByPosition[-1]?.map((img, i) => (
+            <figure key={`img-pre-${i}`} className="my-6 flex justify-center">
+              <img src={img.publicUrl} alt={img.alt} className="rounded-lg max-w-full h-auto" />
+            </figure>
+          ))}
+          <p className="mb-3 sm:mb-4">
           {groups.map((group, gIdx) => {
             const isActive = group.sentenceIdx === currentSentenceIdx && currentSentenceIdx >= 0;
             const isLoop = !isActive && loopWordRange && group.sentenceIdx != null
@@ -377,7 +393,13 @@ export default function TextDisplay({
             }
             return <span key={gIdx}>{inner}</span>;
           })}
-        </p>
+          </p>
+          {imagesByPosition[pIdx]?.map((img, i) => (
+            <figure key={`img-${pIdx}-${i}`} className="my-6 flex justify-center">
+              <img src={img.publicUrl} alt={img.alt} className="rounded-lg max-w-full h-auto" />
+            </figure>
+          ))}
+        </Fragment>
       ))}
     </div>
   );

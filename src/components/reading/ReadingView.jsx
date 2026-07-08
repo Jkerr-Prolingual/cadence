@@ -203,6 +203,7 @@ export default function ReadingView() {
           audioTimestamps: t.audio_timestamps,
           book_id: t.book_id,
           chapter_order: t.chapter_order,
+          images: t.images || [],
         };
       }));
 
@@ -797,6 +798,7 @@ export default function ReadingView() {
                 showStructures={showStructures}
                 syntaxGlosses={chapterGlosses}
                 translationMode={translationMode}
+                images={selectedText.images}
               />
 
               {chapterNav && (

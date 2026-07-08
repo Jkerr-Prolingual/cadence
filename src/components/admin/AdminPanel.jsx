@@ -3,6 +3,7 @@ import { analyzeText, titleToSlug, buildAnalysisPrompt, CEFR_LEVELS, CEFR_COLORS
 import { getVoiceOptions, generateAudio } from '../../lib/elevenlabs';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { extractImages } from '../../lib/imageUtils';
 
 const STEPS = ['Content', 'Analysis', 'Audio & Publish'];
 
@@ -168,6 +169,8 @@ export default function AdminPanel() {
   const [rawText, setRawText] = useState('');
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [existingImages, setExistingImages] = useState([]);
 
   // Books management
   const [books, setBooks] = useState([]);
@@ -202,7 +205,8 @@ export default function AdminPanel() {
   const [corpusTexts, setCorpusTexts] = useState([]);
 
   const voices = useMemo(() => getVoiceOptions(), []);
-  const analysis = useMemo(() => analyzeText(rawText), [rawText]);
+  const { cleanBody, images: parsedImages } = useMemo(() => extractImages(rawText), [rawText]);
+  const analysis = useMemo(() => analyzeText(cleanBody), [cleanBody]);
   const textId = useMemo(() => titleToSlug(title), [title]);
 
   useEffect(() => {
@@ -237,6 +241,7 @@ export default function AdminPanel() {
         audioTimestamps: t.audio_timestamps,
         wordCount: t.word_count,
         coverImageUrl: t.cover_image_url,
+        images: t.images || [],
         status: t.status,
         publishedAt: t.published_at,
       })));
@@ -358,8 +363,8 @@ export default function AdminPanel() {
   }
 
   function handleCopyPrompt() {
-    if (!title || !rawText) return;
-    const prompt = buildAnalysisPrompt(title, rawText, cefrEstimate);
+    if (!title || !cleanBody) return;
+    const prompt = buildAnalysisPrompt(title, cleanBody, cefrEstimate);
     navigator.clipboard.writeText(prompt);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -382,11 +387,11 @@ export default function AdminPanel() {
   }
 
   async function handleGenerateAudio() {
-    if (!rawText || !selectedVoice) return;
+    if (!cleanBody || !selectedVoice) return;
     setGenerating(true);
     setGenerateError(null);
     try {
-      const data = await generateAudio(rawText, selectedVoice);
+      const data = await generateAudio(cleanBody, selectedVoice);
       setAudioData(data);
 
       if (data.audioBlob) {
@@ -420,7 +425,7 @@ export default function AdminPanel() {
   }
 
   async function handlePublish() {
-    if (!title || !rawText) return;
+    if (!title || !cleanBody) return;
     setPublishing(true);
     try {
       const existing = corpusTexts.find(t => t.id === textId);
@@ -450,6 +455,29 @@ export default function AdminPanel() {
         coverImageUrl = urlData.publicUrl;
       }
 
+      let imagesToStore = existingImages;
+      if (parsedImages.length > 0) {
+        const uploadedImages = [];
+        for (const img of parsedImages) {
+          const file = imageFiles.find(f => f.name === img.filename);
+          if (file) {
+            const storagePath = `${textId}/${img.filename}`;
+            const { error: imgError } = await supabase.storage
+              .from('chapter-images')
+              .upload(storagePath, file, { contentType: file.type, upsert: true });
+            if (imgError) throw imgError;
+            const { data: imgUrlData } = supabase.storage.from('chapter-images').getPublicUrl(storagePath);
+            uploadedImages.push({
+              filename: img.filename,
+              alt: img.alt,
+              afterParagraph: img.afterParagraph,
+              publicUrl: imgUrlData.publicUrl,
+            });
+          }
+        }
+        if (uploadedImages.length > 0) imagesToStore = uploadedImages;
+      }
+
       const record = {
         id: textId,
         title,
@@ -457,12 +485,13 @@ export default function AdminPanel() {
         cefr_estimate: cefrEstimate,
         book_id: bookId || null,
         chapter_order: chapterOrder ? Number(chapterOrder) : null,
-        body: rawText,
+        body: cleanBody,
         analysis: textAnalysis || null,
         audio_urls: audioUrls,
         audio_timestamps: audioData?.audioTimestamps || existing?.audioTimestamps || null,
         word_count: analysis?.wordCount || 0,
         cover_image_url: coverImageUrl,
+        images: imagesToStore,
         status: 'published',
         published_at: new Date().toISOString(),
         published_by: user?.id || null,
@@ -488,6 +517,8 @@ export default function AdminPanel() {
     setBookId(text.bookId || '');
     setChapterOrder(text.chapterOrder != null ? String(text.chapterOrder) : '');
     setRawText(text.body || '');
+    setImageFiles([]);
+    setExistingImages(text.images || []);
     setTextAnalysis(text.textAnalysis || null);
     setAnalysisJson(text.textAnalysis ? JSON.stringify(text.textAnalysis, null, 2) : '');
     setParseError(null);
@@ -518,6 +549,8 @@ export default function AdminPanel() {
     setRawText('');
     setCoverFile(null);
     setCoverPreview(null);
+    setImageFiles([]);
+    setExistingImages([]);
     setAnalysisJson('');
     setTextAnalysis(null);
     setParseError(null);
@@ -830,7 +863,56 @@ export default function AdminPanel() {
                 rows={16}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-gray-900 resize-y"
               />
+              {parsedImages.length > 0 && (
+                <p className="text-xs text-blue-600 mt-1">
+                  {parsedImages.length} image{parsedImages.length > 1 ? 's' : ''} detected in text
+                </p>
+              )}
             </div>
+
+            {(parsedImages.length > 0 || existingImages.length > 0) && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+                  Chapter Images
+                </label>
+                {parsedImages.length > 0 && (
+                  <>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={(e) => setImageFiles(Array.from(e.target.files || []))}
+                      className="text-sm text-gray-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border file:border-gray-300 file:text-sm file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
+                    />
+                    <div className="mt-2 space-y-1">
+                      {parsedImages.map((img, i) => {
+                        const hasFile = imageFiles.some(f => f.name === img.filename);
+                        return (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            <span className={`px-1.5 py-0.5 rounded ${hasFile ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {hasFile ? 'ready' : 'needs file'}
+                            </span>
+                            <span className="font-mono text-gray-600">{img.filename}</span>
+                            <span className="text-gray-400">after paragraph {img.afterParagraph + 1}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+                {parsedImages.length === 0 && existingImages.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500 mb-1">{existingImages.length} existing image{existingImages.length > 1 ? 's' : ''} (will be preserved)</p>
+                    {existingImages.map((img, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">stored</span>
+                        <span className="font-mono text-gray-600">{img.filename}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center gap-3">
               <button
@@ -1032,6 +1114,7 @@ export default function AdminPanel() {
                   <Stat label="Words" value={analysis?.wordCount || 0} />
                   <Stat label="Analysis" value={textAnalysis ? 'Yes' : 'None'} />
                   <Stat label="Audio" value={audioData ? 'Yes' : 'None'} />
+                  <Stat label="Images" value={parsedImages.length || existingImages.length || 0} />
                 </div>
               </Section>
 
