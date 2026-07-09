@@ -161,11 +161,13 @@ export default function AdminPanel() {
   const [step, setStep] = useState(1);
 
   // Step 1: Content
+  const [editingTextId, setEditingTextId] = useState(null);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [cefrEstimate, setCefrEstimate] = useState('B1');
   const [bookId, setBookId] = useState('');
   const [chapterOrder, setChapterOrder] = useState('');
+  const [saving, setSaving] = useState(false);
   const [rawText, setRawText] = useState('');
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
@@ -210,7 +212,7 @@ export default function AdminPanel() {
   const analysis = useMemo(() => analyzeText(cleanBody), [cleanBody]);
   const textId = useMemo(() => titleToSlug(title), [title]);
   const [expandedBookId, setExpandedBookId] = useState(null);
-  const editingExisting = useMemo(() => corpusTexts.find(t => t.id === textId), [corpusTexts, textId]);
+  const editingExisting = useMemo(() => corpusTexts.find(t => t.id === (editingTextId || textId)), [corpusTexts, editingTextId, textId]);
 
   const bookChapters = useMemo(() => {
     const map = {};
@@ -411,6 +413,8 @@ export default function AdminPanel() {
     }
   }
 
+  const recordId = editingTextId || textId;
+
   async function handleGenerateAudio() {
     if (!cleanBody || !selectedVoice) return;
     setGenerating(true);
@@ -420,7 +424,7 @@ export default function AdminPanel() {
       setAudioData(data);
 
       if (data.audioBlob) {
-        const storagePath = `${textId}.mp3`;
+        const storagePath = `${recordId}.mp3`;
         const { error: uploadError } = await supabase.storage
           .from('curated-text-audio')
           .upload(storagePath, data.audioBlob, {
@@ -429,7 +433,7 @@ export default function AdminPanel() {
           });
         if (uploadError) throw uploadError;
 
-        const existing = corpusTexts.find(t => t.id === textId);
+        const existing = corpusTexts.find(t => t.id === recordId);
         if (existing) {
           await supabase
             .from('curated_texts')
@@ -439,7 +443,7 @@ export default function AdminPanel() {
               audio_voice_ids: [selectedVoice],
               audio_generated_at: new Date().toISOString(),
             })
-            .eq('id', textId);
+            .eq('id', recordId);
           await loadCorpus();
         }
       }
@@ -449,15 +453,42 @@ export default function AdminPanel() {
     setGenerating(false);
   }
 
+  async function handleSaveChanges() {
+    if (!editingTextId || !title) return;
+    setSaving(true);
+    try {
+      const updates = {
+        title,
+        author,
+        cefr_estimate: cefrEstimate,
+        book_id: bookId || null,
+        chapter_order: chapterOrder ? Number(chapterOrder) : null,
+        body: cleanBody,
+        analysis: textAnalysis || null,
+        word_count: analysis?.wordCount || 0,
+      };
+      const { error } = await supabase
+        .from('curated_texts')
+        .update(updates)
+        .eq('id', editingTextId);
+      if (error) throw error;
+      await loadCorpus();
+      handleReset();
+    } catch (err) {
+      setGenerateError(err.message);
+    }
+    setSaving(false);
+  }
+
   async function handlePublish() {
     if (!title || !cleanBody) return;
     setPublishing(true);
     try {
-      const existing = corpusTexts.find(t => t.id === textId);
+      const existing = corpusTexts.find(t => t.id === recordId);
 
-      let audioUrls = existing?.hasAudio ? { mp3: `${textId}.mp3` } : null;
+      let audioUrls = existing?.hasAudio ? { mp3: `${existing.id}.mp3` } : null;
       if (audioData?.audioBlob) {
-        const storagePath = `${textId}.mp3`;
+        const storagePath = `${recordId}.mp3`;
         const { error: uploadError } = await supabase.storage
           .from('curated-text-audio')
           .upload(storagePath, audioData.audioBlob, {
@@ -471,7 +502,7 @@ export default function AdminPanel() {
       let coverImageUrl = existing?.coverImageUrl || null;
       if (coverFile) {
         const ext = coverFile.name.split('.').pop();
-        const coverPath = `${textId}.${ext}`;
+        const coverPath = `${recordId}.${ext}`;
         const { error: coverError } = await supabase.storage
           .from('text-covers')
           .upload(coverPath, coverFile, { contentType: coverFile.type, upsert: true });
@@ -486,7 +517,7 @@ export default function AdminPanel() {
         for (const img of parsedImages) {
           const file = imageFiles.find(f => f.name === img.filename);
           if (file) {
-            const storagePath = `${textId}/${img.filename}`;
+            const storagePath = `${recordId}/${img.filename}`;
             const { error: imgError } = await supabase.storage
               .from('chapter-images')
               .upload(storagePath, file, { contentType: file.type, upsert: true });
@@ -504,7 +535,7 @@ export default function AdminPanel() {
       }
 
       const record = {
-        id: textId,
+        id: recordId,
         title,
         author,
         cefr_estimate: cefrEstimate,
@@ -536,6 +567,7 @@ export default function AdminPanel() {
   }
 
   function handleEditText(text) {
+    setEditingTextId(text.id);
     setTitle(text.title || '');
     setAuthor(text.author || '');
     setCefrEstimate(text.cefrEstimate || 'B1');
@@ -572,6 +604,7 @@ export default function AdminPanel() {
 
   function handleReset() {
     setStep(1);
+    setEditingTextId(null);
     setTitle('');
     setAuthor('');
     setCefrEstimate('B1');
@@ -891,7 +924,10 @@ export default function AdminPanel() {
         <div id="chapter-wizard" className="border border-gray-200 rounded-lg p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-900">
-              {bookId ? `Chapter — ${books.find(b => b.id === bookId)?.title || bookId}` : 'Edit Text'}
+              {editingTextId
+                ? (bookId ? `Edit Chapter — ${books.find(b => b.id === bookId)?.title || bookId}` : 'Edit Text')
+                : (bookId ? `New Chapter — ${books.find(b => b.id === bookId)?.title || bookId}` : 'New Text')
+              }
             </h2>
             <button
               onClick={handleReset}
@@ -1095,6 +1131,19 @@ export default function AdminPanel() {
             )}
 
             <div className="flex items-center gap-3">
+              {editingTextId && (
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={saving || !title.trim()}
+                  className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                    saving || !title.trim()
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-green-700 text-white hover:bg-green-600'
+                  }`}
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              )}
               <button
                 onClick={() => setStep(2)}
                 disabled={!canAdvance}
@@ -1109,7 +1158,7 @@ export default function AdminPanel() {
                 disabled={!canAdvance}
                 className="px-5 py-2.5 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors"
               >
-                Skip to Publish
+                {editingTextId ? 'Audio & Publish' : 'Skip to Publish'}
               </button>
             </div>
           </div>
