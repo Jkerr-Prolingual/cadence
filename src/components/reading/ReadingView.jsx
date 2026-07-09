@@ -35,12 +35,20 @@ export default function ReadingView() {
     return [...sampleTexts, ...curated];
   }, [curatedTexts]);
 
+  const selectorTexts = useMemo(() => {
+    const text = allTexts.find(t => t.id === selectedTextId);
+    if (text?.book_id) {
+      return allTexts
+        .filter(t => t.book_id === text.book_id)
+        .sort((a, b) => (a.chapter_order ?? 0) - (b.chapter_order ?? 0));
+    }
+    return allTexts.filter(t => !t.book_id);
+  }, [allTexts, selectedTextId]);
+
   const chapterNav = useMemo(() => {
     const text = allTexts.find(t => t.id === selectedTextId);
     if (!text?.book_id) return null;
-    const siblings = allTexts
-      .filter(t => t.book_id === text.book_id)
-      .sort((a, b) => (a.chapter_order ?? 0) - (b.chapter_order ?? 0));
+    const siblings = selectorTexts;
     const idx = siblings.findIndex(t => t.id === selectedTextId);
     if (idx === -1) return null;
     return {
@@ -50,7 +58,7 @@ export default function ReadingView() {
       total: siblings.length,
       bookId: text.book_id,
     };
-  }, [allTexts, selectedTextId]);
+  }, [allTexts, selectorTexts, selectedTextId]);
   const [popup, setPopup] = useState(null);
   const [cardCreator, setCardCreator] = useState(null);
   const [encounters, setEncounters] = useState({});
@@ -718,7 +726,7 @@ export default function ReadingView() {
   return (
     <div className="flex flex-col h-full">
       <TextSelector
-        texts={allTexts}
+        texts={selectorTexts}
         selectedId={selectedTextId}
         onSelect={(id) => { setSelectedTextId(id); setPopup(null); }}
       />

@@ -511,9 +511,8 @@ export default function AdminPanel() {
         coverImageUrl = urlData.publicUrl;
       }
 
-      let imagesToStore = existingImages;
+      let imagesToStore = [...existingImages];
       if (parsedImages.length > 0) {
-        const uploadedImages = [];
         for (const img of parsedImages) {
           const file = imageFiles.find(f => f.name === img.filename);
           if (file) {
@@ -523,15 +522,20 @@ export default function AdminPanel() {
               .upload(storagePath, file, { contentType: file.type, upsert: true });
             if (imgError) throw imgError;
             const { data: imgUrlData } = supabase.storage.from('chapter-images').getPublicUrl(storagePath);
-            uploadedImages.push({
+            const entry = {
               filename: img.filename,
               alt: img.alt,
               afterParagraph: img.afterParagraph,
               publicUrl: imgUrlData.publicUrl,
-            });
+            };
+            const existingIdx = imagesToStore.findIndex(e => e.filename === img.filename);
+            if (existingIdx >= 0) {
+              imagesToStore[existingIdx] = entry;
+            } else {
+              imagesToStore.push(entry);
+            }
           }
         }
-        if (uploadedImages.length > 0) imagesToStore = uploadedImages;
       }
 
       const record = {
@@ -1091,22 +1095,60 @@ export default function AdminPanel() {
                 <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
                   Chapter Images
                 </label>
+                {existingImages.length > 0 && (
+                  <div className="space-y-1 mb-3">
+                    <p className="text-xs text-gray-500 mb-1">Stored images</p>
+                    {existingImages.map((img, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">stored</span>
+                        <span className="font-mono text-gray-600">{img.filename}</span>
+                        <span className="text-gray-400">after paragraph {(img.afterParagraph ?? 0) + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setExistingImages(prev => prev.filter((_, j) => j !== i))}
+                          className="text-red-400 hover:text-red-600 ml-1"
+                        >
+                          remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {parsedImages.length > 0 && (
                   <>
+                    {existingImages.length > 0 && (
+                      <p className="text-xs text-gray-500 mb-1">New images from text</p>
+                    )}
                     <input
                       type="file"
                       multiple
                       accept="image/*"
-                      onChange={(e) => setImageFiles(Array.from(e.target.files || []))}
+                      onChange={(e) => {
+                        const newFiles = Array.from(e.target.files || []);
+                        setImageFiles(prev => {
+                          const merged = [...prev];
+                          for (const f of newFiles) {
+                            const idx = merged.findIndex(ex => ex.name === f.name);
+                            if (idx >= 0) merged[idx] = f;
+                            else merged.push(f);
+                          }
+                          return merged;
+                        });
+                      }}
                       className="text-sm text-gray-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border file:border-gray-300 file:text-sm file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
                     />
                     <div className="mt-2 space-y-1">
                       {parsedImages.map((img, i) => {
                         const hasFile = imageFiles.some(f => f.name === img.filename);
+                        const isStored = existingImages.some(e => e.filename === img.filename);
                         return (
                           <div key={i} className="flex items-center gap-2 text-xs">
-                            <span className={`px-1.5 py-0.5 rounded ${hasFile ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {hasFile ? 'ready' : 'needs file'}
+                            <span className={`px-1.5 py-0.5 rounded ${
+                              hasFile ? 'bg-green-100 text-green-700'
+                                : isStored ? 'bg-blue-100 text-blue-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {hasFile ? 'ready' : isStored ? 'stored' : 'needs file'}
                             </span>
                             <span className="font-mono text-gray-600">{img.filename}</span>
                             <span className="text-gray-400">after paragraph {img.afterParagraph + 1}</span>
@@ -1115,17 +1157,6 @@ export default function AdminPanel() {
                       })}
                     </div>
                   </>
-                )}
-                {parsedImages.length === 0 && existingImages.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500 mb-1">{existingImages.length} existing image{existingImages.length > 1 ? 's' : ''} (will be preserved)</p>
-                    {existingImages.map((img, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs">
-                        <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">stored</span>
-                        <span className="font-mono text-gray-600">{img.filename}</span>
-                      </div>
-                    ))}
-                  </div>
                 )}
               </div>
             )}
