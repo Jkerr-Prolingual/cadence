@@ -289,11 +289,11 @@ export default function LandingPage() {
             <p className="mt-4 text-xs text-gray-400">Gratis para estudiantes. Sin tarjeta de crédito.</p>
           </div>
 
-          <div className="hidden lg:block">
+          <div>
             <img
               src="/images/pexels-raul-sotomayor-2154397849-33265595.jpg"
               alt="Joven leyendo un libro"
-              className="rounded-2xl shadow-2xl object-cover object-bottom w-full aspect-[3/2]"
+              className="rounded-2xl shadow-2xl object-cover object-bottom w-full max-h-64 sm:max-h-80 lg:max-h-none aspect-[3/2]"
             />
           </div>
         </div>
@@ -307,6 +307,33 @@ export default function LandingPage() {
             <p className="mt-3 text-gray-500 max-w-md mx-auto">
               La forma más efectiva de aprender un idioma es también la más sencilla: leer mucho.
             </p>
+          </div>
+
+          <div className="max-w-2xl mx-auto mb-12 space-y-8">
+            <div>
+              <p className="text-sm font-medium text-gray-500 mb-2 text-center">En español</p>
+              <div className="relative w-full rounded-2xl overflow-hidden shadow-lg aspect-video">
+                <iframe
+                  src="https://www.youtube.com/embed/KFnz_QGjomM"
+                  title="Cómo funciona Relato — en español"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full"
+                />
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500 mb-2 text-center">In English</p>
+              <div className="relative w-full rounded-2xl overflow-hidden shadow-lg aspect-video">
+                <iframe
+                  src="https://www.youtube.com/embed/f5K0nHmQ2RI"
+                  title="How Relato works — in English"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
