@@ -445,7 +445,9 @@ export default function LandingPage() {
             seguir tu progreso.
           </p>
           <a
-            href="#"
+            href="https://www.amazon.com/dp/B0H89TNQ6Z?binding=paperback&ref=dbs_dp_sirpi"
+            target="_blank"
+            rel="noopener noreferrer"
             className="mt-6 inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors"
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">

@@ -82,24 +82,6 @@ export default function LibraryPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <a
-          href="#"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6 hover:bg-amber-100 transition-colors group"
-        >
-          <svg className="w-5 h-5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-          <p className="text-sm text-amber-800 flex-1">
-            <span className="font-medium">¿Prefieres leer en papel?</span>{' '}
-            Nuestras lecturas graduadas también están disponibles en formato impreso en Amazon.
-          </p>
-          <svg className="w-4 h-4 text-amber-400 group-hover:text-amber-600 shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </a>
-
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Library</h1>
           <input
@@ -165,6 +147,24 @@ export default function LibraryPage() {
             )}
           </div>
         )}
+
+        <a
+          href="https://www.amazon.com/dp/B0H89TNQ6Z?binding=paperback&ref=dbs_dp_sirpi"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mt-8 hover:bg-amber-100 transition-colors group"
+        >
+          <svg className="w-5 h-5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+          <p className="text-sm text-amber-800 flex-1">
+            <span className="font-medium">¿Prefieres leer en papel?</span>{' '}
+            Nuestras lecturas graduadas también están disponibles en formato impreso en Amazon.
+          </p>
+          <svg className="w-4 h-4 text-amber-400 group-hover:text-amber-600 shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </a>
       </div>
     </div>
   );
