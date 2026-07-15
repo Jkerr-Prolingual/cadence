@@ -9,12 +9,13 @@ export async function generateAudio(text, voiceId, options = {}) {
     modelId = 'eleven_turbo_v2',
     stability = 0.5,
     similarityBoost = 0.75,
+    speed = 0.92,
   } = options;
 
   const response = await fetch('/.netlify/functions/generate-audio', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voiceId, modelId, stability, similarityBoost }),
+    body: JSON.stringify({ text, voiceId, modelId, stability, similarityBoost, speed }),
   });
 
   if (!response.ok) {

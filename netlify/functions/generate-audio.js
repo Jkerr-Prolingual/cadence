@@ -15,7 +15,7 @@ export default async (req) => {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { text, voiceId, modelId = 'eleven_turbo_v2', stability = 0.5, similarityBoost = 0.75 } = body;
+  const { text, voiceId, modelId = 'eleven_turbo_v2', stability = 0.5, similarityBoost = 0.75, speed = 0.92 } = body;
 
   if (!text || !voiceId) {
     return Response.json({ error: 'Missing required fields: text, voiceId' }, { status: 400 });
@@ -37,7 +37,7 @@ export default async (req) => {
         body: JSON.stringify({
           text,
           model_id: modelId,
-          voice_settings: { stability, similarity_boost: similarityBoost },
+          voice_settings: { stability, similarity_boost: similarityBoost, speed },
         }),
       }
     );
