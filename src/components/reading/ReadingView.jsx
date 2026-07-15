@@ -254,9 +254,9 @@ export default function ReadingView() {
     return Object.values(bookManifest.entries).some(e => e.type === 'structure');
   }, [bookManifest]);
 
-  useEffect(() => {
-    setShowStructures(isTeacher && manifestHasStructures);
-  }, [manifestHasStructures, isTeacher]);
+  // useEffect(() => {
+  //   setShowStructures(isTeacher && manifestHasStructures);
+  // }, [manifestHasStructures, isTeacher]);
 
   // Timed reading: tick every second while active
   useEffect(() => {
@@ -770,6 +770,7 @@ export default function ReadingView() {
                       Translate
                     </button>
                   )}
+                  {/* Grammar pill hidden — syntax glosses cover this function.
                   {manifestHasStructures && (
                     <button
                       onClick={() => setShowStructures(s => !s)}
@@ -783,6 +784,7 @@ export default function ReadingView() {
                       Grammar
                     </button>
                   )}
+                  */}
                   <ToolSetSelector
                     active={toolSet}
                     onSelect={setToolSet}

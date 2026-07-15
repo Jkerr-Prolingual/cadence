@@ -301,25 +301,15 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
 
   function renderGlossView() {
     if (!syntaxGloss) return null;
-    const isComplex = syntaxGloss.complexity === 'complex';
-    const typeLabel = syntaxGloss.type.replace(/_/g, ' ');
 
     return (
       <>
         <div className="mb-2">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-              isComplex ? 'bg-blue-100 text-blue-700' : 'bg-blue-50 text-blue-500'
-            }`}>
-              {typeLabel}
-            </span>
-          </div>
           <p className="text-sm text-gray-600 italic leading-snug">"{syntaxGloss.text}"</p>
         </div>
 
         <div className="mb-2">
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">ES</span>
-          <p className="text-sm text-gray-800 mt-0.5">{syntaxGloss.spanish}</p>
+          <p className="text-sm text-gray-800">{syntaxGloss.spanish}</p>
         </div>
 
         {syntaxGloss.note && (
@@ -400,14 +390,6 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           {view === 'structure' ? '+ Cloze card' : '+ Flashcard'}
         </button>
         <div className="flex items-center gap-1">
-          {onResumeAudio && (
-            <button
-              onClick={onResumeAudio}
-              className="text-xs text-green-600 hover:text-green-800 active:text-green-900 font-medium px-2 py-2 min-h-[44px] flex items-center"
-            >
-              Resume ▶
-            </button>
-          )}
           <button
             onClick={onClose}
             className="text-xs text-gray-400 hover:text-gray-600 active:text-gray-800 px-2 py-2 -mr-2 min-h-[44px] flex items-center"
