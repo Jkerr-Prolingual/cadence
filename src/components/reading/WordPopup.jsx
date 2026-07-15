@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { cefrColor, lookupCefr } from '../../lib/wordUtils';
 import { spanishDict } from '../../data/es_dictionary';
+import { lemmaMap } from '../../data/lemmaMap';
 import { egpLookup } from '../../data/egpLookup';
 import { egpSpanishOverlay } from '../../data/egpSpanishOverlay';
 
@@ -54,8 +55,9 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   }, [position, view, structureDrillDown, syntaxGloss]);
 
   const lookupKey = lemma || word.toLowerCase();
-  const manifestEntry = manifest?.entries?.[lookupKey] || manifest?.entries?.[word.toLowerCase()];
-  const wordSpanish = manifestEntry?.spanish || spanishDict[lookupKey] || spanishDict[word.toLowerCase()];
+  const morphLemma = lemmaMap[word.toLowerCase()];
+  const manifestEntry = manifest?.entries?.[lookupKey] || manifest?.entries?.[word.toLowerCase()] || (morphLemma && manifest?.entries?.[morphLemma]);
+  const wordSpanish = manifestEntry?.spanish || spanishDict[lookupKey] || spanishDict[word.toLowerCase()] || (morphLemma && spanishDict[morphLemma]);
   const wordLevel = cefr || 'unclassified';
   const wordColor = cefrColor(wordLevel);
 
@@ -65,11 +67,12 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
 
   function constituentSpanish(token) {
     const key = token.lemma || token.raw.toLowerCase();
+    const mLemma = lemmaMap[token.raw.toLowerCase()];
     if (particle?.constituents_es?.[key]) return particle.constituents_es[key];
     if (particle?.constituents_es?.[token.raw.toLowerCase()]) return particle.constituents_es[token.raw.toLowerCase()];
-    const mEntry = manifest?.entries?.[key] || manifest?.entries?.[token.raw.toLowerCase()];
+    const mEntry = manifest?.entries?.[key] || manifest?.entries?.[token.raw.toLowerCase()] || (mLemma && manifest?.entries?.[mLemma]);
     if (mEntry?.spanish) return mEntry.spanish;
-    return spanishDict[key] || spanishDict[token.raw.toLowerCase()] || null;
+    return spanishDict[key] || spanishDict[token.raw.toLowerCase()] || (mLemma && spanishDict[mLemma]) || null;
   }
 
   function renderParticleView() {

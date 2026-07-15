@@ -266,7 +266,7 @@ export default function LandingPage() {
             </h2>
             <p className="mt-5 text-lg text-gray-500 leading-relaxed max-w-lg">
               Relato te ayuda a aprender inglés a través de la lectura extensiva — historias
-              reales con audio, traducciones instantáneas y seguimiento de vocabulario que se
+              auténticas con audio, traducciones instantáneas y seguimiento de vocabulario que se
               adapta a lo que ya sabes.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -557,7 +557,7 @@ export default function LandingPage() {
             Empieza a leer hoy
           </h3>
           <p className="mt-3 text-violet-200 max-w-md mx-auto">
-            Únete a Relato y descubre cómo leer historias reales transforma tu inglés — una página a la vez.
+            Únete a Relato y descubre cómo leer historias auténticas transforma tu inglés — una página a la vez.
           </p>
           <Link
             to="/login?mode=signup"
