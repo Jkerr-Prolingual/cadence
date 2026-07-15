@@ -1,12 +1,21 @@
-import { supabase } from './supabase.js';
-
 export function getVoiceOptions() {
   const ids = (import.meta.env.VITE_ELEVENLABS_VOICE_IDS || '').split(',').filter(Boolean);
   const names = (import.meta.env.VITE_ELEVENLABS_VOICE_NAMES || '').split(',').filter(Boolean);
   return ids.map((id, i) => ({ id: id.trim(), name: (names[i] || `Voice ${i + 1}`).trim() }));
 }
 
-export async function submitAudioJob(text, voiceId, textId, options = {}) {
+let cachedKey = null;
+
+async function getApiKey() {
+  if (cachedKey) return cachedKey;
+  const res = await fetch('/.netlify/functions/elevenlabs-key');
+  if (!res.ok) throw new Error('Failed to fetch ElevenLabs API key');
+  const { key } = await res.json();
+  cachedKey = key;
+  return key;
+}
+
+export async function generateAudio(text, voiceId, options = {}) {
   const {
     modelId = 'eleven_turbo_v2',
     stability = 0.5,
@@ -14,64 +23,46 @@ export async function submitAudioJob(text, voiceId, textId, options = {}) {
     speed = 0.92,
   } = options;
 
-  const { data: job, error: insertError } = await supabase
-    .from('audio_jobs')
-    .insert({ text_id: textId, status: 'pending' })
-    .select('id')
-    .single();
-  if (insertError) throw new Error(`Failed to create job: ${insertError.message}`);
+  const apiKey = await getApiKey();
 
-  const response = await fetch('/.netlify/functions/generate-audio-background', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jobId: job.id,
-      text,
-      voiceId,
-      textId,
-      modelId,
-      stability,
-      similarityBoost,
-      speed,
-    }),
-  });
+  const response = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        text,
+        model_id: modelId,
+        voice_settings: { stability, similarity_boost: similarityBoost, speed },
+      }),
+    }
+  );
 
-  if (!response.ok && response.status !== 202) {
-    throw new Error(`Failed to submit audio job: HTTP ${response.status}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ElevenLabs API error: ${response.status} — ${errorText}`);
   }
 
-  return job.id;
-}
+  const data = await response.json();
 
-export async function pollAudioJob(jobId, { intervalMs = 3000, timeoutMs = 300000 } = {}) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const { data, error } = await supabase
-      .from('audio_jobs')
-      .select('status, error_message, alignment, audio_path')
-      .eq('id', jobId)
-      .single();
-
-    if (error) throw new Error(`Failed to check job status: ${error.message}`);
-
-    if (data.status === 'complete') return data;
-    if (data.status === 'error') throw new Error(data.error_message || 'Audio generation failed');
-
-    await new Promise(r => setTimeout(r, intervalMs));
+  const audioBytes = atob(data.audio_base64);
+  const audioBuffer = new Uint8Array(audioBytes.length);
+  for (let i = 0; i < audioBytes.length; i++) {
+    audioBuffer[i] = audioBytes.charCodeAt(i);
   }
-  throw new Error('Audio generation timed out');
-}
-
-export function processAudioResult(text, alignment, audioBlob) {
+  const audioBlob = new Blob([audioBuffer], { type: 'audio/mpeg' });
   const audioUrl = URL.createObjectURL(audioBlob);
-  const audioTimestamps = charTimestampsToWordTimestamps(text, alignment);
+  const audioTimestamps = charTimestampsToWordTimestamps(text, data.alignment);
+
   return { audioUrl, audioBlob, audioTimestamps };
 }
 
 function charTimestampsToWordTimestamps(text, alignment) {
   const { characters, character_start_times_seconds, character_end_times_seconds } = alignment;
 
-  // Build words from the alignment's own character stream
   const words = [];
   let currentWord = '';
   let wordStartIdx = -1;
@@ -93,9 +84,6 @@ function charTimestampsToWordTimestamps(text, alignment) {
     words.push({ word: currentWord, startIdx: wordStartIdx, endIdx: characters.length - 1 });
   }
 
-  // Match alignment words to original text words using forward scan
-  // ElevenLabs may drop or normalize characters (e.g., em dashes),
-  // so word counts can differ. Match by normalized content, not index.
   const textWordRegex = /\S+/g;
   const textWords = [];
   let m;
@@ -113,7 +101,6 @@ function charTimestampsToWordTimestamps(text, alignment) {
     const normW = normalize(w.word);
     if (!normW) continue;
 
-    // Scan forward in text words to find a match
     let matched = null;
     for (let j = textIdx; j < textWords.length && j < textIdx + 3; j++) {
       if (normalize(textWords[j].word) === normW) {
@@ -123,7 +110,6 @@ function charTimestampsToWordTimestamps(text, alignment) {
       }
     }
 
-    // If no match found nearby, skip ahead to find it
     if (!matched) {
       for (let j = textIdx; j < textWords.length; j++) {
         if (normalize(textWords[j].word) === normW) {
