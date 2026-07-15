@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { analyzeText, titleToSlug, buildAnalysisPrompt, CEFR_LEVELS, CEFR_COLORS } from '../../lib/textAnalysis';
-import { getVoiceOptions, generateAudio } from '../../lib/elevenlabs';
+import { getVoiceOptions, submitAudioJob, pollAudioJob, processAudioResult } from '../../lib/elevenlabs';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { extractImages } from '../../lib/imageUtils';
@@ -425,46 +425,50 @@ export default function AdminPanel() {
 
   const recordId = editingTextId || textId;
 
+  const [generatingStatus, setGeneratingStatus] = useState('');
+
   async function handleGenerateAudio() {
     if (!cleanBody || !selectedVoice) return;
     setGenerating(true);
     setGenerateError(null);
+    setGeneratingStatus('Submitting...');
     try {
-      const data = await generateAudio(cleanBody, selectedVoice, {
+      const jobId = await submitAudioJob(cleanBody, selectedVoice, recordId, {
         modelId: selectedModel,
         stability: audioStability,
         speed: audioSpeed,
       });
+
+      setGeneratingStatus('Generating audio (this may take up to a minute)...');
+      const result = await pollAudioJob(jobId);
+
+      setGeneratingStatus('Downloading audio...');
+      const { data: fileData, error: dlError } = await supabase.storage
+        .from('curated-text-audio')
+        .download(result.audio_path);
+      if (dlError) throw dlError;
+
+      const data = processAudioResult(cleanBody, result.alignment, fileData);
       setAudioData(data);
 
-      if (data.audioBlob) {
-        const storagePath = `${recordId}.mp3`;
-        const { error: uploadError } = await supabase.storage
-          .from('curated-text-audio')
-          .upload(storagePath, data.audioBlob, {
-            contentType: 'audio/mpeg',
-            upsert: true,
-          });
-        if (uploadError) throw uploadError;
-
-        const existing = corpusTexts.find(t => t.id === recordId);
-        if (existing) {
-          await supabase
-            .from('curated_texts')
-            .update({
-              audio_urls: { mp3: storagePath },
-              audio_timestamps: data.audioTimestamps,
-              audio_voice_ids: [selectedVoice],
-              audio_generated_at: new Date().toISOString(),
-            })
-            .eq('id', recordId);
-          await loadCorpus();
-        }
+      const existing = corpusTexts.find(t => t.id === recordId);
+      if (existing) {
+        await supabase
+          .from('curated_texts')
+          .update({
+            audio_urls: { mp3: result.audio_path },
+            audio_timestamps: data.audioTimestamps,
+            audio_voice_ids: [selectedVoice],
+            audio_generated_at: new Date().toISOString(),
+          })
+          .eq('id', recordId);
+        await loadCorpus();
       }
     } catch (err) {
       setGenerateError(err.message);
     }
     setGenerating(false);
+    setGeneratingStatus('');
   }
 
   async function handleSaveChanges() {
@@ -1417,7 +1421,7 @@ export default function AdminPanel() {
                               : 'bg-gray-900 text-white hover:bg-gray-800'
                         }`}
                       >
-                        {generating ? 'Generating...' : editingExisting?.hasAudio && !audioData ? 'Replace Existing Audio' : 'Generate Audio'}
+                        {generating ? (generatingStatus || 'Generating...') : editingExisting?.hasAudio && !audioData ? 'Replace Existing Audio' : 'Generate Audio'}
                       </button>
                     </div>
 

@@ -1,10 +1,12 @@
+import { supabase } from './supabase.js';
+
 export function getVoiceOptions() {
   const ids = (import.meta.env.VITE_ELEVENLABS_VOICE_IDS || '').split(',').filter(Boolean);
   const names = (import.meta.env.VITE_ELEVENLABS_VOICE_NAMES || '').split(',').filter(Boolean);
   return ids.map((id, i) => ({ id: id.trim(), name: (names[i] || `Voice ${i + 1}`).trim() }));
 }
 
-export async function generateAudio(text, voiceId, options = {}) {
+export async function submitAudioJob(text, voiceId, textId, options = {}) {
   const {
     modelId = 'eleven_turbo_v2',
     stability = 0.5,
@@ -12,28 +14,57 @@ export async function generateAudio(text, voiceId, options = {}) {
     speed = 0.92,
   } = options;
 
-  const response = await fetch('/.netlify/functions/generate-audio', {
+  const { data: job, error: insertError } = await supabase
+    .from('audio_jobs')
+    .insert({ text_id: textId, status: 'pending' })
+    .select('id')
+    .single();
+  if (insertError) throw new Error(`Failed to create job: ${insertError.message}`);
+
+  const response = await fetch('/.netlify/functions/generate-audio-background', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voiceId, modelId, stability, similarityBoost, speed }),
+    body: JSON.stringify({
+      jobId: job.id,
+      text,
+      voiceId,
+      textId,
+      modelId,
+      stability,
+      similarityBoost,
+      speed,
+    }),
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-    throw new Error(err.error || `Audio generation failed: ${response.status}`);
+  if (!response.ok && response.status !== 202) {
+    throw new Error(`Failed to submit audio job: HTTP ${response.status}`);
   }
 
-  const data = await response.json();
+  return job.id;
+}
 
-  const audioBytes = atob(data.audio_base64);
-  const audioBuffer = new Uint8Array(audioBytes.length);
-  for (let i = 0; i < audioBytes.length; i++) {
-    audioBuffer[i] = audioBytes.charCodeAt(i);
+export async function pollAudioJob(jobId, { intervalMs = 3000, timeoutMs = 300000 } = {}) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const { data, error } = await supabase
+      .from('audio_jobs')
+      .select('status, error_message, alignment, audio_path')
+      .eq('id', jobId)
+      .single();
+
+    if (error) throw new Error(`Failed to check job status: ${error.message}`);
+
+    if (data.status === 'complete') return data;
+    if (data.status === 'error') throw new Error(data.error_message || 'Audio generation failed');
+
+    await new Promise(r => setTimeout(r, intervalMs));
   }
-  const audioBlob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+  throw new Error('Audio generation timed out');
+}
+
+export function processAudioResult(text, alignment, audioBlob) {
   const audioUrl = URL.createObjectURL(audioBlob);
-  const audioTimestamps = charTimestampsToWordTimestamps(text, data.alignment);
-
+  const audioTimestamps = charTimestampsToWordTimestamps(text, alignment);
   return { audioUrl, audioBlob, audioTimestamps };
 }
 
