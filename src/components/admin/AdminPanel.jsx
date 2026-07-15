@@ -7,6 +7,13 @@ import { extractImages } from '../../lib/imageUtils';
 
 const STEPS = ['Content', 'Analysis', 'Audio & Publish'];
 
+const ELEVENLABS_MODELS = [
+  { id: 'eleven_multilingual_v2', label: 'Multilingual v2 (Best quality)' },
+  { id: 'eleven_flash_v2_5', label: 'Flash v2.5 (Fast, multilingual)' },
+  { id: 'eleven_flash_v2', label: 'Flash v2 (Fast, English only)' },
+  { id: 'eleven_turbo_v2', label: 'Turbo v2 (Legacy)' },
+];
+
 function CefrBars({ dist }) {
   const max = Math.max(...CEFR_LEVELS.map(l => dist[l] || 0), 1);
   return (
@@ -197,6 +204,9 @@ export default function AdminPanel() {
 
   // Step 3: Audio & Publish
   const [selectedVoice, setSelectedVoice] = useState('');
+  const [selectedModel, setSelectedModel] = useState('eleven_multilingual_v2');
+  const [audioStability, setAudioStability] = useState(0.75);
+  const [audioSpeed, setAudioSpeed] = useState(0.92);
   const [audioData, setAudioData] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState(null);
@@ -420,7 +430,11 @@ export default function AdminPanel() {
     setGenerating(true);
     setGenerateError(null);
     try {
-      const data = await generateAudio(cleanBody, selectedVoice);
+      const data = await generateAudio(cleanBody, selectedVoice, {
+        modelId: selectedModel,
+        stability: audioStability,
+        speed: audioSpeed,
+      });
       setAudioData(data);
 
       if (data.audioBlob) {
@@ -1325,16 +1339,73 @@ export default function AdminPanel() {
                   </p>
                 ) : (
                   <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Voice</label>
+                        <select
+                          value={selectedVoice}
+                          onChange={(e) => setSelectedVoice(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        >
+                          {voices.map(v => (
+                            <option key={v.id} value={v.id}>{v.name} ({v.id.slice(0, 8)}...)</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Model</label>
+                        <select
+                          value={selectedModel}
+                          onChange={(e) => setSelectedModel(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        >
+                          {ELEVENLABS_MODELS.map(m => (
+                            <option key={m.id} value={m.id}>{m.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+                          Stability — {audioStability.toFixed(2)}
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={audioStability}
+                          onChange={(e) => setAudioStability(Number(e.target.value))}
+                          className="w-full accent-gray-900"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+                          <span>More expressive</span>
+                          <span>More consistent</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+                          Speed — {audioSpeed.toFixed(2)}
+                        </label>
+                        <input
+                          type="range"
+                          min="0.7"
+                          max="1.2"
+                          step="0.01"
+                          value={audioSpeed}
+                          onChange={(e) => setAudioSpeed(Number(e.target.value))}
+                          className="w-full accent-gray-900"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+                          <span>Slower</span>
+                          <span>Faster</span>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="flex items-center gap-3">
-                      <select
-                        value={selectedVoice}
-                        onChange={(e) => setSelectedVoice(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                      >
-                        {voices.map(v => (
-                          <option key={v.id} value={v.id}>{v.name} ({v.id.slice(0, 8)}...)</option>
-                        ))}
-                      </select>
                       <button
                         onClick={handleGenerateAudio}
                         disabled={generating || !rawText}
