@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
-export async function handler(event) {
+exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method not allowed' };
   }
@@ -22,7 +22,14 @@ export async function handler(event) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
 
   if (!supabaseUrl || !serviceRoleKey || !apiKey) {
-    return { statusCode: 500, body: 'Missing server configuration' };
+    const missing = [
+      !supabaseUrl && 'SUPABASE_URL',
+      !serviceRoleKey && 'SUPABASE_SERVICE_ROLE_KEY',
+      !apiKey && 'ELEVENLABS_API_KEY',
+    ].filter(Boolean).join(', ');
+
+    await updateJobError(supabaseUrl, serviceRoleKey, jobId, `Missing server env vars: ${missing}`);
+    return { statusCode: 200 };
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -84,4 +91,14 @@ export async function handler(event) {
   }
 
   return { statusCode: 200 };
+};
+
+async function updateJobError(url, key, jobId, message) {
+  if (!url || !key) return;
+  const supabase = createClient(url, key);
+  await supabase.from('audio_jobs').update({
+    status: 'error',
+    error_message: message,
+    completed_at: new Date().toISOString(),
+  }).eq('id', jobId);
 }
