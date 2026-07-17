@@ -6,6 +6,31 @@ import { egpL1Overlays } from '../../data/egpL1Overlays';
 import { getL1Dict, getManifestTranslation, getManifestConstituents, getGlossTranslation, getGlossConstituents } from '../../lib/translations';
 import { getL1Label } from '../../lib/locales';
 
+function speakWord(text) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.85;
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
+function SpeakButton({ text }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); speakWord(text); }}
+      className="p-1 text-gray-400 hover:text-blue-500 active:text-blue-700 shrink-0"
+      aria-label="Listen to pronunciation"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      </svg>
+    </button>
+  );
+}
+
 export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss, l1 = 'es' }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
@@ -84,7 +109,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     return (
       <>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-lg font-semibold text-gray-900">{particle.phrase}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-lg font-semibold text-gray-900">{particle.phrase}</span>
+            <SpeakButton text={particle.phrase} />
+          </div>
           <span
             className="text-xs font-bold px-2 py-0.5 rounded"
             style={{ backgroundColor: particleColor + '20', color: particleColor }}
@@ -110,7 +138,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           <p className="text-sm text-gray-400 italic mb-2">No translation available</p>
         )}
 
-        {particle.note && (
+        {particle.note && l1 === 'es' && (
           <p className="text-xs text-gray-500 italic mb-2">{particle.note}</p>
         )}
 
@@ -185,7 +213,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         )}
 
         <div className="flex items-center justify-between mb-2">
-          <span className="text-lg font-semibold text-gray-900">{word}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-lg font-semibold text-gray-900">{word}</span>
+            <SpeakButton text={word} />
+          </div>
           <span
             className="text-xs font-bold px-2 py-0.5 rounded"
             style={{ backgroundColor: wordColor + '20', color: wordColor }}
@@ -209,7 +240,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           <p className="text-sm text-gray-400 italic">No translation available</p>
         )}
 
-        {manifestEntry?.note && (
+        {manifestEntry?.note && l1 === 'es' && (
           <p className="text-xs text-gray-500 italic mb-2">{manifestEntry.note}</p>
         )}
       </>

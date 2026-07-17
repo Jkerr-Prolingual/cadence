@@ -5,8 +5,9 @@
 ## What This App Is
 
 Relato is a React (Vite) ESL reading and vocabulary acquisition app for
-Spanish-speaking A2–B2 English learners, with emphasis on adolescent and
-young adult long-term English learners (LTEL) in K-12 settings.
+A2–B2 English learners across multiple L1 backgrounds (Spanish, Mandarin,
+Japanese, Korean), with emphasis on adolescent and young adult long-term
+English learners (LTEL) in K-12 settings.
 
 Core loop: Read extensively → Encounter vocabulary → Track depth of
 knowledge through a 5-level fluency model → Practice via flashcards
@@ -40,13 +41,14 @@ Key reusable pieces:
 - Leitner SRS system (flashcardDB.js patterns, LeitnerReview UI)
 - ShadowingPlayer (audio playback, timestamp sync, sentence looping)
 - useAudioRecorder hook (MediaRecorder wrapper)
-- Definition/translation fetching + caching chain (MW API, es_dictionary,
+- Definition/translation fetching + caching chain (MW API, L1 dictionaries,
   en_dictionary, IndexedDB cache)
 - Auth context (Supabase auth + role management)
 - Word highlighting + click-to-lookup popup pattern
 - Flashcard creation (CardCreator, FlashcardPage)
-- Data files: es_dictionary.js, en_dictionary.js, BNC/COCA frequency
-  data, NGSL, AWL word lists
+- Data files: es_dictionary.js, zh_dictionary.js, ja_dictionary.js,
+  ko_dictionary.js, en_dictionary.js, BNC/COCA frequency data, NGSL,
+  AWL word lists
 
 **Adapted:**
 - useProgressSync (remove CEFR instrument handoff)
@@ -221,20 +223,20 @@ sub-mode of reading, not a separate destination.
 
 **Text display:** Word-level and particle-level highlighting. Single words
 and multi-word particles are both clickable. Click triggers a popup with
-CEFR level, Spanish translation, English definition. For particles, the
-popup supports Pleco-style drill-down to constituent words and back up to
-the particle as a unit (see "Particle-aware reading view" in the Particle
-Model section). Cursor-gated colored underlines by CEFR tier. Encounter
-tracking across sessions.
+CEFR level, L1 translation (locale-aware), English definition. For
+particles, the popup supports Pleco-style drill-down to constituent words
+and back up to the particle as a unit (see "Particle-aware reading view"
+in the Particle Model section). Cursor-gated colored underlines by CEFR
+tier. Encounter tracking across sessions.
 
 **Translation mode (syntax glosses):** Binary toggle that overlays
-phrase-level Spanish translations on the text. Curated per-book during
-graded reader production — every sentence is segmented into contiguous
-syntax glosses with grammatical type and complexity classification.
-Complex glosses are visually flagged with a darker underline. Tapping a
-gloss shows the phrase translation with drill-down to contextually
-translated constituent words. See "Syntax Glosses" section for schema
-and design details.
+phrase-level L1 translations on the text. Curated per-book during graded
+reader production — every sentence is segmented into contiguous syntax
+glosses with grammatical type and complexity classification. Complex
+glosses are visually flagged with a darker underline. Tapping a gloss
+shows the phrase translation with drill-down to contextually translated
+constituent words. See "Syntax Glosses" section for schema and design
+details.
 
 **Audio playback:** ElevenLabs-generated audio with word-level timestamps,
 synchronized highlighting, speed slider (0.5×–1.25×), sentence loop for
@@ -287,7 +289,7 @@ provenance). Series/sequence support for multi-chapter works.
 - `transcriptions` — STT + pronunciation assessment output
 - `flag_events` — unified flags (student/AI/teacher source)
 - `fluency_sessions` — timed reading and shadowing session logs
-- `srs_cards` — Leitner box flashcard state
+- `srs_cards` — Leitner box flashcard state (`translation` + `l1` columns)
 - `student_recordings` — shadow read recordings for teacher review
 
 ### IndexedDB Stores (local)
@@ -299,6 +301,72 @@ provenance). Series/sequence support for multi-chapter works.
 Students manage their own rows (`auth.uid() = user_id/student_id`).
 Teachers read enrolled students' rows via `class_enrollments → classes`
 join (`classes.teacher_id = auth.uid()`). Admins read/write all rows.
+
+---
+
+## Multi-L1 Translation Layer
+
+Relato supports four L1 (native language) backgrounds. The L2 (English)
+is fixed. The vocabulary engine (EFLLex, particles, depth model) is
+L1-independent.
+
+### Supported locales
+
+Defined in `src/lib/locales.js`:
+
+| Code | Label | English | Base dictionary coverage |
+|---|---|---|---|
+| `es` | Español | Spanish | ~28% (hand-curated) |
+| `zh` | 中文 | Mandarin | ~72% (CC-CEDICT) |
+| `ja` | 日本語 | Japanese | ~82% (JMdict) |
+| `ko` | 한국어 | Korean | ~77% (KENGDIC) |
+
+Default L1 is `es`. Users select L1 at signup (stored in `profiles.l1`)
+and can change it from the settings menu in Layout.
+
+### Architecture
+
+- **AuthContext** exposes `l1` from the user's profile (fallback: `'es'`).
+- **`src/lib/translations.js`** is the central translation utility:
+  - `getL1Dict(l1)` — returns the locale's base dictionary
+  - `getManifestTranslation(entry, l1)` — reads `entry.translations[l1]`
+    with fallback to `entry.spanish` (backward compat)
+  - `getManifestConstituents(entry, l1)` — reads locale-keyed
+    constituents with auto-detection of old flat format
+  - `getGlossTranslation(gloss, l1)` / `getGlossConstituents(gloss, l1)`
+    — same pattern for syntax glosses
+- **Components** receive `l1` as a prop from ReadingView (which gets it
+  from AuthContext). WordPopup, CardCreator, and TextDisplay all use the
+  translation helpers.
+- **SRS cards** store `translation` and `l1` columns (not `spanish`).
+  Card type `'translation'` replaces `'spanish'`.
+- **EGP grammar overlays** (`egpL1Overlays.js`) are locale-keyed:
+  `explanations[l1]`, `contrasts[l1]`, `examples[l1]`. Currently only
+  `es` is populated; other locales render without the overlay until
+  content is added.
+
+### Backward compatibility
+
+Manifests and glosses stored as JSONB on `books` coexist in old and new
+format. Detection is automatic:
+
+| Data | Old format | New format | Detection |
+|---|---|---|---|
+| Manifest entry | `entry.spanish` | `entry.translations.es` | Check `translations[l1]` first, fall back to `spanish` |
+| Manifest constituents | `{ "take": "quitar" }` (flat) | `{ "es": { "take": "quitar" } }` (nested) | Values are strings → flat; values are objects → nested |
+| Syntax gloss | `gloss.spanish` | `gloss.translations.es` | Same as manifest |
+| Gloss constituents | `{ "I": "yo" }` (flat) | `{ "es": { "I": "yo" } }` (nested) | Same detection |
+
+Old books keep working without re-ingestion. New books use the
+`translations` format. AdminPanel detects and displays which locales are
+populated when ingesting manifests and glosses.
+
+### DB migration
+
+`supabase/migrations/014_multi_l1.sql`:
+- Auth trigger reads `l1` from signup metadata
+- `srs_cards`: added `translation` and `l1` columns
+- Card type constraint accepts both `'spanish'` and `'translation'`
 
 ---
 
@@ -316,11 +384,23 @@ actual EFL textbook corpora — no intermediate band-to-tier mapping needed.
 - `lemmaMap.js` — 34,466 inflected form → headword mappings extracted from
   BNC/COCA wordData.js. Used to resolve surface forms (e.g. "running" → "run")
   before EFLLex lookup.
-- `es_dictionary.js` — ~3k Spanish definitions (NGSL + AWL focused).
-  Only covers ~28% of EFLLex words — insufficient on its own. Serves as
-  the static fallback layer; series vocabulary manifests are the primary
-  translation source for curated content.
 - `en_dictionary.js` — ~3,400 learner-friendly English definitions
+
+**L1 dictionaries** — base translation fallback layer per locale. Each
+maps EFLLex headwords to L1 translations. Vocabulary manifests override
+these when a book-specific sense or note is needed.
+
+| File | Locale | Entries | Coverage | Source | License |
+|---|---|---|---|---|---|
+| `es_dictionary.js` | Spanish | ~3,000 | ~28% | Hand-curated (NGSL+AWL) | — |
+| `zh_dictionary.js` | Mandarin | ~7,200 | ~72% | CC-CEDICT (inverted) | CC BY-SA 4.0 |
+| `ja_dictionary.js` | Japanese | ~8,200 | ~82% | JMdict (inverted) | CC BY-SA 4.0 |
+| `ko_dictionary.js` | Korean | ~7,700 | ~77% | KENGDIC (inverted) | MPL 2.0 / LGPL 2.0+ |
+
+The zh/ja/ko dictionaries are machine-generated by inverting L1→English
+dictionaries and matching against cefrLookup headwords. They pick the
+most common translation per headword but lack sense disambiguation — the
+per-book vocabulary manifest provides context-aware overrides.
 
 ### Lookup chain (`lookupCefr()` in wordUtils.js)
 1. Clean and lowercase the token
@@ -378,32 +458,35 @@ BAND_TIER_MAP system from VocabFrontier. The `lemmaMap.js` file was
 extracted from wordData.js for its inflection-to-headword mappings only;
 the frequency data was discarded.
 
-### Spanish Translation Lookup Order
+### L1 Translation Lookup Order
+
+Translation lookup is locale-aware — the user's L1 setting (from
+`AuthContext.l1`) determines which dictionary and manifest translations
+are used. The lookup chain, implemented in `src/lib/translations.js`:
+
 1. **Book vocabulary manifest** (override layer) — sense-disambiguated
    translations, multi-word particles, and pedagogical notes generated
    per-book during graded reader production. Stored as JSONB on the
-   `books` table (`vocabulary_manifest` column). Only includes entries
-   where the base dictionary translation is insufficient: wrong sense in
-   context, phrasal verbs that don't exist as units in the base dictionary,
-   false friend warnings, or story-specific notes. Typically 20–50 entries
-   per book, not a full dictionary.
-2. Bundled `es_dictionary.js` — base translations for all single words.
-   Covers EFLLex vocabulary plus common content words. The manifest
-   overrides this when a book-specific sense or note is needed.
+   `books` table (`vocabulary_manifest` column). Entries use
+   `translations: { es: "...", zh: "..." }` (new format) or `spanish`
+   field (old format, backward compat). Only includes entries where the
+   base dictionary is insufficient. Typically 20–50 entries per book.
+   Helpers: `getManifestTranslation(entry, l1)`,
+   `getManifestConstituents(entry, l1)`.
+2. **Bundled L1 dictionary** — `getL1Dict(l1)` returns the locale's
+   base dictionary (`es_dictionary`, `zh_dictionary`, etc.). Covers
+   EFLLex vocabulary. The manifest overrides this when a book-specific
+   sense or note is needed.
 3. *(Future)* API fallback for native/uncurated content — translation
    API or LLM call with sentence context, cached to IndexedDB
 
 The manifest is produced during graded reader authoring, not at ingestion
 time. The LLM has full text context during production, so translations
-are sense-disambiguated (e.g., "watch" → "observar" not "reloj" in a
-story about observing people). Manifests are reviewed and version-controlled
-in the graded reader project alongside chapter text and vocabulary
-inventories.
+are sense-disambiguated. Manifests are reviewed and version-controlled
+in the graded reader project.
 
 For non-curated or native content without a manifest, the lookup falls
-through to the static dictionary and eventually to an API layer. This
-ensures coverage scales beyond EFLLex's ~10k ceiling as students advance
-to B2+ material.
+through to the static dictionary and eventually to an API layer.
 
 ### English Definition Lookup Order
 1. IndexedDB cache (`enDefinitions` store)
@@ -411,9 +494,21 @@ to B2+ material.
 3. Merriam-Webster Learner's Dictionary API (`VITE_MW_LEARNERS_KEY`)
 4. Cache MW results to IndexedDB
 
-### Build script
-`scripts/build-data.mjs` regenerates `cefrLookup.js` and `lemmaMap.js`
-from source files. Run `node scripts/build-data.mjs` if source data changes.
+### Build scripts
+- `scripts/build-data.mjs` — regenerates `cefrLookup.js` and `lemmaMap.js`
+  from source files. Run if EFLLex or lemma source data changes.
+- `scripts/build-zh-dict.mjs` — downloads CC-CEDICT, inverts to
+  English→Chinese, generates `zh_dictionary.js`. Caches source to
+  `scripts/.cache/cedict.txt`.
+- `scripts/build-ja-dict.mjs` — downloads JMdict, inverts to
+  English→Japanese, generates `ja_dictionary.js`. Caches source to
+  `scripts/.cache/JMdict_e.xml`.
+- `scripts/build-ko-dict.mjs` — downloads KENGDIC, inverts to
+  English→Korean, generates `ko_dictionary.js`. Caches source to
+  `scripts/.cache/kengdic.tsv`.
+
+All L1 build scripts accept an optional local file path argument. Cached
+source files are gitignored (`scripts/.cache/`).
 
 ---
 
@@ -487,9 +582,10 @@ The reading view renders particles as clickable multi-word spans. The
 popup supports Pleco-style drill-down / drill-up navigation:
 
 1. **Tap a particle span** (e.g., "pick up") → popup shows: particle as
-   a unit, CEFR level, Spanish translation, compositionality tag
+   a unit, CEFR level, L1 translation, compositionality tag
 2. **Decompose** → shows constituent words ("pick", "up") with their own
-   CEFR levels and translations
+   CEFR levels and L1 translations (locale-aware via manifest or base
+   dictionary)
 3. For non-compositional chunks, signal that meaning is NOT the sum of
    parts — this is itself a learning event
 4. **Navigate back** → return to particle-level view
@@ -556,13 +652,15 @@ Each graded reader series produces:
   particles tiered as Core/Thematic/Peripheral, encounter counts, and
   chapter spread
 - A **vocabulary manifest** (`series/<slug>/vocabulary_manifest.json`) —
-  override file with sense-disambiguated translations, multi-word particles,
-  and pedagogical notes. Only entries where the base dictionary is
-  insufficient. Schema and details below in "Vocabulary Manifest Schema."
+  override file with sense-disambiguated multi-locale translations,
+  multi-word particles, and pedagogical notes. Only entries where the
+  base dictionary is insufficient. Uses `translations: { es, zh, ... }`
+  format. Schema and details below in "Vocabulary Manifest Schema."
 - **Syntax glosses** (`series/<slug>/syntax_glosses.json`) — full-text
-  phrase-level segmentation with Spanish translations, grammatical type,
-  complexity flags, and constituent translations. Authored during the
-  same curation pass as the vocabulary manifest. Schema and details in
+  phrase-level segmentation with multi-locale translations, grammatical
+  type, complexity flags, and constituent translations. Uses
+  `translations: { es, zh, ... }` format. Authored during the same
+  curation pass as the vocabulary manifest. Schema and details in
   "Syntax Glosses" section.
 - A constraint specification (`series/<slug>/constraint_spec.md`) with
   CEFR target, sentence constraints, and compliance rules
@@ -580,21 +678,21 @@ When a graded reader chapter is ingested into Relato as a `curated_text`:
   multi-word particle occurrence in the text
 - **Per-particle metadata** — CEFR level, compositionality, tier,
   constituent words
-- **Vocabulary manifest** — context-aware Spanish translations for all
+- **Vocabulary manifest** — context-aware multi-locale translations for
   words and particles in the text, stored as JSONB on the `books` table
   (`vocabulary_manifest` column), ingested from the graded reader
   project's `vocabulary_manifest.json` via AdminPanel
-- **Syntax glosses** — full-text phrase-level Spanish translations with
-  grammatical type and complexity flags, stored as JSONB on the `books`
-  table (`syntax_glosses` column), ingested from the graded reader
-  project's `syntax_glosses.json` via AdminPanel
+- **Syntax glosses** — full-text phrase-level multi-locale translations
+  with grammatical type and complexity flags, stored as JSONB on the
+  `books` table (`syntax_glosses` column), ingested from the graded
+  reader project's `syntax_glosses.json` via AdminPanel
 - Audio (ElevenLabs TTS with word-level timestamps)
 - L1 adjustments (cognate/false-friend effective CEFR overrides)
 
 ### Data flow
 
 ```
-graded_readers/                          cadence/
+graded_readers/                          relato/
   data/efllex.json ───────────────────→ build-data.mjs → cefrLookup.js
   data/phrase_list.json ──────────────→ particle lookup table
   data/observed_chunks.json ──────────→ particle lookup table
@@ -624,17 +722,22 @@ for compositionality-aware encounter crediting.
 The vocabulary manifest is an **override file** produced per-series during
 graded reader authoring and stored **per-book** in Relato as a JSONB column
 on the `books` table (`vocabulary_manifest`). It does NOT duplicate the
-base dictionary (`es_dictionary.js`). It contains only entries where the
-base dictionary is insufficient: sense disambiguation, multi-word particles,
-false friend warnings, and pedagogical notes. Typically 20–50 entries per
-book.
+base dictionaries. It contains only entries where the base dictionary is
+insufficient: sense disambiguation, multi-word particles, false friend
+warnings, and pedagogical notes. Typically 20–50 entries per book.
 
 The graded reader project produces the manifest as
 `series/<slug>/vocabulary_manifest.json`. At ingestion time, it is pasted
 into AdminPanel's book form and stored on the `books` row. ReadingView
 fetches the manifest for the current book and passes it to TextDisplay
 (for particle detection) and WordPopup (for single-word translation
-overrides).
+overrides). AdminPanel detects and displays which locales are populated.
+
+### Multi-locale format
+
+Manifests use a `translations` object keyed by locale code instead of a
+single `spanish` field. Old manifests with `spanish` are still accepted
+via backward-compat detection in `src/lib/translations.js`.
 
 ### When an entry belongs in the manifest
 
@@ -645,68 +748,88 @@ Include an entry only when one or more of these conditions apply:
 2. **Multi-word particle** — phrasal verbs and chunks that don't exist as
    units in the base dictionary (e.g., "put on", "pick up", "of course")
 3. **False friend** — flagged in `l1_adjustments.md`; `note` MUST include
-   the warning
+   the warning. Note: false friend warnings are Spanish-specific and stay
+   in the `note` field as single-string English text.
 4. **Pedagogical note** — story significance, cognate flag, cultural
    context, or L1 transfer hazard worth surfacing
 
 If the base dictionary translation is correct for the book's context and
 no note is needed, do not include the word.
 
-### Schema
+### Schema (multi-locale)
 
 ```json
 {
   "book": "the_cookie",
   "target_cefr": "A1",
-  "generated": "2026-06-09",
+  "generated": "2026-07-16",
   "entries": {
     "watch": {
       "type": "word",
       "pos": "v",
       "cefr": "A1",
-      "spanish": "observar",
+      "translations": {
+        "es": "observar",
+        "zh": "观看"
+      },
       "note": "Used as 'observe people' throughout, not as noun (reloj)"
     },
     "library": {
       "type": "word",
       "pos": "n",
       "cefr": "A2",
-      "spanish": "biblioteca",
+      "translations": {
+        "es": "biblioteca",
+        "zh": "图书馆"
+      },
       "note": "False friend — 'library' ≠ librería (bookstore)"
-    },
-    "apron": {
-      "type": "word",
-      "pos": "n",
-      "cefr": "B1",
-      "spanish": "delantal",
-      "note": "Key story symbol — narrator's apron"
     },
     "put on": {
       "type": "particle",
       "compositionality": "non-compositional",
       "cefr": "A2",
-      "spanish": "ponerse (ropa)",
+      "translations": {
+        "es": "ponerse (ropa)",
+        "zh": "穿上"
+      },
       "note": "Used for clothing — 'I put on my apron'"
-    },
-    "pick up": {
-      "type": "particle",
-      "compositionality": "non-compositional",
-      "cefr": "B1",
-      "spanish": "recoger / levantar"
     },
     "take off": {
       "type": "particle",
       "compositionality": "compositional",
       "cefr": "A2",
-      "spanish": "quitarse (ropa)",
+      "translations": {
+        "es": "quitarse (ropa)",
+        "zh": "脱掉"
+      },
       "constituents": {
-        "take": "quitar",
-        "off": "de encima"
+        "es": { "take": "quitar", "off": "de encima" },
+        "zh": { "take": "脱", "off": "掉" }
       }
     }
   }
 }
 ```
+
+### Schema (old format — still accepted)
+
+```json
+{
+  "entries": {
+    "watch": {
+      "type": "word",
+      "pos": "v",
+      "cefr": "A1",
+      "spanish": "observar",
+      "note": "..."
+    }
+  }
+}
+```
+
+Old manifests with `spanish` field and flat `constituents` (values are
+strings) are detected automatically by the backward-compat helpers in
+`translations.js`. No re-ingestion required for existing books.
 
 ### Field reference
 
@@ -719,10 +842,10 @@ no note is needed, do not include the word.
 | `entries.*.type` | yes | `"word"` or `"particle"` |
 | `entries.*.pos` | yes (words) | Part of speech: n, v, adj, adv, n/v, etc. |
 | `entries.*.cefr` | yes | CEFR level (from EFLLex for words; chunk-meaning principle for non-compositional particles; constituent ceiling for compositional particles) |
-| `entries.*.spanish` | yes | Context-aware Spanish translation for the sense used in this book. Multiple senses separated by ` / `. |
+| `entries.*.translations` | yes | Object keyed by locale code → context-aware translation for the sense used in this book. Multiple senses separated by ` / `. Not all locales need to be present — missing locales fall through to the base dictionary. |
 | `entries.*.compositionality` | yes (particles) | `"compositional"` or `"non-compositional"` |
-| `entries.*.constituents` | yes (compositional) | Map of constituent word (lemma) → sense-disambiguated Spanish translation for that word's contribution to the phrase. Must reflect the sense used *in this particle*, not the word's default dictionary entry (e.g., "off" in "take off" → "de encima" not "apagado"). Omitted for non-compositional particles (parts don't sum to meaning). |
-| `entries.*.note` | no | Pedagogical note — false friends, cultural context, story significance, etc. |
+| `entries.*.constituents` | conditionally | Object keyed by locale code → map of constituent word (lemma) → sense-disambiguated translation. Omit a locale key if the L1 translation is a single indivisible unit that doesn't decompose — the popup will show the unit translation without drill-down for that locale. Omitted entirely for non-compositional particles (parts don't sum to meaning). |
+| `entries.*.note` | no | Pedagogical note — single English string. False friends, cultural context, story significance. Spanish-specific references (e.g., "≠ librería") are acceptable — this field is for content authors and es-speaking learners, not locale-keyed. |
 
 ### Design decisions
 
@@ -730,33 +853,33 @@ no note is needed, do not include the word.
 small. Words where the base dictionary translation is correct and no
 pedagogical note is needed are not included.
 
-**One manifest per book, keyed by lemma/phrase.** Graded readers use
-controlled vocabulary, so a word generally carries one sense throughout
-a book. Stored as JSONB on `books.vocabulary_manifest`. Polysemy handling
-(multiple senses per word within a book) is deferred until needed.
+**One manifest per book, all locales in one file.** Each entry has a
+`translations` object with per-locale values. Not all locales need to be
+present — locales can be added incrementally. AdminPanel shows which
+locales are populated (e.g., "42 entries — locales: es, zh").
 
 **`cefr` is included even though `cefrLookup` has it.** Makes the
 manifest self-contained for review. For particles, CEFR comes from the
 vocabulary inventory (chunk-meaning principle), not from `cefrLookup`.
 
-**`constituents` only on compositional particles, sense-disambiguated.**
-Non-compositional chunks don't show constituent translations in the popup
-— displaying them would imply the meaning is derivable from parts, which
-it isn't. For compositional particles, each constituent's translation must
-reflect its sense *within the phrase*, not its default dictionary entry.
-WordPopup prefers `constituents` translations over `es_dictionary` when
-drilling down into a particle.
+**`constituents` locale-keyed, optional per locale.** For compositional
+particles, each locale's constituent map reflects the word's sense
+*within the phrase*, not its default dictionary entry. If a CJK language
+has no clean decomposition for a particle (the L1 translation is an
+indivisible unit), omit that locale from `constituents` — the popup will
+show the unit translation without drill-down. Non-compositional chunks
+never have `constituents`.
 
-**`note` is the pedagogical annotation field.** Intended for content
-authors reviewing the manifest and potentially surfaced in teacher-facing
-views. Use for: false friends ("actually ≠ actualmente"), cultural context,
-story-specific significance, or L1 transfer hazards.
+**`note` stays a single English string.** False friend warnings are
+Spanish-specific ("library ≠ librería") and not meaningful for zh/ja/ko
+learners. Rather than locale-keying notes, keep them as author-facing
+English text with Spanish L1 references where relevant.
 
 ---
 
 ## Syntax Glosses
 
-Syntax glosses provide **full-text phrase-level Spanish translations** for
+Syntax glosses provide **full-text phrase-level L1 translations** for
 every sentence in a curated text. Where the vocabulary manifest handles
 word- and particle-level translations, syntax glosses handle the
 structures that connect them — clauses, phrases, and constructions whose
@@ -828,16 +951,21 @@ Syntax glosses coexist with word-level and particle-level popups. The
 layers nest: a syntax gloss span may contain particles, which may contain
 individual words. Tapping behavior in translation mode:
 
-1. **Tap a syntax gloss span** → shows the phrase-level Spanish
-   translation, grammatical type, and complexity flag
-2. **Drill down** → shows constituent words with contextually appropriate
-   translations from the gloss's `constituents` map
+1. **Tap a syntax gloss span** → shows the phrase-level L1 translation,
+   grammatical type, and complexity flag
+2. **Drill down** → shows constituent sub-phrases with contextually
+   appropriate L1 translations from the gloss's `constituents` map
+   (locale-keyed). Constituents are rendered as a vertical list sorted
+   by position in the English text — no left-to-right alignment is
+   implied, which works well for SOV languages (ja, ko).
 3. **Individual word/particle popups** remain available within the
    drill-down — CEFR level, definitions, encounter data
 
-Constituent translations in the syntax gloss override `es_dictionary`
-and the vocabulary manifest for words within that gloss, ensuring the
-translation reflects the word's sense *in that specific phrase*.
+Constituent translations in the syntax gloss override the base L1
+dictionary and the vocabulary manifest for words within that gloss,
+ensuring the translation reflects the word's sense *in that specific
+phrase*. If a locale key is missing from `constituents`, the drill-down
+button is hidden for that locale.
 
 ### File format and storage
 
@@ -846,13 +974,65 @@ during graded reader curation, stored alongside the vocabulary manifest.
 Stored as a `syntax_glosses` JSONB column on the `books` table, ingested
 via AdminPanel alongside the vocabulary manifest.
 
-### Schema
+### Schema (multi-locale)
 
 ```json
 {
   "book": "the_cookie",
   "target_cefr": "A1",
-  "generated": "2026-06-24",
+  "generated": "2026-07-16",
+  "chapters": {
+    "ch01": [
+      {
+        "text": "I work at the college cafeteria.",
+        "translations": {
+          "es": "Yo trabajo en la cafetería de la universidad.",
+          "zh": "我在大学食堂工作。"
+        },
+        "type": "simple clause",
+        "complexity": "simple",
+        "constituents": {
+          "es": {
+            "I": "yo",
+            "work": "trabajo",
+            "at the college cafeteria": "en la cafetería de la universidad"
+          },
+          "zh": {
+            "I": "我",
+            "work": "工作",
+            "at the college cafeteria": "在大学食堂"
+          }
+        }
+      },
+      {
+        "text": "the one she had been saving",
+        "translations": {
+          "es": "la que había estado guardando",
+          "zh": "她一直存着的那个"
+        },
+        "type": "relative clause",
+        "complexity": "complex",
+        "constituents": {
+          "es": {
+            "the one": "la que",
+            "she had been saving": "había estado guardando"
+          },
+          "zh": {
+            "the one": "那个",
+            "she had been saving": "她一直存着的"
+          }
+        },
+        "note": "past perfect progressive — complex tense for A1 readers"
+      }
+    ]
+  }
+}
+```
+
+### Schema (old format — still accepted)
+
+```json
+{
   "chapters": {
     "ch01": [
       {
@@ -865,31 +1045,15 @@ via AdminPanel alongside the vocabulary manifest.
           "work": "trabajo",
           "at the college cafeteria": "en la cafetería de la universidad"
         }
-      },
-      {
-        "text": "the one she had been saving",
-        "spanish": "la que había estado guardando",
-        "type": "relative clause",
-        "complexity": "complex",
-        "constituents": {
-          "the one": "la que",
-          "she had been saving": "había estado guardando"
-        },
-        "note": "past perfect progressive — complex tense for A1 readers"
-      },
-      {
-        "text": "Not yet.",
-        "spanish": "Todavía no.",
-        "type": "fragment",
-        "complexity": "simple",
-        "constituents": {
-          "Not yet": "todavía no"
-        }
       }
     ]
   }
 }
 ```
+
+Old glosses with `spanish` field and flat `constituents` (values are
+strings) are detected automatically by the backward-compat helpers in
+`translations.js`. No re-ingestion required for existing books.
 
 ### Field reference
 
@@ -900,11 +1064,11 @@ via AdminPanel alongside the vocabulary manifest.
 | `generated` | yes | Date glosses were generated (YYYY-MM-DD) |
 | `chapters` | yes | Map of chapter key → ordered array of gloss objects |
 | `chapters.*.text` | yes | Exact text from the chapter that this gloss covers. Matched by normalized string, not character offset — survives minor text edits. Glosses must tile the chapter text contiguously with no gaps or overlaps. |
-| `chapters.*.spanish` | yes | Full Spanish translation of the phrase |
+| `chapters.*.translations` | yes | Object keyed by locale code → full L1 translation of the phrase. Not all locales need to be present. |
 | `chapters.*.type` | yes | Grammatical type from the controlled vocabulary |
 | `chapters.*.complexity` | yes | `"simple"` or `"complex"` — drives UI filtering |
-| `chapters.*.constituents` | yes | Map of word or sub-phrase (as it appears in `text`) → contextually appropriate Spanish translation. Prefer **sub-phrase keys** that translate as semantic units (`"at the college cafeteria"` → `"en la cafetería de la universidad"`) over atomic word-by-word keys — the purpose is comprehension support, not a dictionary. Translations are **gloss-local and conjugated** to match the phrase (`"work"` → `"trabajo"` in first person, `"trabaja"` in third person). These are not vocabulary lookup entries; word-level dictionary lookup is handled by the manifest and `es_dictionary`. |
-| `chapters.*.note` | no | Pedagogical note — grammatical explanation, L1 transfer hazard, tense complexity, etc. |
+| `chapters.*.constituents` | yes | Object keyed by locale code → map of English sub-phrase (as it appears in `text`) → contextually appropriate L1 translation. Constituent keys (English sub-phrases) are the SAME across all locales — only the values change. Prefer **sub-phrase keys** that translate as semantic units over atomic word-by-word keys. Translations are **gloss-local and conjugated** to match the phrase (`"work"` → `"trabajo"` in 1st person for es, `"工作"` for zh). Omit a locale key if constituent decomposition is not meaningful for that language. |
+| `chapters.*.note` | no | Pedagogical note — grammatical explanation, tense complexity, etc. Single English string, not locale-keyed. |
 
 ### Design decisions
 
@@ -926,23 +1090,34 @@ lemma (word-level overrides); syntax glosses are keyed by text span
 workflow, different storage column (`syntax_glosses` vs
 `vocabulary_manifest` on `books`).
 
-**Constituents on every gloss.** Each gloss carries its own constituent
-translations rather than falling through to the vocabulary manifest or
-`es_dictionary`. This gives the author full control over per-phrase sense
-disambiguation and avoids the problem of a word having a manifest entry
-for one context but appearing in a different sense within a syntax gloss.
+**Constituents on every gloss, locale-keyed.** Each gloss carries its
+own constituent translations per locale rather than falling through to
+the vocabulary manifest or base dictionaries. This gives the author full
+control over per-phrase sense disambiguation. If a locale's constituent
+decomposition is not meaningful (e.g., the L1 translation is structurally
+different enough that English sub-phrase keys don't map), omit that
+locale from `constituents` — the popup will hide the drill-down for
+that locale.
 
 **Sub-phrase keys over atomic keys.** Constituent keys should be semantic
 units that translate naturally together (`"at the college cafeteria"` →
-`"en la cafetería de la universidad"`), not one-word-per-key breakdowns.
-Atomic keys for function words (`"the"` → `"la"`) are noise. Word-level
-interactivity is already handled by the word/particle popup layer.
+`"en la cafetería de la universidad"` / `"在大学食堂"`), not
+one-word-per-key breakdowns. Atomic keys for function words are noise.
+Word-level interactivity is already handled by the word/particle popup.
 
 **Conjugated, gloss-local translations.** Constituent translations are
 conjugated to match the phrase context (`"work"` → `"trabajo"` in first
-person, `"trabaja"` in third). This means the same English word may map
-to different Spanish across glosses. This is intentional — constituents
-serve reading comprehension, not vocabulary lookup.
+person for es, `"trabaja"` in third). This means the same English word
+may map to different L1 translations across glosses. This is intentional
+— constituents serve reading comprehension, not vocabulary lookup.
+
+**Constituent keys are English-anchored across all locales.** The same
+English sub-phrases serve as keys for every locale. For SOV languages
+(ja, ko), the L1 translations appear in a different order than the
+English keys — this is expected. The popup renders constituents as a
+vertical glossary-style list sorted by English text position, not as an
+interlinear alignment, so word-order differences don't confuse the
+presentation.
 
 **Ordered array per chapter.** Glosses are ordered sequentially as they
 appear in the text. The array order IS the segmentation — adjacent glosses
@@ -960,27 +1135,47 @@ what they do.
 ## Project Structure
 
 ```
-cadence/
+relato/
   scripts/
-    build-data.mjs    — generates cefrLookup.js + lemmaMap.js from source data
+    build-data.mjs      — generates cefrLookup.js + lemmaMap.js
+    build-zh-dict.mjs   — generates zh_dictionary.js from CC-CEDICT
+    build-ja-dict.mjs   — generates ja_dictionary.js from JMdict
+    build-ko-dict.mjs   — generates ko_dictionary.js from KENGDIC
+    .cache/             — downloaded dictionary source files (gitignored)
   src/
     components/
-      reading/        — Read & Track, word highlighting, popups
-      flashcards/     — CardCreator, FlashcardPage, LeitnerReview
-      shadowing/      — ShadowingPlayer, audio controls
-      teacher/        — TeacherDashboard, class management
-      workshop/       — Story Workshop
-      admin/          — AdminPanel, corpus ingestion
-      onboarding/     — Onboarding flow
-      shared/         — Layout, LoginPage, shared UI
-    hooks/            — useAudioRecorder, useProgressSync
-    lib/              — supabase client, db (IndexedDB), wordUtils
-    data/             — cefrLookup, lemmaMap, dictionaries
-    context/          — AuthContext
+      reading/          — Read & Track, word highlighting, popups
+      flashcards/       — CardCreator, FlashcardPage, LeitnerReview
+      shadowing/        — ShadowingPlayer, audio controls
+      teacher/          — TeacherDashboard, class management
+      workshop/         — Story Workshop
+      admin/            — AdminPanel, corpus ingestion
+      onboarding/       — Onboarding flow
+      shared/           — Layout, LoginPage, shared UI
+    hooks/              — useAudioRecorder, useProgressSync
+    lib/
+      supabase.js       — Supabase client
+      db.js             — IndexedDB stores
+      wordUtils.js      — CEFR lookup, lemma resolution
+      locales.js        — L1_LOCALES, DEFAULT_L1, getL1Label()
+      translations.js   — L1 dictionary registry, manifest/gloss helpers
+      srs.js            — Leitner SRS logic
+    data/
+      cefrLookup.js     — EFLLex CEFR levels (10,019 words)
+      lemmaMap.js       — inflection → headword (34,466 mappings)
+      es_dictionary.js  — Spanish translations (~3k)
+      zh_dictionary.js  — Mandarin translations (~7.2k)
+      ja_dictionary.js  — Japanese translations (~8.2k)
+      ko_dictionary.js  — Korean translations (~7.7k)
+      en_dictionary.js  — English definitions (~3.4k)
+      egpLookup.js      — EGP grammar pattern lookup
+      egpL1Overlays.js  — locale-keyed grammar overlays (es populated)
+    context/
+      AuthContext.jsx    — auth + profile (exposes l1)
   supabase/
-    migrations/       — SQL migration files
+    migrations/         — SQL migration files
   netlify/
-    functions/        — Serverless API proxies (MW dictionary)
+    functions/          — Serverless API proxies (MW dictionary)
 ```
 
 ---

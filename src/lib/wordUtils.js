@@ -50,13 +50,17 @@ export function lookupCefr(word) {
   if (!w) return { cefr: null, lemma: w, via: 'empty' };
 
   const direct = cefrLookup[w];
-  if (direct) return { cefr: direct, lemma: w, via: 'direct' };
-
   const lemma = lemmaMap[w];
-  if (lemma) {
-    const viaParts = cefrLookup[lemma];
-    if (viaParts) return { cefr: viaParts, lemma, via: 'lemma' };
+  const lemmaLevel = lemma ? cefrLookup[lemma] : null;
+
+  if (direct && lemmaLevel) {
+    if (CEFR_LEVELS.indexOf(lemmaLevel) < CEFR_LEVELS.indexOf(direct)) {
+      return { cefr: lemmaLevel, lemma, via: 'lemma' };
+    }
+    return { cefr: direct, lemma: w, via: 'direct' };
   }
+  if (direct) return { cefr: direct, lemma: w, via: 'direct' };
+  if (lemmaLevel) return { cefr: lemmaLevel, lemma, via: 'lemma' };
 
   return { cefr: null, lemma: lemma || w, via: 'unclassified' };
 }
