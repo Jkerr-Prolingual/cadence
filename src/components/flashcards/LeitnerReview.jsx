@@ -16,7 +16,7 @@ function ReviewCard({ card, onResponse }) {
   const color = cefrColor(card.cefr);
   const isCloze = card.cardType === 'cloze';
   const frontText = card.front || card.word;
-  const backText = card.back || card.spanish || card.english || '(no definition)';
+  const backText = card.back || card.translation || card.english || '(no definition)';
 
   return (
     <div className="flex flex-col items-center gap-6">

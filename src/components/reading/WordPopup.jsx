@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { cefrColor, lookupCefr } from '../../lib/wordUtils';
-import { spanishDict } from '../../data/es_dictionary';
 import { lemmaMap } from '../../data/lemmaMap';
 import { egpLookup } from '../../data/egpLookup';
-import { egpSpanishOverlay } from '../../data/egpSpanishOverlay';
+import { egpL1Overlays } from '../../data/egpL1Overlays';
+import { getL1Dict, getManifestTranslation, getManifestConstituents, getGlossTranslation, getGlossConstituents } from '../../lib/translations';
+import { getL1Label } from '../../lib/locales';
 
-export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss }) {
+export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss, l1 = 'es' }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
   const [view, setView] = useState(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
@@ -54,25 +55,29 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     setAdjusted({ x, y });
   }, [position, view, structureDrillDown, syntaxGloss]);
 
+  const l1Dict = getL1Dict(l1);
+  const l1Label = getL1Label(l1);
   const lookupKey = lemma || word.toLowerCase();
   const morphLemma = lemmaMap[word.toLowerCase()];
   const manifestEntry = manifest?.entries?.[lookupKey] || manifest?.entries?.[word.toLowerCase()] || (morphLemma && manifest?.entries?.[morphLemma]);
-  const wordSpanish = manifestEntry?.spanish || spanishDict[lookupKey] || spanishDict[word.toLowerCase()] || (morphLemma && spanishDict[morphLemma]);
+  const wordTranslation = getManifestTranslation(manifestEntry, l1) || l1Dict[lookupKey] || l1Dict[word.toLowerCase()] || (morphLemma && l1Dict[morphLemma]);
   const wordLevel = cefr || 'unclassified';
   const wordColor = cefrColor(wordLevel);
 
   const particleLevel = particle?.cefr || 'unclassified';
   const particleColor = cefrColor(particleLevel);
-  const particleSpanish = particle?.spanish;
+  const particleTranslation = particle?.translations?.[l1] || particle?.spanish || null;
+  const particleConstituents = particle?.constituents_l1?.[l1] || particle?.constituents_es || null;
 
-  function constituentSpanish(token) {
+  function constituentTranslation(token) {
     const key = token.lemma || token.raw.toLowerCase();
     const mLemma = lemmaMap[token.raw.toLowerCase()];
-    if (particle?.constituents_es?.[key]) return particle.constituents_es[key];
-    if (particle?.constituents_es?.[token.raw.toLowerCase()]) return particle.constituents_es[token.raw.toLowerCase()];
+    if (particleConstituents?.[key]) return particleConstituents[key];
+    if (particleConstituents?.[token.raw.toLowerCase()]) return particleConstituents[token.raw.toLowerCase()];
     const mEntry = manifest?.entries?.[key] || manifest?.entries?.[token.raw.toLowerCase()] || (mLemma && manifest?.entries?.[mLemma]);
-    if (mEntry?.spanish) return mEntry.spanish;
-    return spanishDict[key] || spanishDict[token.raw.toLowerCase()] || (mLemma && spanishDict[mLemma]) || null;
+    const mTranslation = getManifestTranslation(mEntry, l1);
+    if (mTranslation) return mTranslation;
+    return l1Dict[key] || l1Dict[token.raw.toLowerCase()] || (mLemma && l1Dict[mLemma]) || null;
   }
 
   function renderParticleView() {
@@ -96,10 +101,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           </div>
         )}
 
-        {particleSpanish ? (
+        {particleTranslation ? (
           <div className="mb-2">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">ES</span>
-            <p className="text-sm text-gray-800 mt-0.5">{particleSpanish}</p>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{l1Label}</span>
+            <p className="text-sm text-gray-800 mt-0.5">{particleTranslation}</p>
           </div>
         ) : (
           <p className="text-sm text-gray-400 italic mb-2">No translation available</p>
@@ -137,7 +142,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
               const cLookup = lookupCefr(c.raw);
               const cLevel = cLookup.cefr || 'unclassified';
               const cColor = cefrColor(cLevel);
-              const cSpanish = constituentSpanish(c);
+              const cSpanish = constituentTranslation(c);
 
               return (
                 <div key={i} className="flex items-start justify-between gap-2">
@@ -195,10 +200,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           </div>
         )}
 
-        {wordSpanish ? (
+        {wordTranslation ? (
           <div className="mb-2">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">ES</span>
-            <p className="text-sm text-gray-800 mt-0.5">{wordSpanish}</p>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{l1Label}</span>
+            <p className="text-sm text-gray-800 mt-0.5">{wordTranslation}</p>
           </div>
         ) : (
           <p className="text-sm text-gray-400 italic">No translation available</p>
@@ -214,7 +219,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   function renderStructureView() {
     const egp = structure?.egp || egpLookup[structure?.egp_id];
     if (!egp) return null;
-    const overlay = egpSpanishOverlay[String(structure.egp_id)];
+    const overlay = egpL1Overlays[String(structure.egp_id)];
     const sLevel = structure.override_cefr || egp.level;
     const sColor = cefrColor(sLevel);
 
@@ -238,28 +243,28 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
             </span>
           </div>
 
-          {overlay.explanation_es && (
+          {overlay.explanations?.[l1] && (
             <div className="mb-2">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Explicaci&oacute;n</span>
-              <p className="text-sm text-gray-800 mt-0.5">{overlay.explanation_es}</p>
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{l1Label}</span>
+              <p className="text-sm text-gray-800 mt-0.5">{overlay.explanations[l1]}</p>
             </div>
           )}
 
-          {overlay.spanish_contrast && (
+          {overlay.contrasts?.[l1] && (
             <div className="mb-2">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">ES vs EN</span>
-              <p className="text-sm text-gray-800 mt-0.5">{overlay.spanish_contrast}</p>
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{l1Label} vs EN</span>
+              <p className="text-sm text-gray-800 mt-0.5">{overlay.contrasts[l1]}</p>
             </div>
           )}
 
-          {overlay.examples?.length > 0 && (
+          {overlay.examples?.[l1]?.length > 0 && (
             <div className="mb-1">
               <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Examples</span>
               <div className="mt-1 space-y-1.5">
-                {overlay.examples.map((ex, i) => (
+                {overlay.examples[l1].map((ex, i) => (
                   <div key={i} className="text-xs">
                     <p className="text-gray-800">{ex.en}</p>
-                    <p className="text-gray-500 italic">{ex.es}</p>
+                    <p className="text-gray-500 italic">{ex.l1}</p>
                   </div>
                 ))}
               </div>
@@ -309,14 +314,14 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         </div>
 
         <div className="mb-2">
-          <p className="text-sm text-gray-800">{syntaxGloss.spanish}</p>
+          <p className="text-sm text-gray-800">{getGlossTranslation(syntaxGloss, l1)}</p>
         </div>
 
         {syntaxGloss.note && (
           <p className="text-xs text-gray-500 italic mb-2">{syntaxGloss.note}</p>
         )}
 
-        {syntaxGloss.constituents && Object.keys(syntaxGloss.constituents).length > 0 && (
+        {getGlossConstituents(syntaxGloss, l1) && Object.keys(getGlossConstituents(syntaxGloss, l1)).length > 0 && (
           <button
             onClick={() => setView('gloss-constituents')}
             className="text-xs text-blue-500 hover:text-blue-700 mb-1"
@@ -329,9 +334,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   }
 
   function renderGlossConstituentsView() {
-    if (!syntaxGloss?.constituents) return null;
+    const glossConstituents = getGlossConstituents(syntaxGloss, l1);
+    if (!glossConstituents) return null;
     const textLower = syntaxGloss.text.toLowerCase();
-    const entries = Object.entries(syntaxGloss.constituents)
+    const entries = Object.entries(glossConstituents)
       .sort((a, b) => textLower.indexOf(a[0].toLowerCase()) - textLower.indexOf(b[0].toLowerCase()));
 
     return (
@@ -344,7 +350,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         </button>
 
         <div className="space-y-2">
-          {entries.map(([key, spanish], i) => {
+          {entries.map(([key, translation], i) => {
             const lookup = lookupCefr(key.split(/\s+/)[0]);
             const level = lookup.cefr || 'unclassified';
             const color = cefrColor(level);
@@ -360,7 +366,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                       {level === 'unclassified' ? '—' : level}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-700 mt-0.5">{spanish}</p>
+                  <p className="text-sm text-gray-700 mt-0.5">{translation}</p>
                 </div>
               </div>
             );

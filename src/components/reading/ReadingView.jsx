@@ -20,7 +20,7 @@ import { logFluencySession, getFluencySessionsForText } from '../../lib/fluency'
 import { useAuth } from '../../context/AuthContext';
 
 export default function ReadingView() {
-  const { user, isTeacher } = useAuth();
+  const { user, isTeacher, l1 } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [curatedTexts, setCuratedTexts] = useState([]);
@@ -806,6 +806,7 @@ export default function ReadingView() {
                 syntaxGlosses={chapterGlosses}
                 translationMode={translationMode}
                 images={selectedText.images}
+                l1={l1}
               />
 
               {chapterNav && (
@@ -889,6 +890,7 @@ export default function ReadingView() {
           structure={popup.token.structure || null}
           manifest={bookManifest}
           syntaxGloss={popup.token.syntaxGloss || null}
+          l1={l1}
         />
       )}
 
@@ -902,6 +904,7 @@ export default function ReadingView() {
           textTitle={selectedText?.title}
           isStructure={cardCreator.isStructure || false}
           structureData={cardCreator.structureData || null}
+          l1={l1}
           onClose={() => setCardCreator(null)}
           onCreated={() => {
             setCardCreator(null);

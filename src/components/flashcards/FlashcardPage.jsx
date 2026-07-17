@@ -52,12 +52,12 @@ function CardList({ cards }) {
                   />
                 )}
                 <span className="text-sm text-gray-900 truncate">{card.front || card.word}</span>
-                {card.spanish && (
-                  <span className="text-xs text-gray-400 truncate hidden sm:inline">{card.spanish}</span>
+                {card.translation && (
+                  <span className="text-xs text-gray-400 truncate hidden sm:inline">{card.translation}</span>
                 )}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-xs text-gray-400 hidden sm:inline">{card.cardType === 'cloze' ? 'cloze' : 'ES'}</span>
+                <span className="text-xs text-gray-400 hidden sm:inline">{card.cardType === 'cloze' ? 'cloze' : (card.l1 || 'es').toUpperCase()}</span>
                 <span className="text-xs text-gray-400">Box {card.box || 1}</span>
               </div>
             </div>

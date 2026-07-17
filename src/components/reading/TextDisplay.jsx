@@ -3,6 +3,7 @@ import { lookupCefr, cefrColor, cleanToken } from '../../lib/wordUtils';
 import { findParticles } from '../../lib/particleUtils';
 import { findStructures } from '../../lib/structureUtils';
 import { egpLookup } from '../../data/egpLookup';
+import { getGlossTranslation } from '../../lib/translations';
 
 const SHOW_CEFR_UNDERLINES = false;
 
@@ -35,6 +36,7 @@ export default function TextDisplay({
   syntaxGlosses = null,
   translationMode = false,
   images = [],
+  l1 = 'es',
 }) {
   const paragraphs = useMemo(() => {
     if (!text) return [];
@@ -294,7 +296,7 @@ export default function TextDisplay({
                     borderBottom: `2px solid ${isComplex ? '#3b82f6' : '#93c5fd'}`,
                     paddingBottom: '1px',
                   }}
-                  title={g.gloss.spanish}
+                  title={getGlossTranslation(g.gloss, l1)}
                 >
                   {glossBuffer}
                 </span>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { L1_LOCALES } from '../../lib/locales';
 
 const navItems = [
   { to: '/', label: 'Library' },
@@ -11,7 +12,7 @@ const navItems = [
 ];
 
 export default function Layout() {
-  const { user, profile, signOut, refreshProfile, isTeacher, isAdmin, isStudent } = useAuth();
+  const { user, profile, signOut, refreshProfile, isTeacher, isAdmin, isStudent, l1 } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [joinCode, setJoinCode] = useState('');
@@ -95,6 +96,27 @@ export default function Layout() {
                   <p className="text-sm font-medium text-gray-900">{profile?.display_name || 'User'}</p>
                   <p className="text-xs text-gray-400">{user?.email}</p>
                   <p className="text-xs text-gray-400 capitalize">{profile?.role || 'student'}</p>
+                </div>
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-1.5">My language</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {Object.values(L1_LOCALES).map((loc) => (
+                      <button
+                        key={loc.code}
+                        onClick={async () => {
+                          await supabase.from('profiles').update({ l1: loc.code }).eq('id', user.id);
+                          await refreshProfile();
+                        }}
+                        className={`py-1 rounded text-xs font-medium border transition-colors ${
+                          l1 === loc.code
+                            ? 'bg-gray-900 text-white border-gray-900'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                        }`}
+                      >
+                        {loc.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 {!isAdmin && (
                   <div className="px-4 py-3 border-b border-gray-100">

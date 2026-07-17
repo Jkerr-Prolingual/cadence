@@ -163,6 +163,32 @@ function Section({ label, children }) {
   );
 }
 
+function detectManifestLocales(manifest) {
+  if (!manifest?.entries) return [];
+  const locales = new Set();
+  for (const entry of Object.values(manifest.entries)) {
+    if (entry.spanish) locales.add('es');
+    if (entry.translations) {
+      for (const l of Object.keys(entry.translations)) locales.add(l);
+    }
+  }
+  return [...locales].sort();
+}
+
+function detectGlossLocales(glosses) {
+  if (!glosses?.chapters) return [];
+  const locales = new Set();
+  for (const chapter of Object.values(glosses.chapters)) {
+    for (const gloss of chapter) {
+      if (gloss.spanish) locales.add('es');
+      if (gloss.translations) {
+        for (const l of Object.keys(gloss.translations)) locales.add(l);
+      }
+    }
+  }
+  return [...locales].sort();
+}
+
 export default function AdminPanel() {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
@@ -697,12 +723,16 @@ export default function AdminPanel() {
                       <span className="text-sm font-medium text-gray-900">{book.title}</span>
                       {book.author && <span className="text-xs text-gray-400">{book.author}</span>}
                       <span className="text-xs text-gray-400">{chapters.length} ch.</span>
-                      {book.vocabulary_manifest && (
-                        <span className="text-xs text-green-600" title={`${Object.keys(book.vocabulary_manifest.entries || {}).length} manifest entries`}>manifest</span>
-                      )}
-                      {book.syntax_glosses && (
-                        <span className="text-xs text-purple-600" title={`${Object.values(book.syntax_glosses.chapters || {}).reduce((s, ch) => s + ch.length, 0)} syntax glosses`}>glosses</span>
-                      )}
+                      {book.vocabulary_manifest && (() => {
+                        const count = Object.keys(book.vocabulary_manifest.entries || {}).length;
+                        const locales = detectManifestLocales(book.vocabulary_manifest);
+                        return <span className="text-xs text-green-600" title={`${count} manifest entries${locales.length > 0 ? ` (${locales.join(', ')})` : ''}`}>manifest{locales.length > 0 ? ` [${locales.join(',')}]` : ''}</span>;
+                      })()}
+                      {book.syntax_glosses && (() => {
+                        const count = Object.values(book.syntax_glosses.chapters || {}).reduce((s, ch) => s + ch.length, 0);
+                        const locales = detectGlossLocales(book.syntax_glosses);
+                        return <span className="text-xs text-purple-600" title={`${count} syntax glosses${locales.length > 0 ? ` (${locales.join(', ')})` : ''}`}>glosses{locales.length > 0 ? ` [${locales.join(',')}]` : ''}</span>;
+                      })()}
                     </div>
                     <span className="text-gray-400 text-xs ml-2">{isExpanded ? '▲' : '▼'}</span>
                   </button>
@@ -884,7 +914,8 @@ export default function AdminPanel() {
                 try {
                   const parsed = JSON.parse(bookManifestJson);
                   const count = Object.keys(parsed.entries || {}).length;
-                  return <p className="text-xs text-green-600 mt-1">{count} entries</p>;
+                  const locales = detectManifestLocales(parsed);
+                  return <p className="text-xs text-green-600 mt-1">{count} entries{locales.length > 0 ? ` — locales: ${locales.join(', ')}` : ''}</p>;
                 } catch {
                   return <p className="text-xs text-red-500 mt-1">Invalid JSON</p>;
                 }
@@ -904,7 +935,8 @@ export default function AdminPanel() {
                   const parsed = JSON.parse(bookSyntaxGlossesJson);
                   const chapterCount = Object.keys(parsed.chapters || {}).length;
                   const glossCount = Object.values(parsed.chapters || {}).reduce((sum, ch) => sum + ch.length, 0);
-                  return <p className="text-xs text-green-600 mt-1">{glossCount} glosses across {chapterCount} chapters</p>;
+                  const locales = detectGlossLocales(parsed);
+                  return <p className="text-xs text-green-600 mt-1">{glossCount} glosses across {chapterCount} chapters{locales.length > 0 ? ` — locales: ${locales.join(', ')}` : ''}</p>;
                 } catch {
                   return <p className="text-xs text-red-500 mt-1">Invalid JSON</p>;
                 }

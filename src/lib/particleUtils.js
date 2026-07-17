@@ -57,13 +57,19 @@ export function findParticles(wordTokens, manifest = null) {
     }
 
     if (match) {
+      const translations = match.translations || (match.spanish ? { es: match.spanish } : null);
+      const constituentsL1 = match.constituents && typeof Object.values(match.constituents)[0] === 'object'
+        ? match.constituents
+        : match.constituents ? { es: match.constituents } : null;
       const group = {
         phrase: match.phrase,
         cefr: match.cefr,
         compositionality: match.compositionality || null,
+        translations,
         spanish: match.spanish || null,
         note: match.note || null,
-        constituents_es: match.constituents || null,
+        constituents_l1: constituentsL1,
+        constituents_es: match.constituents_es || (match.constituents && typeof Object.values(match.constituents)[0] === 'string' ? match.constituents : null),
         wordIndices: [],
       };
       for (let j = 0; j < match.words.length; j++) {

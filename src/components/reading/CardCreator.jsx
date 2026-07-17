@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
 import { upsertSrsCard } from '../../lib/srs';
-import { spanishDict } from '../../data/es_dictionary';
 import { cefrColor } from '../../lib/wordUtils';
 import { searchImages } from '../../lib/imageSearch';
+import { getL1Dict } from '../../lib/translations';
+import { getL1EnglishLabel } from '../../lib/locales';
 
 function ImagePicker({ initialQuery, selectedUrl, onSelect }) {
   const [query, setQuery] = useState(initialQuery);
@@ -101,7 +102,7 @@ function ImagePicker({ initialQuery, selectedUrl, onSelect }) {
   );
 }
 
-export default function CardCreator({ word, lemma, cefr, sentence, textId, textTitle, onClose, onCreated, isStructure = false, structureData = null }) {
+export default function CardCreator({ word, lemma, cefr, sentence, textId, textTitle, onClose, onCreated, isStructure = false, structureData = null, l1 = 'es' }) {
   const [step, setStep] = useState(isStructure ? 'build' : 'type');
   const [cardType, setCardType] = useState(isStructure ? 'cloze' : null);
   const [front, setFront] = useState('');
@@ -115,14 +116,16 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
   const phraseRef = useRef(null);
 
   const lookupKey = lemma || word.toLowerCase();
-  const spanish = spanishDict[lookupKey] || spanishDict[word.toLowerCase()] || '';
+  const l1Dict = getL1Dict(l1);
+  const l1EnglishLabel = getL1EnglishLabel(l1);
+  const translation = l1Dict[lookupKey] || l1Dict[word.toLowerCase()] || '';
   const color = cefrColor(cefr);
 
   function handleChooseType(type) {
     setCardType(type);
-    if (type === 'spanish') {
+    if (type === 'translation') {
       setFront(word);
-      setBack(spanish);
+      setBack(translation);
     } else {
       setFront('');
       setBack(word);
@@ -169,7 +172,8 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
       back: back.trim(),
       cardType: srsCardType,
       cefr,
-      spanish: cardType === 'spanish' ? back.trim() : spanish,
+      translation: cardType === 'translation' ? back.trim() : translation,
+      l1,
       imageUrl,
       imageAttribution,
       textId: textId || null,
@@ -218,13 +222,13 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
           {step === 'type' && (
             <div className="space-y-2">
               <button
-                onClick={() => handleChooseType('spanish')}
+                onClick={() => handleChooseType('translation')}
                 className="w-full flex items-start gap-3 px-4 py-4 sm:py-3 rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50 active:bg-blue-100 transition-all text-left"
               >
-                <span className="text-xl mt-0.5">ES</span>
+                <span className="text-xl mt-0.5">{l1.toUpperCase()}</span>
                 <div>
-                  <div className="text-sm font-semibold text-gray-800">Word / Spanish Translation</div>
-                  <div className="text-xs text-gray-500 mt-0.5">English word on front, Spanish translation on back</div>
+                  <div className="text-sm font-semibold text-gray-800">Word / {l1EnglishLabel} Translation</div>
+                  <div className="text-xs text-gray-500 mt-0.5">English word on front, {l1EnglishLabel.toLowerCase()} translation on back</div>
                 </div>
               </button>
               <button
@@ -241,7 +245,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
             </div>
           )}
 
-          {step === 'build' && cardType === 'spanish' && (
+          {step === 'build' && cardType === 'translation' && (
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">Front</label>
@@ -252,11 +256,11 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-500 block mb-1">Back (Spanish)</label>
+                <label className="text-xs font-medium text-gray-500 block mb-1">Back ({l1EnglishLabel})</label>
                 <input
                   value={back}
                   onChange={e => setBack(e.target.value)}
-                  placeholder="Spanish translation..."
+                  placeholder={`${l1EnglishLabel} translation...`}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
                 />
                 {!back && (

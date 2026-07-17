@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { L1_LOCALES, DEFAULT_L1 } from '../../lib/locales';
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -8,6 +9,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState('student');
+  const [l1, setL1] = useState(DEFAULT_L1);
   const [mode, setMode] = useState(searchParams.get('mode') === 'signup' ? 'signup' : 'login');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -29,6 +31,7 @@ export default function LoginPage() {
           data: {
             display_name: displayName.trim() || email.split('@')[0],
             role,
+            l1,
           },
         },
       });
@@ -124,6 +127,26 @@ export default function LoginPage() {
                       }`}
                     >
                       {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mi idioma / My language</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.values(L1_LOCALES).map((loc) => (
+                    <button
+                      key={loc.code}
+                      type="button"
+                      onClick={() => setL1(loc.code)}
+                      className={`py-2 rounded-md text-sm font-medium border transition-colors ${
+                        l1 === loc.code
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {loc.label}
                     </button>
                   ))}
                 </div>
