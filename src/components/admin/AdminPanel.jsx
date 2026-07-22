@@ -204,7 +204,7 @@ export default function AdminPanel() {
   const [rawText, setRawText] = useState('');
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
-  const [imageFiles, setImageFiles] = useState([]);
+  const [imageFiles, setImageFiles] = useState({});
   const [existingImages, setExistingImages] = useState([]);
 
   // Books management
@@ -554,21 +554,23 @@ export default function AdminPanel() {
       let imagesToStore = [...existingImages];
       if (parsedImages.length > 0) {
         for (const img of parsedImages) {
-          const file = imageFiles.find(f => f.name === img.filename);
+          const file = imageFiles[img.slot];
           if (file) {
-            const storagePath = `${recordId}/${img.filename}`;
+            const ext = file.name.split('.').pop();
+            const storageName = `slot${img.slot}.${ext}`;
+            const storagePath = `${recordId}/${storageName}`;
             const { error: imgError } = await supabase.storage
               .from('chapter-images')
               .upload(storagePath, file, { contentType: file.type, upsert: true });
             if (imgError) throw imgError;
             const { data: imgUrlData } = supabase.storage.from('chapter-images').getPublicUrl(storagePath);
             const entry = {
-              filename: img.filename,
+              filename: storageName,
               alt: img.alt,
               afterParagraph: img.afterParagraph,
               publicUrl: imgUrlData.publicUrl,
             };
-            const existingIdx = imagesToStore.findIndex(e => e.filename === img.filename);
+            const existingIdx = imagesToStore.findIndex(e => e.afterParagraph === img.afterParagraph);
             if (existingIdx >= 0) {
               imagesToStore[existingIdx] = entry;
             } else {
@@ -618,7 +620,7 @@ export default function AdminPanel() {
     setBookId(text.bookId || '');
     setChapterOrder(text.chapterOrder != null ? String(text.chapterOrder) : '');
     setRawText(text.body || '');
-    setImageFiles([]);
+    setImageFiles({});
     setExistingImages(text.images || []);
     setTextAnalysis(text.textAnalysis || null);
     setAnalysisJson(text.textAnalysis ? JSON.stringify(text.textAnalysis, null, 2) : '');
@@ -657,7 +659,7 @@ export default function AdminPanel() {
     setRawText('');
     setCoverFile(null);
     setCoverPreview(null);
-    setImageFiles([]);
+    setImageFiles({});
     setExistingImages([]);
     setAnalysisJson('');
     setTextAnalysis(null);
@@ -1147,7 +1149,7 @@ export default function AdminPanel() {
                     {existingImages.map((img, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs">
                         <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">stored</span>
-                        <span className="font-mono text-gray-600">{img.filename}</span>
+                        <span className="text-gray-600">{img.alt || `Image ${i + 1}`}</span>
                         <span className="text-gray-400">after paragraph {(img.afterParagraph ?? 0) + 1}</span>
                         <button
                           type="button"
@@ -1161,48 +1163,41 @@ export default function AdminPanel() {
                   </div>
                 )}
                 {parsedImages.length > 0 && (
-                  <>
-                    {existingImages.length > 0 && (
-                      <p className="text-xs text-gray-500 mb-1">New images from text</p>
-                    )}
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={(e) => {
-                        const newFiles = Array.from(e.target.files || []);
-                        setImageFiles(prev => {
-                          const merged = [...prev];
-                          for (const f of newFiles) {
-                            const idx = merged.findIndex(ex => ex.name === f.name);
-                            if (idx >= 0) merged[idx] = f;
-                            else merged.push(f);
-                          }
-                          return merged;
-                        });
-                      }}
-                      className="text-sm text-gray-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border file:border-gray-300 file:text-sm file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                    />
-                    <div className="mt-2 space-y-1">
-                      {parsedImages.map((img, i) => {
-                        const hasFile = imageFiles.some(f => f.name === img.filename);
-                        const isStored = existingImages.some(e => e.filename === img.filename);
-                        return (
-                          <div key={i} className="flex items-center gap-2 text-xs">
-                            <span className={`px-1.5 py-0.5 rounded ${
-                              hasFile ? 'bg-green-100 text-green-700'
-                                : isStored ? 'bg-blue-100 text-blue-700'
-                                : 'bg-amber-100 text-amber-700'
-                            }`}>
-                              {hasFile ? 'ready' : isStored ? 'stored' : 'needs file'}
-                            </span>
-                            <span className="font-mono text-gray-600">{img.filename}</span>
-                            <span className="text-gray-400">after paragraph {img.afterParagraph + 1}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
+                  <div className="space-y-3 mt-2">
+                    {parsedImages.map((img) => {
+                      const file = imageFiles[img.slot];
+                      const stored = existingImages.find(e => e.afterParagraph === img.afterParagraph);
+                      return (
+                        <div key={img.slot} className="flex items-center gap-2 text-xs">
+                          <span className={`px-1.5 py-0.5 rounded shrink-0 ${
+                            file ? 'bg-green-100 text-green-700'
+                              : stored ? 'bg-blue-100 text-blue-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {file ? 'ready' : stored ? 'stored' : 'needs file'}
+                          </span>
+                          <span className="text-gray-600 shrink-0">
+                            {img.alt || `Image ${img.slot + 1}`}
+                          </span>
+                          <span className="text-gray-400 shrink-0">
+                            {img.afterParagraph < 0 ? 'before text' : `after paragraph ${img.afterParagraph + 1}`}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) setImageFiles(prev => ({ ...prev, [img.slot]: f }));
+                            }}
+                            className="text-xs text-gray-500 file:mr-2 file:px-2 file:py-1 file:rounded file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
+                          />
+                          {file && (
+                            <span className="text-gray-400 font-mono truncate max-w-[120px]">{file.name}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             )}

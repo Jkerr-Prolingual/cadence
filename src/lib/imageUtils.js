@@ -3,10 +3,9 @@
  * and image placement metadata. Image markers must be standalone blocks
  * (separated by blank lines), not inline within paragraphs.
  *
- * Markdown format: ![alt text](filename.png)
- *
- * Non-image paragraph content is preserved exactly as-is (no trimming)
- * to avoid misaligning audio timestamps generated from the original text.
+ * Supported formats:
+ *   ![alt text]                — slot-based (admin assigns file)
+ *   ![alt text](filename.png) — backward compat (filename is hint only)
  */
 export function extractImages(rawText) {
   if (!rawText) return { cleanBody: '', images: [] };
@@ -19,11 +18,12 @@ export function extractImages(rawText) {
   for (const block of blocks) {
     const trimmed = block.trim();
     if (!trimmed) continue;
-    const match = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    const match = trimmed.match(/^!\[([^\]]*)\](?:\(([^)]+)\))?$/);
     if (match) {
       images.push({
+        slot: images.length,
         alt: match[1],
-        filename: match[2].replace(/^.*[\\/]/, ''),
+        filenameHint: match[2] ? match[2].replace(/^.*[\\/]/, '') : null,
         afterParagraph: paragraphIndex - 1,
       });
     } else {
