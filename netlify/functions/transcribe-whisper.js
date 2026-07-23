@@ -40,7 +40,7 @@ export default async (req) => {
 
     const formData = new FormData();
     formData.append('file', new File([fileData], 'recording.webm', { type: 'audio/webm' }));
-    formData.append('model', 'whisper-large-v3');
+    formData.append('model', 'whisper-1');
     formData.append('response_format', 'verbose_json');
     formData.append('timestamp_granularities[]', 'word');
 
