@@ -31,7 +31,7 @@ function SpeakButton({ text }) {
   );
 }
 
-export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss, l1 = 'es' }) {
+export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss, l1 = 'es', assessmentInfo = null }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
   const [view, setView] = useState(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
@@ -418,6 +418,52 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
       {view === 'particle' && renderParticleView()}
       {view === 'structure' && renderStructureView()}
       {view === 'word' && renderWordView()}
+
+      {assessmentInfo && (
+        <div className="mt-2 pt-2 border-t border-gray-100">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pronunciation</span>
+          {assessmentInfo.type === 'omission' ? (
+            <p className="text-sm text-red-600 mt-1">This word was skipped</p>
+          ) : assessmentInfo.type === 'substitution' ? (
+            <div className="mt-1">
+              <p className="text-sm text-orange-600">
+                You said: <strong>{assessmentInfo.spokenWord}</strong>
+              </p>
+              {assessmentInfo.accuracy != null && (
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${assessmentInfo.accuracy}%`,
+                        backgroundColor: assessmentInfo.accuracy >= 80 ? '#22c55e'
+                          : assessmentInfo.accuracy >= 60 ? '#eab308'
+                          : assessmentInfo.accuracy >= 40 ? '#f97316' : '#ef4444',
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-600 tabular-nums">{Math.round(assessmentInfo.accuracy)}%</span>
+                </div>
+              )}
+            </div>
+          ) : assessmentInfo.accuracy != null ? (
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${assessmentInfo.accuracy}%`,
+                    backgroundColor: assessmentInfo.accuracy >= 80 ? '#22c55e'
+                      : assessmentInfo.accuracy >= 60 ? '#eab308'
+                      : assessmentInfo.accuracy >= 40 ? '#f97316' : '#ef4444',
+                  }}
+                />
+              </div>
+              <span className="text-xs text-gray-600 tabular-nums">{Math.round(assessmentInfo.accuracy)}%</span>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
         <button

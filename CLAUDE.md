@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Relato — Project Context
 
 *Leer, escuchar, y aprender inglés.*
@@ -17,6 +21,30 @@ Relato is a redesign of VocabFrontier (`C:\Users\User\vocab-reader-app`).
 It keeps the reading, lookup, flashcard, shadow reading, story workshop,
 and teacher control features but drops the frontier-based profiling,
 island/hex map metaphor, development scores, and terrain states.
+
+---
+
+## Development Commands
+
+```bash
+npm run dev          # Start Vite dev server (HMR)
+npm run build        # Production build → dist/
+npm run preview      # Serve production build locally
+npm run lint         # ESLint (flat config, React hooks + refresh plugins)
+```
+
+No test framework is configured. No TypeScript — plain JS/JSX only.
+
+Netlify Functions live in `netlify/functions/` and deploy automatically.
+Local testing with `netlify dev` if the Netlify CLI is installed.
+
+Dictionary build scripts (run manually when source data changes):
+```bash
+node scripts/build-data.mjs        # Regenerate cefrLookup.js + lemmaMap.js
+node scripts/build-zh-dict.mjs     # Regenerate zh_dictionary.js from CC-CEDICT
+node scripts/build-ja-dict.mjs     # Regenerate ja_dictionary.js from JMdict
+node scripts/build-ko-dict.mjs     # Regenerate ko_dictionary.js from KENGDIC
+```
 
 ---
 

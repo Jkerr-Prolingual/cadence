@@ -14,13 +14,20 @@ export default function LoginPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [signupDone, setSignupDone] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    if (mode === 'login') {
+    if (mode === 'forgot') {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (resetError) setError(resetError.message);
+      else setResetSent(true);
+    } else if (mode === 'login') {
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) setError(authError.message);
     } else {
@@ -67,6 +74,28 @@ export default function LoginPage() {
     );
   }
 
+  if (resetSent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-sm text-center">
+          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 mb-2">Relato</h1>
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <p className="text-sm text-gray-700 font-medium">Revisa tu correo</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Si existe una cuenta con <strong>{email}</strong>, recibirás un enlace para restablecer tu contraseña.
+            </p>
+            <button
+              onClick={() => { setResetSent(false); setMode('login'); }}
+              className="mt-4 text-sm text-gray-500 hover:text-gray-700"
+            >
+              Volver a iniciar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
@@ -87,17 +116,19 @@ export default function LoginPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-              required
-              minLength={6}
-            />
-          </div>
+          {mode !== 'forgot' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                required
+                minLength={6}
+              />
+            </div>
+          )}
 
           {mode === 'signup' && (
             <>
@@ -161,15 +192,25 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-2 px-4 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
           >
-            {loading ? '...' : mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+            {loading ? '...' : mode === 'login' ? 'Iniciar sesión' : mode === 'forgot' ? 'Enviar enlace' : 'Crear cuenta'}
           </button>
+
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => { setMode('forgot'); setError(null); }}
+              className="w-full text-sm text-gray-500 hover:text-gray-700"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          )}
 
           <button
             type="button"
             onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(null); }}
             className="w-full text-sm text-gray-500 hover:text-gray-700"
           >
-            {mode === 'login' ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
+            {mode === 'forgot' ? 'Volver a iniciar sesión' : mode === 'login' ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
           </button>
         </form>
       </div>

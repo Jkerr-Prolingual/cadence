@@ -2,13 +2,24 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { CEFR_COLORS } from '../../lib/wordUtils';
+import { useAuth } from '../../context/AuthContext';
+import useChapterProgress from '../../hooks/useChapterProgress';
+import ChapterProgressPanel from './ChapterProgressPanel';
 
 export default function BookChaptersPage() {
   const { bookId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [book, setBook] = useState(null);
   const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expandedChapter, setExpandedChapter] = useState(null);
+
+  const chapterIds = chapters.map(ch => ch.id);
+  const { progress } = useChapterProgress({
+    chapterIds,
+    userId: user?.id,
+  });
 
   useEffect(() => {
     loadBook();
@@ -115,33 +126,97 @@ export default function BookChaptersPage() {
         <div className="space-y-2">
           {chapters.map((ch, i) => {
             const chColor = CEFR_COLORS[ch.cefr_estimate] || '#6b7280';
+            const cp = progress[ch.id];
+            const hasActivity = cp && (
+              cp.fluency.sessionCount > 0 || cp.recording.exists ||
+              cp.srs.totalCards > 0 || (cp.assignments && cp.assignments.total > 0)
+            );
+            const isExpanded = expandedChapter === ch.id;
+
             return (
-              <button
-                key={ch.id}
-                onClick={() => navigate(`/read?text=${ch.id}`)}
-                className="w-full text-left flex items-center gap-4 px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:shadow-sm transition-all group"
-              >
-                <span className="text-sm font-medium text-gray-400 w-8 text-right">
-                  {ch.chapter_order ?? i + 1}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 group-hover:text-gray-700 truncate">
-                    {ch.title}
-                  </p>
-                </div>
-                {ch.cefr_estimate && (
-                  <span
-                    className="text-xs font-bold px-1.5 py-0.5 rounded"
-                    style={{ backgroundColor: chColor + '20', color: chColor }}
-                  >
-                    {ch.cefr_estimate}
+              <div key={ch.id}>
+                <button
+                  onClick={() => navigate(`/read?text=${ch.id}`)}
+                  className={`w-full text-left flex items-center gap-4 px-4 py-3 border border-gray-200 hover:bg-gray-50 hover:shadow-sm transition-all group ${
+                    isExpanded ? 'rounded-t-lg' : 'rounded-lg'
+                  }`}
+                >
+                  <span className="text-sm font-medium text-gray-400 w-8 text-right">
+                    {ch.chapter_order ?? i + 1}
                   </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 group-hover:text-gray-700 truncate">
+                      {ch.title}
+                    </p>
+                    {hasActivity && (
+                      <div className="flex items-center gap-2.5 mt-0.5">
+                        {cp.fluency.sessionCount > 0 && (
+                          <span className="text-[10px] text-amber-600 font-medium">
+                            {cp.fluency.latestWpm} WPM
+                          </span>
+                        )}
+                        {cp.recording.exists && (
+                          <span className="text-[10px] text-gray-400" title="Recording saved">🎤</span>
+                        )}
+                        {cp.srs.totalCards > 0 && (
+                          <span className="text-[10px] text-gray-500">
+                            {cp.srs.totalCards} {cp.srs.totalCards === 1 ? 'card' : 'cards'}
+                            {cp.srs.dueCards > 0 && (
+                              <span className="text-amber-600 ml-0.5">({cp.srs.dueCards} due)</span>
+                            )}
+                          </span>
+                        )}
+                        {cp.assignments && cp.assignments.total > 0 && (
+                          <span className={`text-[10px] font-medium ${
+                            cp.assignments.completed === cp.assignments.total ? 'text-green-600' : 'text-gray-500'
+                          }`}>
+                            {cp.assignments.completed}/{cp.assignments.total} tasks
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {ch.cefr_estimate && (
+                    <span
+                      className="text-xs font-bold px-1.5 py-0.5 rounded"
+                      style={{ backgroundColor: chColor + '20', color: chColor }}
+                    >
+                      {ch.cefr_estimate}
+                    </span>
+                  )}
+                  {ch.word_count > 0 && (
+                    <span className="text-xs text-gray-400 hidden sm:inline">{ch.word_count} words</span>
+                  )}
+                  {hasActivity && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      title="View progress"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setExpandedChapter(isExpanded ? null : ch.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setExpandedChapter(isExpanded ? null : ch.id);
+                        }
+                      }}
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                        <path d="M15.5 2A1.5 1.5 0 0 0 14 3.5v13a1.5 1.5 0 0 0 1.5 1.5h.5a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 16 2h-.5ZM9.5 6A1.5 1.5 0 0 0 8 7.5v9A1.5 1.5 0 0 0 9.5 18h.5a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 10 6h-.5ZM3.5 10A1.5 1.5 0 0 0 2 11.5v5A1.5 1.5 0 0 0 3.5 18h.5A1.5 1.5 0 0 0 5.5 16.5v-5A1.5 1.5 0 0 0 4 10h-.5Z" />
+                      </svg>
+                    </span>
+                  )}
+                  <span className="text-gray-300 group-hover:text-gray-500 flex-shrink-0">&rsaquo;</span>
+                </button>
+                {isExpanded && cp && (
+                  <ChapterProgressPanel chapterProgress={cp} textId={ch.id} />
                 )}
-                {ch.word_count > 0 && (
-                  <span className="text-xs text-gray-400">{ch.word_count} words</span>
-                )}
-                <span className="text-gray-300 group-hover:text-gray-500">&rsaquo;</span>
-              </button>
+              </div>
             );
           })}
         </div>

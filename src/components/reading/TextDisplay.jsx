@@ -37,6 +37,7 @@ export default function TextDisplay({
   translationMode = false,
   images = [],
   l1 = 'es',
+  wordAssessmentMap = null,
 }) {
   const paragraphs = useMemo(() => {
     if (!text) return [];
@@ -258,6 +259,15 @@ export default function TextDisplay({
               let wordStyle = !inParticle && SHOW_CEFR_UNDERLINES
                 ? { borderBottom: isA1 ? 'none' : `2px solid ${color}`, paddingBottom: isA1 ? 0 : '1px' }
                 : {};
+
+              if (wordAssessmentMap) {
+                const assessment = wordAssessmentMap.get(token.wordIdx);
+                if (assessment && (assessment.accuracy < 60 || assessment.type === 'omission')) {
+                  const assessColor = assessment.accuracy < 40 || assessment.type === 'omission'
+                    ? '#ef4444' : '#f97316';
+                  wordStyle = { ...wordStyle, borderBottom: `3px solid ${assessColor}`, paddingBottom: '2px' };
+                }
+              }
 
               return (
                 <span

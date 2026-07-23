@@ -55,7 +55,14 @@ export default function AssignmentChecklist({ textId, refreshKey, onSelectText }
     });
   }
 
-  const activeAssignments = allAssignments.filter(a => !a.archivedAt);
+  const activeAssignments = allAssignments.filter(a => {
+    if (a.archivedAt) return false;
+    const prog = getStudentProgress(a.id);
+    const taskList = Object.entries(a.tasks).filter(([, v]) => v);
+    if (taskList.length === 0) return true;
+    const allDone = taskList.every(([key]) => prog?.completed?.[key]);
+    return !allDone;
+  });
 
   if (activeAssignments.length === 0) return null;
 

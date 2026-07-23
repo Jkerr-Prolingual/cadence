@@ -102,6 +102,14 @@ export async function upsertSrsCard(cardData) {
   if (!user) return;
 
   const now = Date.now();
+
+  const { data: existing } = await supabase
+    .from('srs_cards')
+    .select('id, text_id, text_title')
+    .eq('user_id', user.id)
+    .eq('word', cardData.word)
+    .single();
+
   const row = {
     user_id: user.id,
     word: cardData.word,
@@ -113,17 +121,41 @@ export async function upsertSrsCard(cardData) {
     l1: cardData.l1 || 'es',
     image_url: cardData.imageUrl || null,
     image_attribution: cardData.imageAttribution || null,
-    text_id: cardData.textId || null,
-    text_title: cardData.textTitle || null,
-    leitner_box: cardData.box || 1,
-    next_review_date: new Date(cardData.nextReviewDate || now).toISOString(),
-    added_date: new Date(cardData.createdAt || now).toISOString(),
+    text_id: existing ? existing.text_id : (cardData.textId || null),
+    text_title: existing ? existing.text_title : (cardData.textTitle || null),
+    leitner_box: existing ? undefined : (cardData.box || 1),
+    next_review_date: existing ? undefined : new Date(cardData.nextReviewDate || now).toISOString(),
+    added_date: existing ? undefined : new Date(cardData.createdAt || now).toISOString(),
   };
+
+  // Remove undefined keys so upsert doesn't overwrite with null
+  Object.keys(row).forEach(k => { if (row[k] === undefined) delete row[k]; });
 
   const { error } = await supabase
     .from('srs_cards')
     .upsert(row, { onConflict: 'user_id,word' });
   if (error) throw error;
+
+  if (cardData.textId) {
+    await supabase.from('srs_card_sources').upsert({
+      user_id: user.id,
+      word: cardData.word,
+      text_id: cardData.textId,
+      text_title: cardData.textTitle || null,
+    }, { onConflict: 'user_id,word,text_id' }).catch(() => {});
+  }
+
+  return { isNew: !existing, existingTextTitle: existing?.text_title || null };
+}
+
+export async function getCardSources(userId, word) {
+  const { data } = await supabase
+    .from('srs_card_sources')
+    .select('text_id, text_title, added_at')
+    .eq('user_id', userId)
+    .eq('word', word)
+    .order('added_at', { ascending: true });
+  return data || [];
 }
 
 function fromSupabase(row) {

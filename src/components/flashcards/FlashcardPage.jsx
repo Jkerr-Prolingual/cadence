@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getAllSrsCards, getDueSrsCards } from '../../lib/srs';
 import { cefrColor } from '../../lib/wordUtils';
+import { supabase } from '../../lib/supabase';
 import LeitnerReview from './LeitnerReview';
 
 function BoxDistribution({ cards }) {
@@ -71,6 +72,7 @@ function CardList({ cards }) {
 export default function FlashcardPage() {
   const [allCards, setAllCards] = useState([]);
   const [dueCards, setDueCards] = useState([]);
+  const [cardSources, setCardSources] = useState([]);
   const [reviewing, setReviewing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedFolder, setSelectedFolder] = useState('all');
@@ -84,13 +86,50 @@ export default function FlashcardPage() {
       const [all, due] = await Promise.all([getAllSrsCards(), getDueSrsCards()]);
       setAllCards(all);
       setDueCards(due);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: sources } = await supabase
+          .from('srs_card_sources')
+          .select('word, text_id, text_title')
+          .eq('user_id', user.id);
+        setCardSources(sources || []);
+      }
     } catch {}
     setLoading(false);
   }
 
   const folders = useMemo(() => {
     const map = {};
+    const cardsByWord = {};
     for (const card of allCards) {
+      cardsByWord[card.word] = card;
+    }
+    const dueWords = new Set(dueCards.map(c => c.word));
+
+    // Build folders from srs_card_sources (multi-chapter aware)
+    const sourcedWords = new Set();
+    for (const src of cardSources) {
+      sourcedWords.add(src.word);
+      const key = src.text_id;
+      if (!map[key]) {
+        map[key] = {
+          textId: src.text_id,
+          title: src.text_title || 'Untitled',
+          cards: [],
+          dueCount: 0,
+        };
+      }
+      const card = cardsByWord[src.word];
+      if (card) {
+        map[key].cards.push(card);
+        if (dueWords.has(card.word)) map[key].dueCount++;
+      }
+    }
+
+    // Cards without sources go to their text_id folder or _unassigned
+    for (const card of allCards) {
+      if (sourcedWords.has(card.word)) continue;
       const key = card.textId || '_unassigned';
       if (!map[key]) {
         map[key] = {
@@ -101,11 +140,9 @@ export default function FlashcardPage() {
         };
       }
       map[key].cards.push(card);
+      if (dueWords.has(card.word)) map[key].dueCount++;
     }
-    for (const card of dueCards) {
-      const key = card.textId || '_unassigned';
-      if (map[key]) map[key].dueCount++;
-    }
+
     return Object.entries(map)
       .sort(([a], [b]) => {
         if (a === '_unassigned') return 1;
@@ -113,15 +150,19 @@ export default function FlashcardPage() {
         return 0;
       })
       .map(([key, val]) => ({ key, ...val }));
-  }, [allCards, dueCards]);
+  }, [allCards, dueCards, cardSources]);
 
-  const filteredCards = selectedFolder === 'all'
-    ? allCards
-    : allCards.filter(c => (c.textId || '_unassigned') === selectedFolder);
+  const filteredCards = useMemo(() => {
+    if (selectedFolder === 'all') return allCards;
+    const folder = folders.find(f => f.key === selectedFolder);
+    return folder ? folder.cards : [];
+  }, [selectedFolder, allCards, folders]);
 
-  const filteredDueCount = selectedFolder === 'all'
-    ? dueCards.length
-    : dueCards.filter(c => (c.textId || '_unassigned') === selectedFolder).length;
+  const filteredDueCount = useMemo(() => {
+    if (selectedFolder === 'all') return dueCards.length;
+    const folder = folders.find(f => f.key === selectedFolder);
+    return folder ? folder.dueCount : 0;
+  }, [selectedFolder, dueCards, folders]);
 
   const reviewTextId = selectedFolder === 'all' ? undefined : (selectedFolder === '_unassigned' ? null : selectedFolder);
 

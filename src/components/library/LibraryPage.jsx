@@ -2,14 +2,18 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { CEFR_LEVELS, CEFR_COLORS } from '../../lib/wordUtils';
+import { useAuth } from '../../context/AuthContext';
+import useLibraryProgress from '../../hooks/useLibraryProgress';
 
 export default function LibraryPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [texts, setTexts] = useState([]);
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeLevels, setActiveLevels] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const { getBookProgress } = useLibraryProgress(user?.id);
 
   useEffect(() => {
     loadLibrary();
@@ -135,6 +139,7 @@ export default function LibraryPage() {
                   key={`book-${item.book.id}`}
                   book={item.book}
                   chapterCount={item.chapterCount}
+                  bookProgress={getBookProgress((chaptersByBook[item.book.id] || []).map(c => c.id))}
                   onClick={() => navigate(`/book/${item.book.id}`)}
                 />
               ) : (
@@ -170,9 +175,10 @@ export default function LibraryPage() {
   );
 }
 
-function BookCard({ book, chapterCount, onClick }) {
+function BookCard({ book, chapterCount, bookProgress, onClick }) {
   const color = CEFR_COLORS[book.cefr_estimate] || CEFR_COLORS.unclassified;
   const initial = (book.title || '?')[0].toUpperCase();
+  const hasProgress = bookProgress && bookProgress.chaptersWithActivity > 0;
 
   return (
     <button
@@ -202,13 +208,26 @@ function BookCard({ book, chapterCount, onClick }) {
             {book.cefr_estimate}
           </span>
         )}
+        {hasProgress && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200/60">
+            <div
+              className="h-full bg-green-500 transition-all"
+              style={{ width: `${(bookProgress.chaptersWithActivity / bookProgress.totalChapters) * 100}%` }}
+            />
+          </div>
+        )}
       </div>
       <div className="p-3">
         <p className="text-sm font-semibold text-gray-900 line-clamp-2 group-hover:text-gray-700">{book.title}</p>
         {book.author && (
           <p className="text-xs text-gray-500 mt-1 truncate">{book.author}</p>
         )}
-        <p className="text-xs text-gray-400 mt-1">{chapterCount} {chapterCount === 1 ? 'chapter' : 'chapters'}</p>
+        <p className="text-xs text-gray-400 mt-1">
+          {hasProgress
+            ? `${bookProgress.chaptersWithActivity}/${bookProgress.totalChapters} chapters`
+            : `${chapterCount} ${chapterCount === 1 ? 'chapter' : 'chapters'}`
+          }
+        </p>
       </div>
     </button>
   );

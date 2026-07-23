@@ -8,7 +8,7 @@ const navItems = [
   { to: '/', label: 'Library' },
   { to: '/read', label: 'Read' },
   { to: '/flashcards', label: 'Flashcards' },
-  { to: '/workshop', label: 'Workshop' },
+  // { to: '/workshop', label: 'Workshop' },
 ];
 
 export default function Layout() {

@@ -5,6 +5,12 @@
 [functions]
   directory = "netlify/functions"
 
+[functions."transcribe-whisper"]
+  timeout = 26
+
+[functions."assess-pronunciation"]
+  timeout = 26
+
 [[edge_functions]]
   path = "/*"
   function = "ua_blocker_ef"

@@ -17,6 +17,7 @@ import { cleanToken } from '../../lib/wordUtils';
 import { findCurrentWord, findCurrentSentence, detectSentences, findSentenceForWord } from '../../lib/audioUtils';
 import { completeTaskForText } from '../../lib/assignments';
 import { logFluencySession, getFluencySessionsForText } from '../../lib/fluency';
+import { runPronunciationAssessment, buildWordAssessmentMap } from '../../lib/pronunciation';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ReadingView() {
@@ -99,6 +100,13 @@ export default function ReadingView() {
   // Shadow reading sentence tracking
   const shadowedSentencesRef = useRef(new Set());
 
+  // Pronunciation assessment
+  const [assessmentStatus, setAssessmentStatus] = useState(null);
+  const [assessmentError, setAssessmentError] = useState(null);
+  const [assessmentData, setAssessmentData] = useState(null);
+  const [wordAssessmentMap, setWordAssessmentMap] = useState(null);
+  const [hasRecording, setHasRecording] = useState(false);
+
   // Timed reading
   const [timedMode, setTimedMode] = useState('idle');
   const [timedStart, setTimedStart] = useState(null);
@@ -141,7 +149,49 @@ export default function ReadingView() {
     setTimedStart(null);
     setTimedElapsed(0);
     setTimedResult(null);
+    setAssessmentStatus(null);
+    setAssessmentError(null);
+    setAssessmentData(null);
+    setWordAssessmentMap(null);
+    setHasRecording(false);
   }, [selectedTextId]);
+
+  // Load existing assessment + recording state when text changes
+  useEffect(() => {
+    if (!user?.id || !selectedTextId) return;
+    let cancelled = false;
+
+    (async () => {
+      const [{ data: assessment }, { data: rec }] = await Promise.all([
+        supabase
+          .from('pronunciation_assessments')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('text_id', selectedTextId)
+          .maybeSingle(),
+        supabase
+          .from('student_recordings')
+          .select('assessment_status, assessment_error')
+          .eq('user_id', user.id)
+          .eq('text_id', selectedTextId)
+          .maybeSingle(),
+      ]);
+      if (cancelled) return;
+
+      setHasRecording(!!rec);
+
+      if (assessment) {
+        setAssessmentData(assessment);
+        setWordAssessmentMap(buildWordAssessmentMap(assessment));
+        setAssessmentStatus('complete');
+      } else if (rec) {
+        setAssessmentStatus(rec.assessment_status || null);
+        setAssessmentError(rec.assessment_error || null);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [selectedTextId, user?.id]);
 
   // Reset tool-specific state when switching tool sets
   useEffect(() => {
@@ -498,6 +548,58 @@ export default function ReadingView() {
     recorder.clearRecording();
     setRecordingMode('idle');
     setSaving(false);
+    setHasRecording(true);
+    setAssessmentStatus(null);
+    setAssessmentError(null);
+    setAssessmentData(null);
+    setWordAssessmentMap(null);
+  }
+
+  async function handleAnalyzePronunciation() {
+    if (!user?.id || !selectedText?.body) return;
+    const textId = selectedTextIdRef.current;
+    setAssessmentStatus('processing');
+    setAssessmentError(null);
+
+    const { data: rec } = await supabase
+      .from('student_recordings')
+      .select('storage_path')
+      .eq('user_id', user.id)
+      .eq('text_id', textId)
+      .single();
+    if (!rec) {
+      setAssessmentStatus('error');
+      setAssessmentError('No recording found');
+      return;
+    }
+
+    const { data: blob } = await supabase.storage
+      .from('student-recordings')
+      .download(rec.storage_path);
+    if (!blob) {
+      setAssessmentStatus('error');
+      setAssessmentError('Could not download recording');
+      return;
+    }
+
+    const result = await runPronunciationAssessment({
+      userId: user.id,
+      textId,
+      storagePath: rec.storage_path,
+      referenceText: selectedText.body,
+      audioBlob: blob,
+      supabase,
+    });
+
+    if (result.success) {
+      setAssessmentData(result.assessmentData);
+      setWordAssessmentMap(buildWordAssessmentMap(result.assessmentData));
+      setAssessmentStatus('complete');
+      setAssessmentError(null);
+    } else {
+      setAssessmentStatus('error');
+      setAssessmentError(result.error);
+    }
   }
 
   function handleDiscardRecording() {
@@ -691,6 +793,13 @@ export default function ReadingView() {
           saving={saving}
           saveError={saveError}
           recorderError={recorder.error}
+          hasRecording={hasRecording}
+          assessmentStatus={assessmentStatus}
+          assessmentError={assessmentError}
+          assessmentData={assessmentData}
+          onAnalyze={handleAnalyzePronunciation}
+          onRetryAssessment={handleAnalyzePronunciation}
+          wordAssessmentMap={wordAssessmentMap}
         />
       );
     }
@@ -807,6 +916,7 @@ export default function ReadingView() {
                 translationMode={translationMode}
                 images={selectedText.images}
                 l1={l1}
+                wordAssessmentMap={wordAssessmentMap}
               />
 
               {chapterNav && (
@@ -891,6 +1001,7 @@ export default function ReadingView() {
           manifest={bookManifest}
           syntaxGloss={popup.token.syntaxGloss || null}
           l1={l1}
+          assessmentInfo={wordAssessmentMap?.get(popup.token.wordIdx) || null}
         />
       )}
 

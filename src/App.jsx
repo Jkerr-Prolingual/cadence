@@ -10,6 +10,7 @@ import WorkshopView from './components/workshop/WorkshopView';
 import LibraryPage from './components/library/LibraryPage';
 import BookChaptersPage from './components/library/BookChaptersPage';
 import LoginPage from './components/shared/LoginPage';
+import ResetPasswordPage from './components/shared/ResetPasswordPage';
 import LandingPage from './components/landing/LandingPage';
 
 function ProtectedRoute({ children, requireTeacher, requireAdmin }) {
@@ -33,6 +34,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {user ? (
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

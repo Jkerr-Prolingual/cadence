@@ -110,6 +110,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
   const [imageUrl, setImageUrl] = useState(null);
   const [imageAttribution, setImageAttribution] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [saveMessage, setSaveMessage] = useState(null);
 
   const [phraseSelection, setPhraseSelection] = useState('');
   const [selectionError, setSelectionError] = useState('');
@@ -166,7 +167,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
     if (!front.trim() || !back.trim()) return;
     const srsWord = isStructure && structureData ? `egp_${structureData.egp_id}` : lookupKey;
     const srsCardType = isStructure ? 'structure_cloze' : cardType;
-    await upsertSrsCard({
+    const result = await upsertSrsCard({
       word: srsWord,
       front: front.trim(),
       back: back.trim(),
@@ -183,8 +184,11 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
       createdAt: Date.now(),
     });
     setSaved(true);
+    if (result && !result.isNew && result.existingTextTitle && result.existingTextTitle !== textTitle) {
+      setSaveMessage(`Added to existing card from "${result.existingTextTitle}"`);
+    }
     onCreated?.();
-    setTimeout(onClose, 600);
+    setTimeout(onClose, result && !result.isNew ? 1200 : 600);
   }
 
   const canSave = front.trim() && back.trim();
@@ -280,7 +284,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
                     : 'bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed'
                 }`}
               >
-                {saved ? 'Saved!' : 'Add to Review Deck'}
+                {saved ? (saveMessage || 'Saved!') : 'Add to Review Deck'}
               </button>
             </div>
           )}
@@ -341,7 +345,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
                     : 'bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed'
                 }`}
               >
-                {saved ? 'Saved!' : 'Add to Review Deck'}
+                {saved ? (saveMessage || 'Saved!') : 'Add to Review Deck'}
               </button>
             </div>
           )}
