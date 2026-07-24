@@ -423,7 +423,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         <div className="mt-2 pt-2 border-t border-gray-100">
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pronunciation</span>
           {assessmentInfo.type === 'omission' ? (
-            <p className="text-sm text-red-600 mt-1">This word was skipped</p>
+            <p className="text-sm text-red-600 mt-1">Skipped</p>
           ) : assessmentInfo.type === 'substitution' ? (
             <div className="mt-1">
               <p className="text-sm text-orange-600">
@@ -462,6 +462,9 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
               <span className="text-xs text-gray-600 tabular-nums">{Math.round(assessmentInfo.accuracy)}%</span>
             </div>
           ) : null}
+          {assessmentInfo.pauseMs && (
+            <p className="text-xs text-gray-500 mt-1">Pause {(assessmentInfo.pauseMs / 1000).toFixed(1)}s</p>
+          )}
         </div>
       )}
 

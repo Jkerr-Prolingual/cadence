@@ -96,9 +96,11 @@ export async function runPronunciationAssessment({ userId, textId, storagePath, 
   }
 }
 
+const PAUSE_THRESHOLD_MS = 1000;
+
 export function buildWordAssessmentMap(assessmentData) {
   const map = new Map();
-  const { alignment, azure_word_scores } = assessmentData;
+  const { alignment, azure_word_scores, whisper_word_timestamps } = assessmentData;
   if (!alignment) return map;
 
   const azureByIdx = new Map();
@@ -112,6 +114,8 @@ export function buildWordAssessmentMap(assessmentData) {
       }
     }
   }
+
+  const pauseByRefIdx = computePauses(alignment, whisper_word_timestamps);
 
   for (const entry of alignment) {
     if (entry.refIdx == null) continue;
@@ -134,10 +138,36 @@ export function buildWordAssessmentMap(assessmentData) {
       accuracy,
       timestampMs: entry.timestampMs,
       errorType: azure?.errorType || null,
+      pauseMs: pauseByRefIdx.get(entry.refIdx) || null,
     });
   }
 
   return map;
+}
+
+function computePauses(alignment, whisperTimestamps) {
+  const pauses = new Map();
+  if (!whisperTimestamps?.length) return pauses;
+
+  const timestampBySpokenIdx = new Map();
+  for (let i = 0; i < whisperTimestamps.length; i++) {
+    const w = whisperTimestamps[i];
+    timestampBySpokenIdx.set(i, { start: (w.start || 0) * 1000, end: (w.end || 0) * 1000 });
+  }
+
+  const spoken = alignment.filter(e => e.spokenIdx != null && e.refIdx != null);
+  for (let i = 1; i < spoken.length; i++) {
+    const prev = timestampBySpokenIdx.get(spoken[i - 1].spokenIdx);
+    const curr = timestampBySpokenIdx.get(spoken[i].spokenIdx);
+    if (!prev || !curr) continue;
+
+    const gap = curr.start - prev.end;
+    if (gap >= PAUSE_THRESHOLD_MS) {
+      pauses.set(spoken[i].refIdx, Math.round(gap));
+    }
+  }
+
+  return pauses;
 }
 
 function generateFlagEvents({ userId, textId, alignment, azureData }) {

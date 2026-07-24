@@ -800,6 +800,7 @@ export default function ReadingView() {
           onAnalyze={handleAnalyzePronunciation}
           onRetryAssessment={handleAnalyzePronunciation}
           wordAssessmentMap={wordAssessmentMap}
+          l1={l1}
         />
       );
     }
@@ -916,7 +917,7 @@ export default function ReadingView() {
                 translationMode={translationMode}
                 images={selectedText.images}
                 l1={l1}
-                wordAssessmentMap={wordAssessmentMap}
+                wordAssessmentMap={toolSet === 'record' ? wordAssessmentMap : null}
               />
 
               {chapterNav && (
@@ -1001,7 +1002,7 @@ export default function ReadingView() {
           manifest={bookManifest}
           syntaxGloss={popup.token.syntaxGloss || null}
           l1={l1}
-          assessmentInfo={wordAssessmentMap?.get(popup.token.wordIdx) || null}
+          assessmentInfo={toolSet === 'record' ? (wordAssessmentMap?.get(popup.token.wordIdx) || null) : null}
         />
       )}
 

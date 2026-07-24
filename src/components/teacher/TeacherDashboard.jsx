@@ -18,6 +18,7 @@ export default function TeacherDashboard() {
   const [curatedTexts, setCuratedTexts] = useState([]);
   const [books, setBooks] = useState([]);
   const [studentRecordings, setStudentRecordings] = useState([]);
+  const [pronunciationAssessments, setPronunciationAssessments] = useState([]);
   const [fluencySessions, setFluencySessions] = useState([]);
   const [srsCards, setSrsCards] = useState([]);
   const [reviewLogs, setReviewLogs] = useState([]);
@@ -68,9 +69,10 @@ export default function TeacherDashboard() {
 
       const studentIds = [...new Set(enrollData.map(e => e.student_id))];
       if (studentIds.length > 0) {
-        const [profilesRes, recordingsRes, fluencyRes, cardsRes, reviewsRes] = await Promise.all([
+        const [profilesRes, recordingsRes, assessmentsRes, fluencyRes, cardsRes, reviewsRes] = await Promise.all([
           supabase.from('profiles').select('id, display_name, email').in('id', studentIds),
           supabase.from('student_recordings').select('*').in('user_id', studentIds),
+          supabase.from('pronunciation_assessments').select('user_id, text_id, overall_accuracy, azure_fluency_score, azure_prosody_score, azure_completeness_score').in('user_id', studentIds),
           supabase.from('fluency_sessions').select('*').in('user_id', studentIds).order('session_date', { ascending: true }),
           supabase.from('srs_cards').select('user_id, word, text_id, leitner_box, card_type, cefr, added_date, last_review_date').in('user_id', studentIds),
           supabase.from('review_log').select('user_id, word, correct, reviewed_at').in('user_id', studentIds),
@@ -80,6 +82,7 @@ export default function TeacherDashboard() {
         for (const p of (profilesRes.data || [])) map[p.id] = p;
         setStudentProfiles(map);
         setStudentRecordings(recordingsRes.data || []);
+        setPronunciationAssessments(assessmentsRes.data || []);
         setFluencySessions(fluencyRes.data || []);
         setSrsCards(cardsRes.data || []);
         setReviewLogs(reviewsRes.data || []);
@@ -343,6 +346,7 @@ function AssignmentsPanel({ assignments, allTexts, books, students, progress, st
             students={students}
             progress={progress.filter(p => p.assignmentId === a.id)}
             studentRecordings={studentRecordings.filter(r => r.text_id === a.textId)}
+            pronunciationAssessments={pronunciationAssessments.filter(pa => pa.text_id === a.textId)}
             fluencySessions={fluencySessions.filter(f => f.text_id === a.textId)}
             srsCards={srsCards.filter(c => c.text_id === a.textId)}
             reviewLogs={reviewLogs}
@@ -545,7 +549,7 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
   );
 }
 
-function AssignmentCard({ assignment, allTexts, students, progress, studentRecordings, fluencySessions, srsCards, reviewLogs, onChanged }) {
+function AssignmentCard({ assignment, allTexts, students, progress, studentRecordings, pronunciationAssessments = [], fluencySessions, srsCards, reviewLogs, onChanged }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [playingStudentId, setPlayingStudentId] = useState(null);
   const [audioUrls, setAudioUrls] = useState({});
@@ -567,6 +571,10 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
 
   function getStudentRecording(studentId) {
     return studentRecordings.find(r => r.user_id === studentId);
+  }
+
+  function getStudentAssessment(studentId) {
+    return pronunciationAssessments.find(a => a.user_id === studentId);
   }
 
   function getStudentWpmHistory(studentId) {
@@ -720,6 +728,7 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
                   </th>
                 ))}
                 {hasRecordTask && <th className="text-center font-medium py-1 w-20">Listen</th>}
+                {hasRecordTask && <th className="text-left font-medium py-1">Pronunciation</th>}
                 {hasTimedTask && <th className="text-left font-medium py-1">WPM</th>}
               </tr>
             </thead>
@@ -777,6 +786,23 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
                           )}
                         </td>
                       )}
+                      {hasRecordTask && (() => {
+                        const assess = getStudentAssessment(s.id);
+                        return (
+                          <td className="py-1.5">
+                            {assess ? (
+                              <div className="flex items-center gap-2 text-xs text-gray-600 tabular-nums">
+                                <span title="Accuracy">{Math.round(assess.overall_accuracy)}%</span>
+                                {assess.azure_fluency_score != null && <span className="text-gray-400" title="Fluency">F{Math.round(assess.azure_fluency_score)}</span>}
+                                {assess.azure_prosody_score != null && <span className="text-gray-400" title="Prosody">P{Math.round(assess.azure_prosody_score)}</span>}
+                                {assess.azure_completeness_score != null && <span className="text-gray-400" title="Completeness">C{Math.round(assess.azure_completeness_score)}%</span>}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
+                          </td>
+                        );
+                      })()}
                       {hasTimedTask && (
                         <td className="py-1.5">
                           <WpmTimeline readings={getStudentWpmHistory(s.id)} />
@@ -785,7 +811,7 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
                     </tr>
                     {expandedFlashcardStudent === s.id && hasFlashcardTask && (
                       <tr>
-                        <td colSpan={taskList.length + 1 + (hasRecordTask ? 1 : 0) + (hasTimedTask ? 1 : 0)}>
+                        <td colSpan={taskList.length + 1 + (hasRecordTask ? 2 : 0) + (hasTimedTask ? 1 : 0)}>
                           <FlashcardDetail cards={cards} reviews={reviews} />
                         </td>
                       </tr>

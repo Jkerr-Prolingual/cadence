@@ -1,3 +1,26 @@
+import { useState, useEffect } from 'react';
+
+const SCORE_DESCRIPTIONS = {
+  fluency: {
+    es: 'Qué tan fluidamente leíste, sin detenerte ni repetir palabras.',
+    zh: '你阅读的流畅程度，没有停顿或重复。',
+    ja: '止まったり繰り返したりせず、どれだけスムーズに読めたか。',
+    ko: '멈추거나 반복하지 않고 얼마나 유창하게 읽었는지.',
+  },
+  prosody: {
+    es: 'Tu ritmo, acentuación y entonación al leer.',
+    zh: '你朗读时的节奏、重音和语调。',
+    ja: '読むときのリズム、ストレス、イントネーション。',
+    ko: '읽을 때의 리듬, 강세, 억양.',
+  },
+  completeness: {
+    es: 'Cuánto del texto leíste en voz alta.',
+    zh: '你朗读了多少文本内容。',
+    ja: 'テキストのどれだけを声に出して読んだか。',
+    ko: '텍스트를 얼마나 소리 내어 읽었는지.',
+  },
+};
+
 function formatElapsed(seconds) {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
@@ -22,7 +45,16 @@ export default function RecordReviewStrip({
   onAnalyze,
   onRetryAssessment,
   wordAssessmentMap = null,
+  l1 = 'es',
 }) {
+  const [activeTooltip, setActiveTooltip] = useState(null);
+
+  useEffect(() => {
+    if (!activeTooltip) return;
+    const dismiss = () => setActiveTooltip(null);
+    document.addEventListener('click', dismiss);
+    return () => document.removeEventListener('click', dismiss);
+  }, [activeTooltip]);
   if (recordingMode === 'idle' && assessmentStatus === 'processing') {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
@@ -44,25 +76,54 @@ export default function RecordReviewStrip({
     const flaggedCount = wordAssessmentMap
       ? [...wordAssessmentMap.values()].filter(a => a.accuracy < 60 || a.type === 'omission').length
       : 0;
+    const fluency = assessmentData.azure_fluency_score != null ? Math.round(assessmentData.azure_fluency_score) : null;
+    const prosody = assessmentData.azure_prosody_score != null ? Math.round(assessmentData.azure_prosody_score) : null;
+    const completeness = assessmentData.azure_completeness_score != null ? Math.round(assessmentData.azure_completeness_score) : null;
+
+    const ScoreChip = ({ label, value, tooltipKey }) => (
+      <span className="relative">
+        <button
+          onClick={(e) => { e.stopPropagation(); setActiveTooltip(activeTooltip === tooltipKey ? null : tooltipKey); }}
+          className="text-xs text-gray-600 hover:text-gray-800 tabular-nums"
+        >
+          {label} {value}
+        </button>
+        {activeTooltip === tooltipKey && (
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg shadow-md w-52 text-center z-50">
+            {SCORE_DESCRIPTIONS[tooltipKey]?.[l1] || SCORE_DESCRIPTIONS[tooltipKey]?.es}
+          </span>
+        )}
+      </span>
+    );
+
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-700">
-              Overall: {accuracy}%
-            </span>
-            {flaggedCount > 0 && (
-              <span className="text-xs text-gray-500">
-                {flaggedCount} {flaggedCount === 1 ? 'word' : 'words'} to practice
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700">
+                Accuracy: {accuracy}%
               </span>
-            )}
+              {flaggedCount > 0 && (
+                <span className="text-xs text-gray-500">
+                  {flaggedCount} {flaggedCount === 1 ? 'word' : 'words'} to practice
+                </span>
+              )}
+            </div>
+            <button
+              onClick={onStartRecording}
+              className="text-xs text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors px-2 py-2 min-h-[44px] flex items-center"
+            >
+              Re-record
+            </button>
           </div>
-          <button
-            onClick={onStartRecording}
-            className="text-xs text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors px-2 py-2 min-h-[44px] flex items-center"
-          >
-            Re-record
-          </button>
+          {(fluency != null || prosody != null || completeness != null) && (
+            <div className="flex items-center gap-3 mt-1">
+              {fluency != null && <ScoreChip label="Fluency" value={fluency} tooltipKey="fluency" />}
+              {prosody != null && <ScoreChip label="Prosody" value={prosody} tooltipKey="prosody" />}
+              {completeness != null && <ScoreChip label="Completeness" value={`${completeness}%`} tooltipKey="completeness" />}
+            </div>
+          )}
         </div>
       </div>
     );

@@ -262,14 +262,16 @@ export default function TextDisplay({
 
               if (wordAssessmentMap) {
                 const assessment = wordAssessmentMap.get(token.wordIdx);
-                if (assessment && (assessment.accuracy < 60 || assessment.type === 'omission')) {
-                  const assessColor = assessment.accuracy < 40 || assessment.type === 'omission'
-                    ? '#ef4444' : '#f97316';
+                if (assessment && assessment.type !== 'omission') {
+                  const acc = assessment.accuracy;
+                  const assessColor = acc >= 80 ? '#22c55e'
+                    : acc >= 60 ? '#eab308'
+                    : acc >= 40 ? '#f97316' : '#ef4444';
                   wordStyle = { ...wordStyle, borderBottom: `3px solid ${assessColor}`, paddingBottom: '2px' };
                 }
               }
 
-              return (
+              const wordEl = (
                 <span
                   key={token.tIdx}
                   data-widx={token.wordIdx}
@@ -288,6 +290,24 @@ export default function TextDisplay({
                   )}
                 </span>
               );
+
+              const pauseMs = wordAssessmentMap?.get(token.wordIdx)?.pauseMs;
+              if (pauseMs) {
+                return [
+                  <span
+                    key={`pause-${token.tIdx}`}
+                    className="inline-block align-middle mx-0.5"
+                    style={{
+                      width: '2px',
+                      height: '1em',
+                      borderLeft: `2px dotted ${pauseMs >= 2000 ? '#ef4444' : '#eab308'}`,
+                    }}
+                    title={`Pause ${(pauseMs / 1000).toFixed(1)}s`}
+                  />,
+                  wordEl,
+                ];
+              }
+              return wordEl;
             };
 
             const inner = [];
