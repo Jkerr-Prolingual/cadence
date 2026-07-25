@@ -132,10 +132,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         {particleTranslation ? (
           <div className="mb-2">
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{l1Label}</span>
-            <p className="text-sm text-gray-800 mt-0.5">{particleTranslation}</p>
+            <p className="text-base text-gray-800 mt-0.5">{particleTranslation}</p>
           </div>
         ) : (
-          <p className="text-sm text-gray-400 italic mb-2">No translation available</p>
+          <p className="text-base text-gray-400 italic mb-2">No translation available</p>
         )}
 
         {particle.note && l1 === 'es' && (
@@ -188,9 +188,9 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                       <span className="text-xs text-gray-400">→ {cLookup.lemma}</span>
                     )}
                     {cSpanish ? (
-                      <p className="text-sm text-gray-700 mt-0.5">{cSpanish}</p>
+                      <p className="text-base text-gray-700 mt-0.5">{cSpanish}</p>
                     ) : (
-                      <p className="text-xs text-gray-400 italic mt-0.5">No translation</p>
+                      <p className="text-sm text-gray-400 italic mt-0.5">No translation</p>
                     )}
                   </div>
                 </div>
@@ -234,10 +234,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         {wordTranslation ? (
           <div className="mb-2">
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{l1Label}</span>
-            <p className="text-sm text-gray-800 mt-0.5">{wordTranslation}</p>
+            <p className="text-base text-gray-800 mt-0.5">{wordTranslation}</p>
           </div>
         ) : (
-          <p className="text-sm text-gray-400 italic">No translation available</p>
+          <p className="text-base text-gray-400 italic">No translation available</p>
         )}
 
         {manifestEntry?.note && l1 === 'es' && (
@@ -341,11 +341,11 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     return (
       <>
         <div className="mb-2">
-          <p className="text-sm text-gray-600 italic leading-snug">"{syntaxGloss.text}"</p>
+          <p className="text-base text-gray-600 italic leading-snug">"{syntaxGloss.text}"</p>
         </div>
 
         <div className="mb-2">
-          <p className="text-sm text-gray-800">{getGlossTranslation(syntaxGloss, l1)}</p>
+          <p className="text-base text-gray-800">{getGlossTranslation(syntaxGloss, l1)}</p>
         </div>
 
         {syntaxGloss.note && (
@@ -397,7 +397,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                       {level === 'unclassified' ? '—' : level}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-700 mt-0.5">{translation}</p>
+                  <p className="text-base text-gray-700 mt-0.5">{translation}</p>
                 </div>
               </div>
             );
@@ -410,7 +410,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   return (
     <div
       ref={popupRef}
-      className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-[calc(100vw-16px)] sm:w-72 overflow-y-auto"
+      className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-[calc(100vw-16px)] sm:w-80 overflow-y-auto"
       style={{ left: `${adjusted.x}px`, top: `${adjusted.y}px`, maxHeight: 'calc(100vh - 16px)' }}
     >
       {view === 'gloss' && renderGlossView()}
@@ -436,9 +436,9 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                       className="h-full rounded-full"
                       style={{
                         width: `${assessmentInfo.accuracy}%`,
-                        backgroundColor: assessmentInfo.accuracy >= 80 ? '#22c55e'
-                          : assessmentInfo.accuracy >= 60 ? '#eab308'
-                          : assessmentInfo.accuracy >= 40 ? '#f97316' : '#ef4444',
+                        backgroundColor: assessmentInfo.accuracy >= 95 ? '#22c55e'
+                          : assessmentInfo.accuracy >= 75 ? '#eab308'
+                          : assessmentInfo.accuracy >= 50 ? '#f97316' : '#ef4444',
                       }}
                     />
                   </div>
@@ -471,14 +471,14 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
         <button
           onClick={onAddFlashcard}
-          className="text-xs text-blue-600 hover:text-blue-800 active:text-blue-900 font-medium px-2 py-2 -mx-2 min-h-[44px] flex items-center"
+          className="text-sm text-blue-600 hover:text-blue-800 active:text-blue-900 font-medium px-2 py-2 -mx-2 min-h-[44px] flex items-center"
         >
           {view === 'structure' ? '+ Cloze card' : '+ Flashcard'}
         </button>
         <div className="flex items-center gap-1">
           <button
             onClick={onClose}
-            className="text-xs text-gray-400 hover:text-gray-600 active:text-gray-800 px-2 py-2 -mr-2 min-h-[44px] flex items-center"
+            className="text-sm text-gray-400 hover:text-gray-600 active:text-gray-800 px-2 py-2 -mr-2 min-h-[44px] flex items-center"
           >
             Close
           </button>

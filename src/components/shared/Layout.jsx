@@ -13,7 +13,7 @@ const navItems = [
 ];
 
 export default function Layout() {
-  const { user, profile, signOut, refreshProfile, isTeacher, isAdmin, isStudent, l1 } = useAuth();
+  const { user, profile, signOut, refreshProfile, isTeacher, isAdmin, isStudent, l1, textSize } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [joinCode, setJoinCode] = useState('');
@@ -125,6 +125,32 @@ export default function Layout() {
                         }`}
                       >
                         {loc.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-1.5">{getUILabel('textSize', l1)}</p>
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { key: 'small', labelKey: 'textSizeSmall' },
+                      { key: 'medium', labelKey: 'textSizeMedium' },
+                      { key: 'large', labelKey: 'textSizeLarge' },
+                      { key: 'xlarge', labelKey: 'textSizeXLarge' },
+                    ].map(({ key, labelKey }) => (
+                      <button
+                        key={key}
+                        onClick={async () => {
+                          await supabase.from('profiles').update({ text_size: key }).eq('id', user.id);
+                          await refreshProfile();
+                        }}
+                        className={`py-1 rounded text-xs font-medium border transition-colors ${
+                          textSize === key
+                            ? 'bg-gray-900 text-white border-gray-900'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                        }`}
+                      >
+                        {getUILabel(labelKey, l1)}
                       </button>
                     ))}
                   </div>

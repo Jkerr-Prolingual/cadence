@@ -76,7 +76,7 @@ export default function RecordReviewStrip({
   if (recordingMode === 'idle' && assessmentStatus === 'complete' && assessmentData) {
     const accuracy = Math.round(assessmentData.overall_accuracy || 0);
     const flaggedCount = wordAssessmentMap
-      ? [...wordAssessmentMap.values()].filter(a => a.accuracy < 60 || a.type === 'omission').length
+      ? [...wordAssessmentMap.values()].filter(a => a.accuracy < 75 && a.type !== 'omission').length
       : 0;
     const fluency = assessmentData.azure_fluency_score != null ? Math.round(assessmentData.azure_fluency_score) : null;
     const prosody = assessmentData.azure_prosody_score != null ? Math.round(assessmentData.azure_prosody_score) : null;

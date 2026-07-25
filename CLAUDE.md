@@ -1341,9 +1341,15 @@ Server-side env vars: `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`,
 Audio API (`decodeAudioBlob` + `encodeWavSlice` in `audioUtils.js`)
 before uploading chunks.
 
-**L2 accent calibration:** Accuracy threshold set at < 60 (not Azure's
-default ~80). Words scoring 60–80 are "accented but intelligible" — they
-get yellow UI treatment but no flag event. Words < 60 are flagged.
+**L2 accent calibration:** Azure PA scores accented-but-intelligible
+speech at 75–95, so thresholds are raised above Azure's defaults to
+surface meaningful variation for L2 learners:
+- Green: ≥95 (near-native)
+- Yellow: 75–95 (accented but intelligible, not flagged)
+- Orange: 50–75 (flagged, needs work)
+- Red: <50 (flagged, high severity)
+Flag threshold: <75. Words scoring 75–95 get yellow UI treatment but
+no flag event.
 
 ### Database Schema
 
@@ -1383,10 +1389,10 @@ generated with `source = 'ai'`:
 |---|---|---|
 | Word omitted (skip) | `skip` | 3 |
 | Word substituted | `mispronunciation` | 3 |
-| Azure accuracy < 30 | `mispronunciation` | 5 |
-| Azure accuracy 30–45 | `mispronunciation` | 4 |
-| Azure accuracy 45–55 | `mispronunciation` | 3 |
-| Azure accuracy 55–60 | `mispronunciation` | 2 |
+| Azure accuracy < 40 | `mispronunciation` | 5 |
+| Azure accuracy 40–50 | `mispronunciation` | 4 |
+| Azure accuracy 50–65 | `mispronunciation` | 3 |
+| Azure accuracy 65–75 | `mispronunciation` | 2 |
 | Azure hesitation detected | `hesitation` | 2 |
 
 ### UI Integration
@@ -1398,10 +1404,10 @@ accuracy % and count of words needing work. Error state with retry button.
 **TextDisplay:** Accepts `wordAssessmentMap` prop. Renders colored
 underlines on assessed words (additive — does not replace CEFR underlines
 or sentence highlighting):
-- Green: accuracy 80+ (fluent)
-- Yellow: accuracy 60–80 (accented but intelligible, not flagged)
-- Orange: accuracy 40–60 (flagged)
-- Red: accuracy < 40 or omitted (flagged, high severity)
+- Green: accuracy 95+ (near-native)
+- Yellow: accuracy 75–95 (accented but intelligible, not flagged)
+- Orange: accuracy 50–75 (flagged, needs work)
+- Red: accuracy < 50 or omitted (flagged, high severity)
 
 **WordPopup:** Accepts `assessmentInfo` prop. Shows pronunciation section:
 - Accuracy score

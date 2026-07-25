@@ -76,7 +76,7 @@ export default function ToolSetSelector({ active, onSelect, hasAudio, hasSyntaxG
             }`}
           >
             {ICONS[tool.icon]}
-            <span className="hidden sm:inline">{label}</span>
+            <span>{label}</span>
           </button>
         );
       })}

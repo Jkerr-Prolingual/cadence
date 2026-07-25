@@ -22,7 +22,7 @@ import { resetChapterRecording, resetChapterWpm } from '../../lib/resetProgress'
 import { useAuth } from '../../context/AuthContext';
 
 export default function ReadingView() {
-  const { user, isTeacher, l1 } = useAuth();
+  const { user, isTeacher, l1, textSize } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [curatedTexts, setCuratedTexts] = useState([]);
@@ -918,6 +918,7 @@ export default function ReadingView() {
                 images={selectedText.images}
                 l1={l1}
                 wordAssessmentMap={toolSet === 'record' ? wordAssessmentMap : null}
+                textSize={textSize}
               />
 
               {chapterNav && (

@@ -64,6 +64,7 @@ export function AuthProvider({ children }) {
     isAdmin: profile?.role === 'admin',
     isStudent: profile?.role === 'student',
     l1: profile?.l1 || 'es',
+    textSize: profile?.text_size || 'medium',
     devMode: DEV_MODE,
   };
 

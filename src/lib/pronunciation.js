@@ -2,7 +2,7 @@ import { tokenizeReference, alignWords } from './alignment';
 import { decodeAudioBlob, encodeWavSlice, detectSentences } from './audioUtils';
 import { cleanToken } from './wordUtils';
 
-const FLAG_THRESHOLD = 60;
+const FLAG_THRESHOLD = 75;
 const PAUSE_THRESHOLD_MS = 1000;
 const CHUNK_MIN_WORDS = 15;
 const AUDIO_BUFFER_SEC = 0.3;
@@ -372,24 +372,24 @@ function generateFlagEvents({ userId, textId, alignment, azureData }) {
 }
 
 function accuracyToSeverity(accuracy) {
-  if (accuracy < 30) return 5;
-  if (accuracy < 45) return 4;
-  if (accuracy < 55) return 3;
+  if (accuracy < 40) return 5;
+  if (accuracy < 50) return 4;
+  if (accuracy < 65) return 3;
   return 2;
 }
 
 function computeOverallAccuracy(alignment, azureData) {
   if (azureData?.words?.length) {
     const scores = azureData.words
-      .filter(w => w.accuracyScore != null && w.errorType !== 'Insertion')
+      .filter(w => w.accuracyScore != null && w.errorType !== 'Insertion' && w.errorType !== 'Omission')
       .map(w => w.accuracyScore);
     if (scores.length > 0) {
       return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
     }
   }
 
-  const refEntries = alignment.filter(e => e.refIdx != null);
-  if (refEntries.length === 0) return 0;
-  const matched = refEntries.filter(e => e.type === 'match').length;
-  return Math.round((matched / refEntries.length) * 100);
+  const attempted = alignment.filter(e => e.refIdx != null && e.type !== 'omission');
+  if (attempted.length === 0) return 0;
+  const matched = attempted.filter(e => e.type === 'match').length;
+  return Math.round((matched / attempted.length) * 100);
 }

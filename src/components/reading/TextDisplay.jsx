@@ -38,6 +38,7 @@ export default function TextDisplay({
   images = [],
   l1 = 'es',
   wordAssessmentMap = null,
+  textSize = 'medium',
 }) {
   const paragraphs = useMemo(() => {
     if (!text) return [];
@@ -227,7 +228,9 @@ export default function TextDisplay({
   };
 
   return (
-    <div className="leading-7 sm:leading-8 text-base sm:text-lg text-gray-900">
+    <div className={`text-gray-900 ${
+      { small: 'text-sm leading-6 sm:leading-7', medium: 'text-base leading-7 sm:text-lg sm:leading-8', large: 'text-lg leading-8 sm:text-xl sm:leading-9', xlarge: 'text-xl leading-9 sm:text-2xl sm:leading-10' }[textSize] || 'text-base leading-7 sm:text-lg sm:leading-8'
+    }`}>
       {sentenceGroups.flatMap((groups, pIdx) => {
         const elements = [];
         if (pIdx === 0 && imagesByPosition[-1]) {
@@ -264,9 +267,9 @@ export default function TextDisplay({
                 const assessment = wordAssessmentMap.get(token.wordIdx);
                 if (assessment && assessment.type !== 'omission') {
                   const acc = assessment.accuracy;
-                  const assessColor = acc >= 80 ? '#22c55e'
-                    : acc >= 60 ? '#eab308'
-                    : acc >= 40 ? '#f97316' : '#ef4444';
+                  const assessColor = acc >= 95 ? '#22c55e'
+                    : acc >= 75 ? '#eab308'
+                    : acc >= 50 ? '#f97316' : '#ef4444';
                   wordStyle = { ...wordStyle, borderBottom: `3px solid ${assessColor}`, paddingBottom: '2px' };
                 }
               }

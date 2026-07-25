@@ -1,4 +1,5 @@
 export const L1_LOCALES = {
+  en: { code: 'en', label: 'English', englishLabel: 'English' },
   es: { code: 'es', label: 'Español', englishLabel: 'Spanish' },
   zh: { code: 'zh', label: '中文', englishLabel: 'Mandarin' },
   ja: { code: 'ja', label: '日本語', englishLabel: 'Japanese' },
@@ -33,6 +34,11 @@ export const UI_LABELS = {
     resetAllConfirm: 'This will clear all your encounters, reading sessions, recordings, flashcards, and timed reading history across all texts. This cannot be undone. Continue?',
     startFresh: 'Start fresh',
     startFreshConfirm: 'This will delete your recording and pronunciation feedback. Continue?',
+    textSize: 'Text size',
+    textSizeSmall: 'Small',
+    textSizeMedium: 'Medium',
+    textSizeLarge: 'Large',
+    textSizeXLarge: 'Extra Large',
   },
   es: {
     listenRead: 'Escuchar y leer',
@@ -51,6 +57,11 @@ export const UI_LABELS = {
     resetAllConfirm: 'Esto borrará todos tus encuentros, sesiones de lectura, grabaciones, tarjetas y lecturas cronometradas en todos los textos. No se puede deshacer. ¿Continuar?',
     startFresh: 'Empezar de nuevo',
     startFreshConfirm: 'Esto eliminará tu grabación y retroalimentación de pronunciación. ¿Continuar?',
+    textSize: 'Tamaño del texto',
+    textSizeSmall: 'Pequeño',
+    textSizeMedium: 'Mediano',
+    textSizeLarge: 'Grande',
+    textSizeXLarge: 'Extra grande',
   },
   zh: {
     listenRead: '听读',
@@ -69,6 +80,11 @@ export const UI_LABELS = {
     resetAllConfirm: '这将清除你所有的词汇记录、阅读记录、录音、闪卡和计时阅读历史。此操作无法撤消。继续？',
     startFresh: '重新开始',
     startFreshConfirm: '这将删除你的录音和发音反馈。继续？',
+    textSize: '文字大小',
+    textSizeSmall: '小',
+    textSizeMedium: '中',
+    textSizeLarge: '大',
+    textSizeXLarge: '特大',
   },
   ja: {
     listenRead: '聞いて読む',
@@ -87,6 +103,11 @@ export const UI_LABELS = {
     resetAllConfirm: 'すべてのテキストの出会い、読書セッション、録音、フラッシュカード、時間計測読書の履歴がクリアされます。元に戻せません。続行しますか？',
     startFresh: 'やり直す',
     startFreshConfirm: '録音と発音フィードバックが削除されます。続行しますか？',
+    textSize: '文字サイズ',
+    textSizeSmall: '小',
+    textSizeMedium: '中',
+    textSizeLarge: '大',
+    textSizeXLarge: '特大',
   },
   ko: {
     listenRead: '듣고 읽기',
@@ -105,6 +126,11 @@ export const UI_LABELS = {
     resetAllConfirm: '모든 텍스트의 단어 기록, 읽기 세션, 녹음, 플래시카드, 시간 측정 읽기 기록이 삭제됩니다. 되돌릴 수 없습니다. 계속하시겠습니까?',
     startFresh: '다시 시작',
     startFreshConfirm: '녹음과 발음 피드백이 삭제됩니다. 계속하시겠습니까?',
+    textSize: '글자 크기',
+    textSizeSmall: '작게',
+    textSizeMedium: '보통',
+    textSizeLarge: '크게',
+    textSizeXLarge: '아주 크게',
   },
 };
 
