@@ -1,8 +1,11 @@
 import { tokenizeReference, alignWords } from './alignment';
-import { wavFromBlob } from './audioUtils';
+import { decodeAudioBlob, encodeWavSlice, detectSentences } from './audioUtils';
 import { cleanToken } from './wordUtils';
 
 const FLAG_THRESHOLD = 60;
+const PAUSE_THRESHOLD_MS = 1000;
+const CHUNK_MIN_WORDS = 15;
+const AUDIO_BUFFER_SEC = 0.3;
 
 export async function runPronunciationAssessment({ userId, textId, storagePath, referenceText, audioBlob, supabase }) {
   await supabase
@@ -25,24 +28,69 @@ export async function runPronunciationAssessment({ userId, textId, storagePath, 
 
     let azureData = null;
     try {
-      const wavBlob = await wavFromBlob(audioBlob);
-      const wavPath = `${userId}/${textId}.wav`;
-      await supabase.storage
-        .from('student-recordings')
-        .upload(wavPath, wavBlob, { contentType: 'audio/wav', upsert: true });
+      const audioBuffer = await decodeAudioBlob(audioBlob);
+      const sentences = detectSentences(referenceText, null);
+      const chunks = buildSentenceChunks(sentences, refTokens, CHUNK_MIN_WORDS);
+      const wordPositions = getWordPositions(referenceText);
 
-      const azureRes = await fetch('/.netlify/functions/assess-pronunciation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storagePath: wavPath, referenceText }),
-      });
-      azureData = await azureRes.json();
-      if (azureData.error) {
-        console.warn('Azure PA returned error, continuing with Whisper-only:', azureData.error);
-        azureData = null;
+      const chunkResults = await Promise.all(chunks.map(async (chunk, idx) => {
+        const timeRange = getChunkTimeRange(chunk, alignment, whisperData.words);
+        if (!timeRange) return null;
+
+        const wavBlob = encodeWavSlice(audioBuffer, timeRange.startSec, timeRange.endSec);
+        if (!wavBlob) return null;
+
+        const chunkPath = `${userId}/${textId}_chunk${idx}.wav`;
+        const chunkRefText = extractChunkText(referenceText, wordPositions, chunk.firstWordIdx, chunk.lastWordIdx);
+
+        try {
+          await supabase.storage
+            .from('student-recordings')
+            .upload(chunkPath, wavBlob, { contentType: 'audio/wav', upsert: true });
+
+          const res = await fetch('/.netlify/functions/assess-pronunciation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ storagePath: chunkPath, referenceText: chunkRefText }),
+          });
+          const data = await res.json();
+
+          await supabase.storage.from('student-recordings').remove([chunkPath]);
+
+          if (data.error) {
+            console.warn(`Azure PA chunk ${idx} error:`, data.error);
+            return null;
+          }
+          return data;
+        } catch (err) {
+          console.warn(`Azure PA chunk ${idx} failed:`, err);
+          await supabase.storage.from('student-recordings').remove([chunkPath]).catch(() => {});
+          return null;
+        }
+      }));
+
+      const mergedWords = [];
+      const fluencyScores = [];
+      const prosodyScores = [];
+      const completenessScores = [];
+
+      for (const result of chunkResults) {
+        if (!result) continue;
+        if (result.words?.length) mergedWords.push(...result.words);
+        if (result.fluencyScore != null) fluencyScores.push(result.fluencyScore);
+        if (result.prosodyScore != null) prosodyScores.push(result.prosodyScore);
+        if (result.completenessScore != null) completenessScores.push(result.completenessScore);
       }
 
-      await supabase.storage.from('student-recordings').remove([wavPath]);
+      if (mergedWords.length > 0) {
+        const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+        azureData = {
+          words: mergedWords,
+          fluencyScore: avg(fluencyScores),
+          prosodyScore: avg(prosodyScores),
+          completenessScore: avg(completenessScores),
+        };
+      }
     } catch (azureErr) {
       console.warn('Azure PA failed, saving Whisper-only results:', azureErr);
     }
@@ -96,26 +144,109 @@ export async function runPronunciationAssessment({ userId, textId, storagePath, 
   }
 }
 
-const PAUSE_THRESHOLD_MS = 1000;
+function buildSentenceChunks(sentences, refTokens, minWords) {
+  if (!sentences.length) {
+    const totalWords = refTokens.length;
+    return [{ firstWordIdx: 0, lastWordIdx: totalWords - 1, wordCount: totalWords, sentenceIndices: [] }];
+  }
 
-export function buildWordAssessmentMap(assessmentData) {
+  const chunks = [];
+  let current = { firstWordIdx: null, lastWordIdx: null, wordCount: 0, sentenceIndices: [] };
+
+  for (const s of sentences) {
+    const wordCount = s.lastWordIdx - s.firstWordIdx + 1;
+    if (current.firstWordIdx === null) current.firstWordIdx = s.firstWordIdx;
+    current.lastWordIdx = s.lastWordIdx;
+    current.wordCount += wordCount;
+    current.sentenceIndices.push(s.sentenceIdx);
+
+    if (current.wordCount >= minWords) {
+      chunks.push(current);
+      current = { firstWordIdx: null, lastWordIdx: null, wordCount: 0, sentenceIndices: [] };
+    }
+  }
+
+  if (current.sentenceIndices.length > 0) {
+    if (chunks.length > 0 && current.wordCount < Math.ceil(minWords / 2)) {
+      const last = chunks[chunks.length - 1];
+      last.lastWordIdx = current.lastWordIdx;
+      last.wordCount += current.wordCount;
+      last.sentenceIndices.push(...current.sentenceIndices);
+    } else {
+      chunks.push(current);
+    }
+  }
+
+  return chunks;
+}
+
+function getWordPositions(text) {
+  const positions = [];
+  const regex = /[a-zA-ZÀ-ÿ'''-]+/g;
+  let match;
+  let wordIdx = 0;
+  while ((match = regex.exec(text)) !== null) {
+    positions.push({ wordIdx: wordIdx++, charStart: match.index, charEnd: match.index + match[0].length });
+  }
+  return positions;
+}
+
+function extractChunkText(referenceText, wordPositions, firstWordIdx, lastWordIdx) {
+  const first = wordPositions.find(p => p.wordIdx === firstWordIdx);
+  const nextAfterLast = wordPositions.find(p => p.wordIdx === lastWordIdx + 1);
+  if (!first) return referenceText;
+  const endPos = nextAfterLast ? nextAfterLast.charStart : referenceText.length;
+  return referenceText.substring(first.charStart, endPos).trim();
+}
+
+function getChunkTimeRange(chunk, alignment, whisperTimestamps) {
+  if (!whisperTimestamps?.length) return null;
+
+  const chunkEntries = alignment.filter(e =>
+    e.refIdx != null &&
+    e.refIdx >= chunk.firstWordIdx &&
+    e.refIdx <= chunk.lastWordIdx &&
+    e.spokenIdx != null
+  );
+
+  if (chunkEntries.length === 0) return null;
+
+  const spokenIndices = chunkEntries.map(e => e.spokenIdx);
+  const minIdx = Math.min(...spokenIndices);
+  const maxIdx = Math.max(...spokenIndices);
+
+  const firstTs = whisperTimestamps[minIdx];
+  const lastTs = whisperTimestamps[maxIdx];
+  if (!firstTs || !lastTs) return null;
+
+  return {
+    startSec: Math.max(0, (firstTs.start || 0) - AUDIO_BUFFER_SEC),
+    endSec: (lastTs.end || lastTs.start || 0) + AUDIO_BUFFER_SEC,
+  };
+}
+
+function mapAzureToAlignment(azureWords, alignment) {
+  const azureByIdx = new Map();
+  if (!azureWords?.length) return azureByIdx;
+
+  const azureRefWords = azureWords.filter(w => w.errorType !== 'Insertion');
+  let azIdx = 0;
+  for (const entry of alignment) {
+    if (entry.refIdx == null) continue;
+    if (azIdx >= azureRefWords.length) break;
+    azureByIdx.set(entry.refIdx, azureRefWords[azIdx]);
+    azIdx++;
+  }
+  return azureByIdx;
+}
+
+export function buildWordAssessmentMap(assessmentData, sentences = null) {
   const map = new Map();
   const { alignment, azure_word_scores, whisper_word_timestamps } = assessmentData;
   if (!alignment) return map;
 
-  const azureByIdx = new Map();
-  if (azure_word_scores?.length) {
-    let azIdx = 0;
-    for (const entry of alignment) {
-      if (azIdx >= azure_word_scores.length) break;
-      if (entry.type === 'match' || entry.type === 'substitution') {
-        azureByIdx.set(entry.refIdx, azure_word_scores[azIdx]);
-        azIdx++;
-      }
-    }
-  }
-
-  const pauseByRefIdx = computePauses(alignment, whisper_word_timestamps);
+  const azureByIdx = mapAzureToAlignment(azure_word_scores, alignment);
+  const pauseByRefIdx = computePauses(alignment, whisper_word_timestamps, sentences);
 
   for (const entry of alignment) {
     if (entry.refIdx == null) continue;
@@ -145,9 +276,18 @@ export function buildWordAssessmentMap(assessmentData) {
   return map;
 }
 
-function computePauses(alignment, whisperTimestamps) {
+function computePauses(alignment, whisperTimestamps, sentences) {
   const pauses = new Map();
   if (!whisperTimestamps?.length) return pauses;
+
+  const sentenceForIdx = new Map();
+  if (sentences?.length) {
+    for (const s of sentences) {
+      for (let w = s.firstWordIdx; w <= s.lastWordIdx; w++) {
+        sentenceForIdx.set(w, s.sentenceIdx);
+      }
+    }
+  }
 
   const timestampBySpokenIdx = new Map();
   for (let i = 0; i < whisperTimestamps.length; i++) {
@@ -157,6 +297,12 @@ function computePauses(alignment, whisperTimestamps) {
 
   const spoken = alignment.filter(e => e.spokenIdx != null && e.refIdx != null);
   for (let i = 1; i < spoken.length; i++) {
+    if (sentenceForIdx.size > 0) {
+      const prevSent = sentenceForIdx.get(spoken[i - 1].refIdx);
+      const currSent = sentenceForIdx.get(spoken[i].refIdx);
+      if (prevSent != null && currSent != null && prevSent !== currSent) continue;
+    }
+
     const prev = timestampBySpokenIdx.get(spoken[i - 1].spokenIdx);
     const curr = timestampBySpokenIdx.get(spoken[i].spokenIdx);
     if (!prev || !curr) continue;
@@ -172,18 +318,7 @@ function computePauses(alignment, whisperTimestamps) {
 
 function generateFlagEvents({ userId, textId, alignment, azureData }) {
   const flags = [];
-  const azureByIdx = new Map();
-
-  if (azureData?.words?.length) {
-    let azIdx = 0;
-    for (const entry of alignment) {
-      if (azIdx >= azureData.words.length) break;
-      if (entry.type === 'match' || entry.type === 'substitution') {
-        azureByIdx.set(entry.refIdx, azureData.words[azIdx]);
-        azIdx++;
-      }
-    }
-  }
+  const azureByIdx = mapAzureToAlignment(azureData?.words, alignment);
 
   for (const entry of alignment) {
     if (entry.refIdx == null) continue;

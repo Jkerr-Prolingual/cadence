@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { resetChapterProgress, resetChapterRecording } from '../../lib/resetProgress';
+import { getUILabel } from '../../lib/locales';
 
 function formatDuration(seconds) {
   if (!seconds) return '';
@@ -9,7 +11,7 @@ function formatDuration(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function ChapterProgressPanel({ chapterProgress }) {
+export default function ChapterProgressPanel({ chapterProgress, textId, userId, l1, onReset }) {
   const navigate = useNavigate();
   const { fluency, recording, srs, assignments } = chapterProgress;
   const [audioUrl, setAudioUrl] = useState(null);
@@ -117,6 +119,34 @@ export default function ChapterProgressPanel({ chapterProgress }) {
               <span className="text-green-600 text-xs font-medium">✓ Complete</span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Reset */}
+      {userId && (
+        <div className="pt-2 border-t border-gray-200 flex flex-wrap gap-2">
+          <button
+            onClick={async () => {
+              if (!confirm(getUILabel('resetChapterConfirm', l1))) return;
+              await resetChapterProgress(userId, textId);
+              onReset?.();
+            }}
+            className="text-xs text-red-500 hover:text-red-700 active:text-red-800 transition-colors px-2 py-1.5"
+          >
+            {getUILabel('resetChapter', l1)}
+          </button>
+          {recording.exists && (
+            <button
+              onClick={async () => {
+                if (!confirm(getUILabel('resetRecordingConfirm', l1))) return;
+                await resetChapterRecording(userId, textId);
+                onReset?.();
+              }}
+              className="text-xs text-red-500 hover:text-red-700 active:text-red-800 transition-colors px-2 py-1.5"
+            >
+              {getUILabel('resetRecording', l1)}
+            </button>
+          )}
         </div>
       )}
     </div>

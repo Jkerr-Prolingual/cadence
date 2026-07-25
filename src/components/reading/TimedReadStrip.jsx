@@ -1,3 +1,5 @@
+import { getUILabel } from '../../lib/locales';
+
 function formatElapsed(seconds) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -14,6 +16,8 @@ export default function TimedReadStrip({
   onDone,
   onSave,
   onDiscard,
+  onClearHistory,
+  l1 = 'es',
 }) {
   if (mode === 'idle' || mode === 'pending') {
     return (
@@ -34,6 +38,17 @@ export default function TimedReadStrip({
             </svg>
             Start the clock
           </button>
+          {wpmHistory.length > 0 && onClearHistory && (
+            <button
+              onClick={() => {
+                if (!confirm(getUILabel('clearWpmConfirm', l1))) return;
+                onClearHistory();
+              }}
+              className="text-xs text-red-500 hover:text-red-700 active:text-red-800 transition-colors"
+            >
+              {getUILabel('clearWpmHistory', l1)}
+            </button>
+          )}
         </div>
       </div>
     );

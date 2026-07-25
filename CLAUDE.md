@@ -1232,10 +1232,26 @@ recording, diffs the transcript against the reference text, obtains
 per-word accuracy scores, generates AI flag events, and surfaces results
 in the reading view.
 
-### Architecture: Client-Orchestrated Two-Function Pipeline
+### Architecture: Client-Orchestrated Chunked Pipeline
 
-The pipeline uses two separate Netlify functions (compatible with the free
-tier), orchestrated by the client:
+The pipeline uses two Netlify functions orchestrated by the client. Audio
+is chunked by sentence groups so Azure PA processes the full recording
+rather than truncating after the first ~15 seconds.
+
+**Why chunking:** Azure's single-shot REST API only processes one
+recognition turn (~15–60s of audio). Sending a full multi-minute recording
+in one call meant most words got no Azure score, defaulting to accuracy
+100 (green). This eliminated yellow highlighting (60–80 accuracy range)
+and made the assessment data unreliable. Sentence-level chunking gives
+Azure a short, precisely-aligned audio slice with matching reference text
+for every part of the recording.
+
+**Why Whisper is still needed:** Whisper's word-level timestamps are what
+make chunking possible — they tell the client where each word lives in
+the audio so it can slice precisely at sentence boundaries. Whisper also
+provides "you said X instead of Y" feedback for substitutions, which
+Azure PA alone cannot (Azure scores pronunciation quality but doesn't
+transcribe what was actually said).
 
 ```
 Student saves recording (existing flow)
@@ -1243,32 +1259,47 @@ Student saves recording (existing flow)
   → Client sets assessment_status = 'pending'
   → Client calls Netlify fn: transcribe-whisper
       → Downloads audio from Supabase Storage (service role key)
-      → Sends to Groq Whisper API
+      → Sends to OpenAI Whisper API (whisper-1)
       → Returns transcript + word-level timestamps
   → Client runs word alignment locally (edit distance, pure JS)
-  → Client calls Netlify fn: assess-pronunciation
-      → Downloads audio from Supabase Storage
-      → Sends to Azure PA with reference text
-      → Returns per-word accuracy, fluency, prosody, completeness
-  → Client merges results: alignment + Azure scores → flag events
+  → Client detects sentence boundaries, groups into chunks (≥15 words)
+  → Client decodes audio to AudioBuffer (Web Audio API, 16kHz mono)
+  → For each chunk (in parallel):
+      → Slices audio by Whisper timestamps (+ 300ms buffer)
+      → Uploads chunk WAV to Supabase Storage
+      → Calls Netlify fn: assess-pronunciation with chunk audio + ref text
+      → Cleans up chunk WAV from storage
+  → Client merges all chunk Azure results into one word score array
+  → Client merges: alignment + merged Azure scores → flag events
   → Client writes pronunciation_assessments row + flag_events to Supabase
   → Client sets assessment_status = 'complete'
   → TextDisplay renders assessment overlay
 ```
 
-Each Netlify function handles one API call, keeping execution time within
-the ~10–26s window. The diff/alignment is pure computation — runs
-client-side instantly.
+**Chunking algorithm:** Sentences are detected using the same
+`detectSentences()` used by the reading view. Consecutive sentences are
+grouped until the chunk reaches ≥15 words (`CHUNK_MIN_WORDS`). A trailing
+remainder smaller than half the minimum is merged into the last chunk.
+This ensures every chunk has enough substance for Azure PA to score
+accurately, while never splitting mid-sentence. The 15-word floor
+accommodates A1–A2 graded readers with many short sentences and fragments;
+longer B1+ sentences naturally stand alone.
 
-### Whisper Transcription (Groq)
+**Pause detection:** Pauses between sentences are suppressed (natural
+breath pauses, not pedagogically meaningful). Only mid-sentence pauses
+≥1000ms are flagged. The 1000ms threshold is appropriate for L2 learners
+— shorter pauses are normal for English language learners. The threshold
+can be adjusted empirically once real usage data is available.
 
-Groq's Whisper API (`whisper-large-v3`) provides near-real-time
-transcription with word-level timestamps. It accepts webm/opus directly.
-The Netlify function `transcribe-whisper.js` downloads the recording from
-Supabase Storage using the service role key, sends it to Groq, and returns
-the transcript + word timestamps.
+### Whisper Transcription (OpenAI)
 
-Server-side env vars: `GROQ_API_KEY`, `SUPABASE_URL`,
+OpenAI's Whisper API (`whisper-1`) provides transcription with word-level
+timestamps. It accepts webm/opus directly. The Netlify function
+`transcribe-whisper.js` downloads the recording from Supabase Storage
+using the service role key, sends it to OpenAI, and returns the transcript
++ word timestamps.
+
+Server-side env vars: `OPENAI_API_KEY`, `SUPABASE_URL`,
 `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### Word Alignment (Client-Side)
@@ -1289,20 +1320,26 @@ reference text words. This produces an alignment array:
 Word normalization: lowercase, strip punctuation, expand contractions
 (reuses `CONTRACTIONS` from `wordUtils.js`).
 
+Azure-to-alignment mapping filters out Azure Insertion entries and maps
+sequentially to all reference words (not just matches/substitutions),
+correctly handling Azure's omission detection.
+
 ### Azure Pronunciation Assessment
 
-The Netlify function `assess-pronunciation.js` downloads the recording
-from Supabase Storage and sends it to Azure Speech with Pronunciation
+The Netlify function `assess-pronunciation.js` downloads audio from
+Supabase Storage and sends it to Azure Speech with Pronunciation
 Assessment config (referenceText, granularity=Word, dimension=
 Comprehensive, enableMiscue=true). Returns per-word accuracy scores
-(0–100), fluency, prosody, and completeness scores.
+(0–100), fluency, prosody, and completeness scores. Called once per
+sentence chunk — each chunk is a short audio slice with matching
+reference text.
 
 Server-side env vars: `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`,
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 
-**Audio format:** Azure prefers WAV. If webm/opus is rejected, conversion
-via Web Audio API on the client (decode to PCM, encode as WAV) before
-triggering the Azure function.
+**Audio format:** Client converts webm/opus to 16kHz mono WAV via Web
+Audio API (`decodeAudioBlob` + `encodeWavSlice` in `audioUtils.js`)
+before uploading chunks.
 
 **L2 accent calibration:** Accuracy threshold set at < 60 (not Azure's
 default ~80). Words scoring 60–80 are "accented but intelligible" — they
@@ -1391,8 +1428,20 @@ or sentence highlighting):
 
 ### Cost Estimates
 
-Groq Whisper: ~$0.11/hour of audio. Azure PA: ~$1/hour. For a class of
-30 students doing 2 recordings/week, each 3 minutes: ~$3.33/week.
+OpenAI Whisper: ~$0.10/hour of audio. Azure PA: ~$1/hour. Azure is billed
+on total audio duration, not number of API calls, so sentence-level
+chunking does not increase Azure cost vs. a single call that processes the
+same audio. For a class of 30 students doing 2 recordings/week, each
+3 minutes: ~$3.30/week (~$130/year).
+
+**Cost decision (2026-07):** An earlier design ("flagged segments only")
+would have sent only Whisper-flagged segments to Azure PA, reducing Azure
+cost to ~$0.50–1.00/week. This was rejected because it fundamentally
+cannot produce yellow (60–80 accuracy) highlighting — Whisper is
+speech-to-text and cannot score pronunciation quality on correctly-
+transcribed words. Full Azure coverage is necessary for meaningful
+pronunciation feedback. If Relato scales, the service will need to charge
+for pronunciation assessment.
 
 ### Future: Chunk-Level Pronunciation Feedback
 
@@ -1439,13 +1488,36 @@ there's real word-level usage data to calibrate thresholds against.
 
 ### Known Risks
 
-- **Netlify timeout:** If Groq or Azure responses exceed 10s, functions
-  will time out. Groq Whisper is near-real-time (~5–8s for 5-min audio).
-  Mitigations: set function timeout to 26s in config, compress audio
-  client-side, or move to Supabase Edge Functions.
-- **Azure webm/opus format:** If rejected, client-side conversion via
-  Web Audio API (decode to PCM, encode as WAV) before triggering the
-  Azure function.
+- **Netlify timeout:** Each chunk's Azure PA call must complete within
+  the Netlify function timeout (~10–26s). Sentence-level chunks produce
+  short audio slices (typically 5–30s), well within limits. Whisper
+  processes the full recording in one call (~5–8s for 5-min audio).
+  If timeouts occur: set function timeout to 26s in config, or move to
+  Supabase Edge Functions.
+- **Parallel chunk uploads:** All chunks upload to Supabase Storage and
+  call Azure PA in parallel. For long texts with many chunks, this could
+  hit Supabase or Azure rate limits. Monitor and add sequential fallback
+  if needed.
 - **L2 accent over-flagging:** Threshold at < 60 (not default ~80).
   Future: change-over-time analysis (compare accuracy across recordings
   for the same word).
+
+### Future: Azure-Only Pipeline (Drop Whisper)
+
+Whisper currently serves two purposes: (1) providing word-level timestamps
+for audio slicing, and (2) identifying what the student actually said for
+substitution feedback ("You said X instead of Y").
+
+Azure's Speech SDK with continuous recognition could replace both Whisper
+and the chunking approach entirely — it handles long audio natively via
+WebSocket streaming and provides pronunciation assessment for the full
+recording in one call. Azure also returns word-level Offset/Duration
+timestamps that could replace Whisper's for pause detection.
+
+**Why not yet:** Continuous recognition requires a persistent WebSocket
+connection, which exceeds Netlify Functions' timeout. Moving to this
+approach requires a different backend — Supabase Edge Functions, a
+dedicated server, or Azure Functions. The "You said X" substitution
+feedback would also be lost (Azure PA scores pronunciation quality but
+doesn't transcribe the spoken word). When Relato's backend architecture
+evolves, this is a simplification worth pursuing.

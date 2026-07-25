@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getUILabel } from '../../lib/locales';
 
 const SCORE_DESCRIPTIONS = {
   fluency: {
@@ -46,6 +47,7 @@ export default function RecordReviewStrip({
   onRetryAssessment,
   wordAssessmentMap = null,
   l1 = 'es',
+  onStartFresh,
 }) {
   const [activeTooltip, setActiveTooltip] = useState(null);
 
@@ -110,12 +112,25 @@ export default function RecordReviewStrip({
                 </span>
               )}
             </div>
-            <button
-              onClick={onStartRecording}
-              className="text-xs text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors px-2 py-2 min-h-[44px] flex items-center"
-            >
-              Re-record
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onStartRecording}
+                className="text-xs text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors px-2 py-2 min-h-[44px] flex items-center"
+              >
+                Re-record
+              </button>
+              {onStartFresh && (
+                <button
+                  onClick={() => {
+                    if (!confirm(getUILabel('startFreshConfirm', l1))) return;
+                    onStartFresh();
+                  }}
+                  className="text-xs text-red-500 hover:text-red-700 active:text-red-800 transition-colors px-2 py-2 min-h-[44px] flex items-center"
+                >
+                  {getUILabel('startFresh', l1)}
+                </button>
+              )}
+            </div>
           </div>
           {(fluency != null || prosody != null || completeness != null) && (
             <div className="flex items-center gap-3 mt-1">
@@ -185,7 +200,7 @@ export default function RecordReviewStrip({
           </p>
           <button
             onClick={onStartRecording}
-            className="inline-flex items-center gap-2 px-5 py-3 sm:py-2.5 text-sm font-medium bg-gray-900 text-white rounded-full hover:bg-gray-800 active:bg-gray-700 transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-3 sm:py-2.5 text-sm font-medium bg-red-500 text-white rounded-full hover:bg-red-600 active:bg-red-700 transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <circle cx="8" cy="6" r="4" />

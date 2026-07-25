@@ -5,18 +5,19 @@ import { CEFR_COLORS } from '../../lib/wordUtils';
 import { useAuth } from '../../context/AuthContext';
 import useChapterProgress from '../../hooks/useChapterProgress';
 import ChapterProgressPanel from './ChapterProgressPanel';
+import { getUILabel } from '../../lib/locales';
 
 export default function BookChaptersPage() {
   const { bookId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, l1 } = useAuth();
   const [book, setBook] = useState(null);
   const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedChapter, setExpandedChapter] = useState(null);
 
   const chapterIds = chapters.map(ch => ch.id);
-  const { progress } = useChapterProgress({
+  const { progress, reload: reloadProgress } = useChapterProgress({
     chapterIds,
     userId: user?.id,
   });
@@ -214,7 +215,7 @@ export default function BookChaptersPage() {
                   <span className="text-gray-300 group-hover:text-gray-500 flex-shrink-0">&rsaquo;</span>
                 </button>
                 {isExpanded && cp && (
-                  <ChapterProgressPanel chapterProgress={cp} textId={ch.id} />
+                  <ChapterProgressPanel chapterProgress={cp} textId={ch.id} userId={user?.id} l1={l1} onReset={reloadProgress} />
                 )}
               </div>
             );

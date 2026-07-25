@@ -18,6 +18,7 @@ import { findCurrentWord, findCurrentSentence, detectSentences, findSentenceForW
 import { completeTaskForText } from '../../lib/assignments';
 import { logFluencySession, getFluencySessionsForText } from '../../lib/fluency';
 import { runPronunciationAssessment, buildWordAssessmentMap } from '../../lib/pronunciation';
+import { resetChapterRecording, resetChapterWpm } from '../../lib/resetProgress';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ReadingView() {
@@ -74,6 +75,7 @@ export default function ReadingView() {
   // Tool set state — resets on text change
   const [toolSet, setToolSet] = useState('listen');
 
+  const scrollContainerRef = useRef(null);
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1.0);
@@ -182,7 +184,7 @@ export default function ReadingView() {
 
       if (assessment) {
         setAssessmentData(assessment);
-        setWordAssessmentMap(buildWordAssessmentMap(assessment));
+        setWordAssessmentMap(buildWordAssessmentMap(assessment, sentences));
         setAssessmentStatus('complete');
       } else if (rec) {
         setAssessmentStatus(rec.assessment_status || null);
@@ -593,7 +595,7 @@ export default function ReadingView() {
 
     if (result.success) {
       setAssessmentData(result.assessmentData);
-      setWordAssessmentMap(buildWordAssessmentMap(result.assessmentData));
+      setWordAssessmentMap(buildWordAssessmentMap(result.assessmentData, sentences));
       setAssessmentStatus('complete');
       setAssessmentError(null);
     } else {
@@ -692,6 +694,22 @@ export default function ReadingView() {
 
   function handleTimedDiscard() {
     handleTimedCancel();
+  }
+
+  async function handleStartFresh() {
+    if (!user?.id || !selectedTextId) return;
+    await resetChapterRecording(user.id, selectedTextId);
+    setHasRecording(false);
+    setAssessmentStatus(null);
+    setAssessmentError(null);
+    setAssessmentData(null);
+    setWordAssessmentMap(null);
+  }
+
+  async function handleClearWpmHistory() {
+    if (!user?.id || !selectedTextId) return;
+    await resetChapterWpm(user.id, selectedTextId);
+    setWpmHistory([]);
   }
 
   // ── Word click / popup ────────────────────────────────────────────────────────
@@ -801,6 +819,7 @@ export default function ReadingView() {
           onRetryAssessment={handleAnalyzePronunciation}
           wordAssessmentMap={wordAssessmentMap}
           l1={l1}
+          onStartFresh={handleStartFresh}
         />
       );
     }
@@ -817,6 +836,8 @@ export default function ReadingView() {
           onDone={() => handleTimedDone()}
           onSave={handleTimedSave}
           onDiscard={handleTimedDiscard}
+          onClearHistory={handleClearWpmHistory}
+          l1={l1}
         />
       );
     }
@@ -848,7 +869,7 @@ export default function ReadingView() {
         onSelectText={(id) => { setSelectedTextId(id); setPopup(null); }}
       />
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           {selectedText && (
             <>
@@ -866,41 +887,20 @@ export default function ReadingView() {
                     )}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {hasSyntaxGlosses && (
-                    <button
-                      onClick={() => setTranslationMode(m => !m)}
-                      className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
-                        translationMode
-                          ? 'bg-blue-50 border-blue-300 text-blue-700'
-                          : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'
-                      }`}
-                      title={translationMode ? 'Hide translations' : 'Show translations'}
-                    >
-                      Translate
-                    </button>
-                  )}
-                  {/* Grammar pill hidden — syntax glosses cover this function.
-                  {manifestHasStructures && (
-                    <button
-                      onClick={() => setShowStructures(s => !s)}
-                      className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
-                        showStructures
-                          ? 'bg-purple-50 border-purple-300 text-purple-700'
-                          : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'
-                      }`}
-                      title={showStructures ? 'Hide grammar structures' : 'Show grammar structures'}
-                    >
-                      Grammar
-                    </button>
-                  )}
-                  */}
-                  <ToolSetSelector
-                    active={toolSet}
-                    onSelect={setToolSet}
-                    hasAudio={hasAudio}
-                  />
-                </div>
+                <ToolSetSelector
+                  active={toolSet}
+                  onSelect={(id) => {
+                    if (id === 'translate') {
+                      setTranslationMode(m => !m);
+                    } else {
+                      setToolSet(id);
+                    }
+                  }}
+                  hasAudio={hasAudio}
+                  hasSyntaxGlosses={hasSyntaxGlosses}
+                  translationMode={translationMode}
+                  l1={l1}
+                />
               </div>
 
               <TextDisplay
@@ -925,7 +925,7 @@ export default function ReadingView() {
                   <div>
                     {chapterNav.prev ? (
                       <button
-                        onClick={() => { setSelectedTextId(chapterNav.prev.id); setPopup(null); window.scrollTo(0, 0); }}
+                        onClick={() => { setSelectedTextId(chapterNav.prev.id); setPopup(null); scrollContainerRef.current?.scrollTo(0, 0); }}
                         className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1"
                       >
                         <span>&larr;</span> {chapterNav.prev.title}
@@ -945,7 +945,7 @@ export default function ReadingView() {
                   <div>
                     {chapterNav.next ? (
                       <button
-                        onClick={() => { setSelectedTextId(chapterNav.next.id); setPopup(null); window.scrollTo(0, 0); }}
+                        onClick={() => { setSelectedTextId(chapterNav.next.id); setPopup(null); scrollContainerRef.current?.scrollTo(0, 0); }}
                         className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1"
                       >
                         {chapterNav.next.title} <span>&rarr;</span>

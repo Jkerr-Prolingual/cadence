@@ -126,10 +126,10 @@ export default function ShadowReadStrip({
             {loopRecordingMode === 'idle' && (
               <button
                 onClick={onStartLoopRecording}
-                className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center rounded-full border-2 border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 active:text-red-600 transition-colors"
+                className="w-12 h-12 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400 active:bg-red-100 transition-colors"
                 title="Record yourself (practice — not saved)"
               >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                   <circle cx="8" cy="6" r="4" />
                   <path d="M3 6a5 5 0 0 0 10 0" fill="none" stroke="currentColor" strokeWidth="1.5" />
                   <line x1="8" y1="12" x2="8" y2="15" stroke="currentColor" strokeWidth="1.5" />

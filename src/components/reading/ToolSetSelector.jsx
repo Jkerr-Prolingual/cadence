@@ -1,8 +1,11 @@
+import { getUILabel } from '../../lib/locales';
+
 const TOOL_SETS = [
-  { id: 'listen', label: 'Listen & Read', icon: 'headphones' },
-  { id: 'shadow', label: 'Shadow Read', icon: 'loop' },
-  { id: 'record', label: 'Record & Review', icon: 'mic' },
-  { id: 'timed', label: 'Timed Read', icon: 'timer' },
+  { id: 'listen', labelKey: 'listenRead', icon: 'headphones' },
+  { id: 'translate', labelKey: 'translate', icon: 'translate' },
+  { id: 'shadow', labelKey: 'shadowRead', icon: 'loop' },
+  { id: 'timed', labelKey: 'timedRead', icon: 'timer' },
+  { id: 'record', labelKey: 'pronunciation', icon: 'mic' },
 ];
 
 const ICONS = {
@@ -11,6 +14,13 @@ const ICONS = {
       <path d="M3 12V8a5 5 0 0 1 10 0v4" />
       <rect x="1" y="10" width="3" height="4" rx="1" />
       <rect x="12" y="10" width="3" height="4" rx="1" />
+    </svg>
+  ),
+  translate: (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M2 3h7M5.5 1v2M3.5 3c0 2 1 4 4 5.5" />
+      <path d="M7.5 3c0 1.5-.5 3-2 4.5" />
+      <path d="M9 9l2.5 6M14 9l-2.5 6M9.75 13h3.5" />
     </svg>
   ),
   loop: (
@@ -38,30 +48,35 @@ const ICONS = {
   ),
 };
 
-export default function ToolSetSelector({ active, onSelect, hasAudio }) {
-  const available = hasAudio
-    ? TOOL_SETS
-    : TOOL_SETS.filter(t => t.id === 'timed');
+export default function ToolSetSelector({ active, onSelect, hasAudio, hasSyntaxGlosses, translationMode, l1 }) {
+  const available = TOOL_SETS.filter(t => {
+    if (t.id === 'translate') return hasSyntaxGlosses;
+    if (!hasAudio) return t.id === 'timed';
+    return true;
+  });
 
   if (available.length <= 1) return null;
 
   return (
-    <div className="inline-flex rounded-lg border border-gray-200 bg-gray-100/80 p-0.5 gap-0.5">
+    <div className="inline-flex flex-wrap rounded-lg border border-gray-200 bg-gray-100/80 p-0.5 gap-0.5">
       {available.map(tool => {
-        const isActive = active === tool.id;
+        const isActive = tool.id === 'translate' ? translationMode : active === tool.id;
+        const label = getUILabel(tool.labelKey, l1);
         return (
           <button
             key={tool.id}
             onClick={() => onSelect(tool.id)}
-            title={tool.label}
+            title={label}
             className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
               isActive
-                ? 'bg-white text-gray-900 shadow-sm'
+                ? tool.id === 'translate'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             {ICONS[tool.icon]}
-            <span>{tool.label}</span>
+            <span className="hidden sm:inline">{label}</span>
           </button>
         );
       })}

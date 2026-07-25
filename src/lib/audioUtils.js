@@ -108,7 +108,14 @@ export function formatTime(seconds) {
 }
 
 export async function wavFromBlob(webmBlob) {
-  const arrayBuffer = await webmBlob.arrayBuffer();
+  const rendered = await decodeAudioBlob(webmBlob);
+  const pcm = rendered.getChannelData(0);
+  const wavBuffer = encodeWAV(pcm, rendered.sampleRate);
+  return new Blob([wavBuffer], { type: 'audio/wav' });
+}
+
+export async function decodeAudioBlob(blob) {
+  const arrayBuffer = await blob.arrayBuffer();
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const decoded = await audioCtx.decodeAudioData(arrayBuffer);
   await audioCtx.close();
@@ -119,9 +126,15 @@ export async function wavFromBlob(webmBlob) {
   source.buffer = decoded;
   source.connect(offlineCtx.destination);
   source.start();
-  const rendered = await offlineCtx.startRendering();
+  return await offlineCtx.startRendering();
+}
 
-  const pcm = rendered.getChannelData(0);
+export function encodeWavSlice(audioBuffer, startSec, endSec) {
+  const sampleRate = audioBuffer.sampleRate;
+  const startSample = Math.max(0, Math.floor(startSec * sampleRate));
+  const endSample = Math.min(audioBuffer.length, Math.ceil(endSec * sampleRate));
+  if (endSample <= startSample) return null;
+  const pcm = audioBuffer.getChannelData(0).slice(startSample, endSample);
   const wavBuffer = encodeWAV(pcm, sampleRate);
   return new Blob([wavBuffer], { type: 'audio/wav' });
 }

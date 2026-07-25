@@ -139,5 +139,5 @@ export default function useChapterProgress({ chapterIds, userId }) {
     loadProgress();
   }, [userId, chapterKey]);
 
-  return { progress, loading };
+  return { progress, loading, reload: loadProgress };
 }
