@@ -453,9 +453,9 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                   className="h-full rounded-full"
                   style={{
                     width: `${assessmentInfo.accuracy}%`,
-                    backgroundColor: assessmentInfo.accuracy >= 80 ? '#22c55e'
-                      : assessmentInfo.accuracy >= 60 ? '#eab308'
-                      : assessmentInfo.accuracy >= 40 ? '#f97316' : '#ef4444',
+                    backgroundColor: assessmentInfo.accuracy >= 95 ? '#22c55e'
+                      : assessmentInfo.accuracy >= 75 ? '#eab308'
+                      : assessmentInfo.accuracy >= 50 ? '#f97316' : '#ef4444',
                   }}
                 />
               </div>

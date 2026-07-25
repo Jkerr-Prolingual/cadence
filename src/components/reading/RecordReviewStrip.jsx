@@ -1,33 +1,3 @@
-import { useState, useEffect } from 'react';
-import { getUILabel } from '../../lib/locales';
-
-const SCORE_DESCRIPTIONS = {
-  fluency: {
-    es: 'Qué tan fluidamente leíste, sin detenerte ni repetir palabras.',
-    zh: '你阅读的流畅程度，没有停顿或重复。',
-    ja: '止まったり繰り返したりせず、どれだけスムーズに読めたか。',
-    ko: '멈추거나 반복하지 않고 얼마나 유창하게 읽었는지.',
-  },
-  prosody: {
-    es: 'Tu ritmo, acentuación y entonación al leer.',
-    zh: '你朗读时的节奏、重音和语调。',
-    ja: '読むときのリズム、ストレス、イントネーション。',
-    ko: '읽을 때의 리듬, 강세, 억양.',
-  },
-  completeness: {
-    es: 'Cuánto del texto leíste en voz alta.',
-    zh: '你朗读了多少文本内容。',
-    ja: 'テキストのどれだけを声に出して読んだか。',
-    ko: '텍스트를 얼마나 소리 내어 읽었는지.',
-  },
-};
-
-function formatElapsed(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
 export default function RecordReviewStrip({
   recordingMode,
   recordingElapsed,
@@ -39,164 +9,13 @@ export default function RecordReviewStrip({
   saving,
   saveError,
   recorderError,
-  hasRecording = false,
-  assessmentStatus = null,
-  assessmentError = null,
-  assessmentData = null,
-  onAnalyze,
-  onRetryAssessment,
-  wordAssessmentMap = null,
-  l1 = 'es',
-  onStartFresh,
 }) {
-  const [activeTooltip, setActiveTooltip] = useState(null);
-
-  useEffect(() => {
-    if (!activeTooltip) return;
-    const dismiss = () => setActiveTooltip(null);
-    document.addEventListener('click', dismiss);
-    return () => document.removeEventListener('click', dismiss);
-  }, [activeTooltip]);
-  if (recordingMode === 'idle' && assessmentStatus === 'processing') {
-    return (
-      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
-        <div className="max-w-2xl mx-auto text-center space-y-2">
-          <div className="flex items-center justify-center gap-2">
-            <svg className="w-4 h-4 animate-spin text-gray-500" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-            </svg>
-            <span className="text-sm text-gray-600">Analyzing pronunciation...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (recordingMode === 'idle' && assessmentStatus === 'complete' && assessmentData) {
-    const accuracy = Math.round(assessmentData.overall_accuracy || 0);
-    const flaggedCount = wordAssessmentMap
-      ? [...wordAssessmentMap.values()].filter(a => a.accuracy < 75 && a.type !== 'omission').length
-      : 0;
-    const fluency = assessmentData.azure_fluency_score != null ? Math.round(assessmentData.azure_fluency_score) : null;
-    const prosody = assessmentData.azure_prosody_score != null ? Math.round(assessmentData.azure_prosody_score) : null;
-    const completeness = assessmentData.azure_completeness_score != null ? Math.round(assessmentData.azure_completeness_score) : null;
-
-    const ScoreChip = ({ label, value, tooltipKey }) => (
-      <span className="relative">
-        <button
-          onClick={(e) => { e.stopPropagation(); setActiveTooltip(activeTooltip === tooltipKey ? null : tooltipKey); }}
-          className="text-xs text-gray-600 hover:text-gray-800 tabular-nums"
-        >
-          {label} {value}
-        </button>
-        {activeTooltip === tooltipKey && (
-          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg shadow-md w-52 text-center z-50">
-            {SCORE_DESCRIPTIONS[tooltipKey]?.[l1] || SCORE_DESCRIPTIONS[tooltipKey]?.es}
-          </span>
-        )}
-      </span>
-    );
-
-    return (
-      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-gray-700">
-                Accuracy: {accuracy}%
-              </span>
-              {flaggedCount > 0 && (
-                <span className="text-xs text-gray-500">
-                  {flaggedCount} {flaggedCount === 1 ? 'word' : 'words'} to practice
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onStartRecording}
-                className="text-xs text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors px-2 py-2 min-h-[44px] flex items-center"
-              >
-                Re-record
-              </button>
-              {onStartFresh && (
-                <button
-                  onClick={() => {
-                    if (!confirm(getUILabel('startFreshConfirm', l1))) return;
-                    onStartFresh();
-                  }}
-                  className="text-xs text-red-500 hover:text-red-700 active:text-red-800 transition-colors px-2 py-2 min-h-[44px] flex items-center"
-                >
-                  {getUILabel('startFresh', l1)}
-                </button>
-              )}
-            </div>
-          </div>
-          {(fluency != null || prosody != null || completeness != null) && (
-            <div className="flex items-center gap-3 mt-1">
-              {fluency != null && <ScoreChip label="Fluency" value={fluency} tooltipKey="fluency" />}
-              {prosody != null && <ScoreChip label="Prosody" value={prosody} tooltipKey="prosody" />}
-              {completeness != null && <ScoreChip label="Completeness" value={`${completeness}%`} tooltipKey="completeness" />}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (recordingMode === 'idle' && assessmentStatus === 'error') {
-    return (
-      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
-        <div className="max-w-2xl mx-auto text-center space-y-2">
-          <p className="text-xs text-red-500">{assessmentError || 'Assessment failed'}</p>
-          <div className="flex items-center justify-center gap-3">
-            <button
-              onClick={onRetryAssessment}
-              className="text-xs text-blue-500 hover:text-blue-700 px-2 py-2 min-h-[44px]"
-            >
-              Retry
-            </button>
-            <button
-              onClick={onStartRecording}
-              className="text-xs text-gray-500 hover:text-gray-700 px-2 py-2 min-h-[44px]"
-            >
-              Re-record
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (recordingMode === 'idle' && hasRecording && !assessmentStatus) {
-    return (
-      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
-        <div className="max-w-2xl mx-auto text-center space-y-3">
-          <button
-            onClick={onAnalyze}
-            className="inline-flex items-center gap-2 px-5 py-3 sm:py-2.5 text-sm font-medium bg-gray-900 text-white rounded-full hover:bg-gray-800 active:bg-gray-700 transition-colors"
-          >
-            Analyze pronunciation
-          </button>
-          <div>
-            <button
-              onClick={onStartRecording}
-              className="text-xs text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors"
-            >
-              Re-record instead
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (recordingMode === 'idle') {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
           <p className="text-xs text-gray-500">
-            Read the text aloud. You'll get pronunciation feedback afterward.
+            Read the text aloud. Your recording will be saved for teacher review.
           </p>
           <button
             onClick={onStartRecording}
@@ -216,13 +35,17 @@ export default function RecordReviewStrip({
   }
 
   if (recordingMode === 'recording') {
+    const m = Math.floor(recordingElapsed / 60);
+    const s = Math.floor(recordingElapsed % 60);
+    const elapsed = `${m}:${s.toString().padStart(2, '0')}`;
+
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
           <div className="flex items-center justify-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
             <span className="text-sm font-semibold text-red-900 tabular-nums">
-              {formatElapsed(recordingElapsed)}
+              {elapsed}
             </span>
             <span className="text-xs text-red-400">/ 5:00</span>
           </div>
@@ -245,7 +68,7 @@ export default function RecordReviewStrip({
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
           <p className="text-xs text-gray-500">
-            Review your recording. Save to get pronunciation feedback.
+            Review your recording before saving.
           </p>
           <div className="flex items-center justify-center gap-2">
             <button
@@ -259,7 +82,7 @@ export default function RecordReviewStrip({
               disabled={saving}
               className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors disabled:opacity-50"
             >
-              {saving ? 'Saving...' : 'Save & get feedback'}
+              {saving ? 'Saving...' : 'Save'}
             </button>
             <button
               onClick={onDiscardRecording}

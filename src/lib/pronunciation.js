@@ -1,5 +1,5 @@
 import { tokenizeReference, alignWords } from './alignment';
-import { decodeAudioBlob, encodeWavSlice, detectSentences } from './audioUtils';
+import { decodeAudioBlob, encodeWavSlice, detectSentences, wavFromBlob } from './audioUtils';
 import { cleanToken } from './wordUtils';
 
 const FLAG_THRESHOLD = 75;
@@ -180,7 +180,7 @@ function buildSentenceChunks(sentences, refTokens, minWords) {
   return chunks;
 }
 
-function getWordPositions(text) {
+export function getWordPositions(text) {
   const positions = [];
   const regex = /[a-zA-ZÀ-ÿ'''-]+/g;
   let match;
@@ -191,7 +191,7 @@ function getWordPositions(text) {
   return positions;
 }
 
-function extractChunkText(referenceText, wordPositions, firstWordIdx, lastWordIdx) {
+export function extractChunkText(referenceText, wordPositions, firstWordIdx, lastWordIdx) {
   const first = wordPositions.find(p => p.wordIdx === firstWordIdx);
   const nextAfterLast = wordPositions.find(p => p.wordIdx === lastWordIdx + 1);
   if (!first) return referenceText;
@@ -376,6 +376,51 @@ function accuracyToSeverity(accuracy) {
   if (accuracy < 50) return 4;
   if (accuracy < 65) return 3;
   return 2;
+}
+
+export async function assessSentencePronunciation({ audioBlob, referenceText, firstWordIdx, lastWordIdx, supabase, userId, textId }) {
+  const wavBlob = await wavFromBlob(audioBlob);
+  const tempPath = `${userId}/shadow_${textId}_${Date.now()}.wav`;
+
+  await supabase.storage
+    .from('student-recordings')
+    .upload(tempPath, wavBlob, { contentType: 'audio/wav', upsert: true });
+
+  try {
+    const res = await fetch('/.netlify/functions/assess-pronunciation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storagePath: tempPath, referenceText }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    const map = new Map();
+    const azureRefWords = (data.words || []).filter(w => w.errorType !== 'Insertion');
+    const totalRefWords = lastWordIdx - firstWordIdx + 1;
+
+    for (let i = 0; i < Math.min(azureRefWords.length, totalRefWords); i++) {
+      const w = azureRefWords[i];
+      map.set(firstWordIdx + i, {
+        type: w.errorType === 'Omission' ? 'omission'
+          : w.errorType === 'Mispronunciation' ? 'substitution' : 'match',
+        spokenWord: w.word,
+        accuracy: w.accuracyScore ?? 0,
+        errorType: w.errorType || 'None',
+      });
+    }
+
+    const scores = azureRefWords
+      .filter(w => w.accuracyScore != null && w.errorType !== 'Omission')
+      .map(w => w.accuracyScore);
+    const overallAccuracy = scores.length > 0
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : 0;
+
+    return { map, overallAccuracy };
+  } finally {
+    await supabase.storage.from('student-recordings').remove([tempPath]).catch(() => {});
+  }
 }
 
 function computeOverallAccuracy(alignment, azureData) {

@@ -141,7 +141,8 @@ export default function Layout() {
                       <button
                         key={key}
                         onClick={async () => {
-                          await supabase.from('profiles').update({ text_size: key }).eq('id', user.id);
+                          localStorage.setItem('relato_text_size', key);
+                          supabase.from('profiles').update({ text_size: key }).eq('id', user.id).catch(() => {});
                           await refreshProfile();
                         }}
                         className={`py-1 rounded text-xs font-medium border transition-colors ${

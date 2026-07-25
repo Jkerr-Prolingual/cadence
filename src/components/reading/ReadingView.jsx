@@ -17,7 +17,7 @@ import { cleanToken } from '../../lib/wordUtils';
 import { findCurrentWord, findCurrentSentence, detectSentences, findSentenceForWord } from '../../lib/audioUtils';
 import { completeTaskForText } from '../../lib/assignments';
 import { logFluencySession, getFluencySessionsForText } from '../../lib/fluency';
-import { runPronunciationAssessment, buildWordAssessmentMap } from '../../lib/pronunciation';
+import { runPronunciationAssessment, buildWordAssessmentMap, assessSentencePronunciation, getWordPositions, extractChunkText } from '../../lib/pronunciation';
 import { resetChapterRecording, resetChapterWpm } from '../../lib/resetProgress';
 import { useAuth } from '../../context/AuthContext';
 
@@ -109,6 +109,10 @@ export default function ReadingView() {
   const [wordAssessmentMap, setWordAssessmentMap] = useState(null);
   const [hasRecording, setHasRecording] = useState(false);
 
+  // Shadow read pronunciation feedback (per-sentence, client-side only)
+  const [shadowFeedbackMap, setShadowFeedbackMap] = useState(new Map());
+  const [shadowFeedbackLoading, setShadowFeedbackLoading] = useState(false);
+
   // Timed reading
   const [timedMode, setTimedMode] = useState('idle');
   const [timedStart, setTimedStart] = useState(null);
@@ -156,6 +160,8 @@ export default function ReadingView() {
     setAssessmentData(null);
     setWordAssessmentMap(null);
     setHasRecording(false);
+    setShadowFeedbackMap(new Map());
+    setShadowFeedbackLoading(false);
   }, [selectedTextId]);
 
   // Load existing assessment + recording state when text changes
@@ -639,6 +645,60 @@ export default function ReadingView() {
     setLoopRecordingMode('idle');
   }, [loopSentenceIdx]);
 
+  // ── Shadow read pronunciation feedback ─────────────────────────────────────────
+
+  function buildShadowWordAssessmentMap(feedbackMap) {
+    const combined = new Map();
+    for (const sentenceMap of feedbackMap.values()) {
+      for (const [refIdx, assessment] of sentenceMap) {
+        combined.set(refIdx, assessment);
+      }
+    }
+    return combined;
+  }
+
+  async function handleRequestShadowFeedback() {
+    const sentIdx = loopSentenceIdx;
+    if (sentIdx == null || !loopRecorder.audioBlob || !selectedText?.body) return;
+    const sentence = sentences[sentIdx];
+    if (!sentence) return;
+
+    setShadowFeedbackLoading(true);
+    try {
+      const wordPositions = getWordPositions(selectedText.body);
+      const refText = extractChunkText(selectedText.body, wordPositions, sentence.firstWordIdx, sentence.lastWordIdx);
+      const result = await assessSentencePronunciation({
+        audioBlob: loopRecorder.audioBlob,
+        referenceText: refText,
+        firstWordIdx: sentence.firstWordIdx,
+        lastWordIdx: sentence.lastWordIdx,
+        supabase,
+        userId: user?.id,
+        textId: selectedTextId,
+      });
+
+      setShadowFeedbackMap(prev => {
+        const next = new Map(prev);
+        next.set(sentIdx, result.map);
+        setWordAssessmentMap(buildShadowWordAssessmentMap(next));
+        return next;
+      });
+    } catch (err) {
+      console.error('Shadow feedback error:', err);
+    } finally {
+      setShadowFeedbackLoading(false);
+    }
+  }
+
+  function handleClearShadowFeedback(sentIdx) {
+    setShadowFeedbackMap(prev => {
+      const next = new Map(prev);
+      next.delete(sentIdx);
+      setWordAssessmentMap(next.size > 0 ? buildShadowWordAssessmentMap(next) : null);
+      return next;
+    });
+  }
+
   // ── Timed reading controls ────────────────────────────────────────────────────
 
   function countWords(text) {
@@ -794,6 +854,19 @@ export default function ReadingView() {
           onStartLoopRecording={handleStartLoopRecording}
           onStopLoopRecording={handleStopLoopRecording}
           onPlayLoopRecording={handlePlayLoopRecording}
+          sentenceFeedback={(() => {
+            const accMap = new Map();
+            for (const [sIdx, sentMap] of shadowFeedbackMap) {
+              const scores = [...sentMap.values()]
+                .filter(a => a.accuracy != null && a.type !== 'omission')
+                .map(a => a.accuracy);
+              if (scores.length > 0) accMap.set(sIdx, Math.round(scores.reduce((a, b) => a + b, 0) / scores.length));
+            }
+            return accMap;
+          })()}
+          feedbackLoading={shadowFeedbackLoading}
+          onRequestFeedback={handleRequestShadowFeedback}
+          onClearFeedback={handleClearShadowFeedback}
         />
       );
     }
@@ -811,15 +884,7 @@ export default function ReadingView() {
           saving={saving}
           saveError={saveError}
           recorderError={recorder.error}
-          hasRecording={hasRecording}
-          assessmentStatus={assessmentStatus}
-          assessmentError={assessmentError}
-          assessmentData={assessmentData}
-          onAnalyze={handleAnalyzePronunciation}
-          onRetryAssessment={handleAnalyzePronunciation}
-          wordAssessmentMap={wordAssessmentMap}
           l1={l1}
-          onStartFresh={handleStartFresh}
         />
       );
     }
@@ -917,7 +982,7 @@ export default function ReadingView() {
                 translationMode={translationMode}
                 images={selectedText.images}
                 l1={l1}
-                wordAssessmentMap={toolSet === 'record' ? wordAssessmentMap : null}
+                wordAssessmentMap={(toolSet === 'record' || toolSet === 'shadow') ? wordAssessmentMap : null}
                 textSize={textSize}
               />
 
@@ -1003,7 +1068,7 @@ export default function ReadingView() {
           manifest={bookManifest}
           syntaxGloss={popup.token.syntaxGloss || null}
           l1={l1}
-          assessmentInfo={toolSet === 'record' ? (wordAssessmentMap?.get(popup.token.wordIdx) || null) : null}
+          assessmentInfo={(toolSet === 'record' || toolSet === 'shadow') ? (wordAssessmentMap?.get(popup.token.wordIdx) || null) : null}
         />
       )}
 

@@ -15,6 +15,10 @@ export default function ShadowReadStrip({
   onStartLoopRecording,
   onStopLoopRecording,
   onPlayLoopRecording,
+  sentenceFeedback,
+  feedbackLoading,
+  onRequestFeedback,
+  onClearFeedback,
 }) {
   const totalSentences = sentences?.length || 0;
   const isLooping = loopSentenceIdx != null;
@@ -159,6 +163,64 @@ export default function ShadowReadStrip({
                 </svg>
               </button>
             )}
+
+            {(() => {
+              const hasFeedback = sentenceFeedback?.has(isLooping ? loopSentenceIdx : activeIdx);
+              const acc = hasFeedback ? sentenceFeedback.get(isLooping ? loopSentenceIdx : activeIdx) : null;
+              const chipColor = acc != null
+                ? (acc >= 95 ? 'bg-green-100 text-green-800 border-green-300'
+                  : acc >= 75 ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                  : acc >= 50 ? 'bg-orange-100 text-orange-800 border-orange-300'
+                  : 'bg-red-100 text-red-800 border-red-300')
+                : '';
+
+              if (feedbackLoading) {
+                return (
+                  <span className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center">
+                    <svg className="w-5 h-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  </span>
+                );
+              }
+
+              if (hasFeedback) {
+                return (
+                  <span className="flex items-center gap-1">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full border ${chipColor} tabular-nums`}>
+                      {acc}%
+                    </span>
+                    <button
+                      onClick={() => onClearFeedback(isLooping ? loopSentenceIdx : activeIdx)}
+                      className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                      title="Clear and retry"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5" fill="none">
+                        <path d="M2 2l6 6M8 2l-6 6" />
+                      </svg>
+                    </button>
+                  </span>
+                );
+              }
+
+              if (loopRecordingMode === 'playback' && loopRecorderAudioUrl) {
+                return (
+                  <button
+                    onClick={onRequestFeedback}
+                    className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center rounded-full border-2 border-indigo-300 text-indigo-500 hover:bg-indigo-50 hover:border-indigo-400 active:bg-indigo-100 transition-colors"
+                    title="Get pronunciation feedback"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="8" cy="8" r="7" strokeWidth="1.5" />
+                      <path d="M5 8l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                );
+              }
+
+              return null;
+            })()}
           </div>
         </div>
       </div>
