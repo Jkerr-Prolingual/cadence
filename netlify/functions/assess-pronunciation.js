@@ -45,8 +45,9 @@ export default async (req) => {
 
     const audioBuffer = await fileData.arrayBuffer();
 
+    const cleanRef = referenceText.replace(/[\r\n]+/g, ' ').trim();
     const paConfig = {
-      ReferenceText: referenceText,
+      ReferenceText: cleanRef,
       GradingSystem: 'HundredMark',
       Granularity: 'Word',
       Dimension: 'Comprehensive',
@@ -61,15 +62,16 @@ export default async (req) => {
       `https://${azureRegion}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1` +
       `?language=en-US&format=detailed`;
 
+    const audioBody = Buffer.from(audioBuffer);
     const azureRes = await fetch(azureUrl, {
       method: 'POST',
       headers: {
         'Ocp-Apim-Subscription-Key': azureKey,
-        'Content-Type': 'audio/wav',
+        'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
         'Pronunciation-Assessment': paHeaderValue,
         Accept: 'application/json',
       },
-      body: audioBuffer,
+      body: audioBody,
     });
 
     if (!azureRes.ok) {
@@ -78,8 +80,11 @@ export default async (req) => {
     }
 
     const result = await azureRes.json();
-    console.log('[assess-pronunciation] Azure raw response:', JSON.stringify(result).substring(0, 2000));
-    console.log('[assess-pronunciation] Audio size:', audioBuffer.byteLength, 'Reference:', referenceText);
+    console.log('[assess-pronunciation] Azure raw response:', JSON.stringify(result).substring(0, 3000));
+    console.log('[assess-pronunciation] Audio size:', audioBody.byteLength, 'Reference:', cleanRef);
+    const nBest0 = result.NBest?.[0];
+    console.log('[assess-pronunciation] NBest[0] keys:', nBest0 ? Object.keys(nBest0) : 'NO_NBEST');
+    console.log('[assess-pronunciation] First word:', nBest0?.Words?.[0] ? JSON.stringify(nBest0.Words[0]) : 'NO_WORDS');
 
     const nBest = result.NBest?.[0];
     if (!nBest) {
