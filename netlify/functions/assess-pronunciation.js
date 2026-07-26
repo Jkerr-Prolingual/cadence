@@ -75,6 +75,8 @@ export default async (req) => {
     }
 
     const result = await azureRes.json();
+    console.log('[assess-pronunciation] Azure raw response:', JSON.stringify(result).substring(0, 2000));
+    console.log('[assess-pronunciation] Audio size:', audioBuffer.byteLength, 'Reference:', referenceText);
 
     const nBest = result.NBest?.[0];
     if (!nBest) {

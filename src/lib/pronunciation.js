@@ -379,7 +379,10 @@ function accuracyToSeverity(accuracy) {
 }
 
 export async function assessSentencePronunciation({ audioBlob, referenceText, firstWordIdx, lastWordIdx, supabase, userId, textId }) {
+  console.log('[shadow-feedback] audioBlob size:', audioBlob.size, 'type:', audioBlob.type);
+  console.log('[shadow-feedback] referenceText:', JSON.stringify(referenceText));
   const wavBlob = await wavFromBlob(audioBlob);
+  console.log('[shadow-feedback] wavBlob size:', wavBlob.size);
   const tempPath = `${userId}/shadow_${textId}_${Date.now()}.wav`;
 
   await supabase.storage
@@ -393,6 +396,7 @@ export async function assessSentencePronunciation({ audioBlob, referenceText, fi
       body: JSON.stringify({ storagePath: tempPath, referenceText }),
     });
     const data = await res.json();
+    console.log('[shadow-feedback] Azure response:', JSON.stringify(data));
     if (data.error) throw new Error(data.error);
 
     const map = new Map();
