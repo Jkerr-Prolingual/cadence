@@ -52,7 +52,10 @@ export default async (req) => {
       Dimension: 'Comprehensive',
       EnableMiscue: true,
     };
-    const paHeaderValue = btoa(JSON.stringify(paConfig));
+    const paJson = JSON.stringify(paConfig);
+    const paHeaderValue = Buffer.from(paJson, 'utf-8').toString('base64');
+    console.log('[assess-pronunciation] PA header JSON:', paJson);
+    console.log('[assess-pronunciation] PA header base64:', paHeaderValue);
 
     const azureUrl =
       `https://${azureRegion}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1` +
