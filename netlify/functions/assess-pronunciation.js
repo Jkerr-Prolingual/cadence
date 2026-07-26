@@ -59,7 +59,7 @@ export default async (req) => {
 
     const azureUrl =
       `https://${azureRegion}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1` +
-      `?language=en-US`;
+      `?language=en-US&format=detailed`;
 
     const azureRes = await fetch(azureUrl, {
       method: 'POST',
