@@ -66,7 +66,6 @@ export default function ReadingView() {
   const [encounters, setEncounters] = useState({});
   const [bookManifest, setBookManifest] = useState(null);
   const [syntaxGlosses, setSyntaxGlosses] = useState(null);
-  const [translationMode, setTranslationMode] = useState(false);
   const [showStructures, setShowStructures] = useState(false);
   const [checklistKey, setChecklistKey] = useState(0);
   const selectedTextIdRef = useRef(selectedTextId);
@@ -188,11 +187,7 @@ export default function ReadingView() {
 
       setHasRecording(!!rec);
 
-      if (assessment) {
-        setAssessmentData(assessment);
-        setWordAssessmentMap(buildWordAssessmentMap(assessment, sentences));
-        setAssessmentStatus('complete');
-      } else if (rec) {
+      if (rec) {
         setAssessmentStatus(rec.assessment_status || null);
         setAssessmentError(rec.assessment_error || null);
       }
@@ -954,16 +949,9 @@ export default function ReadingView() {
                 </div>
                 <ToolSetSelector
                   active={toolSet}
-                  onSelect={(id) => {
-                    if (id === 'translate') {
-                      setTranslationMode(m => !m);
-                    } else {
-                      setToolSet(id);
-                    }
-                  }}
+                  onSelect={(id) => setToolSet(id)}
                   hasAudio={hasAudio}
                   hasSyntaxGlosses={hasSyntaxGlosses}
-                  translationMode={translationMode}
                   l1={l1}
                 />
               </div>
@@ -979,7 +967,7 @@ export default function ReadingView() {
                 manifest={bookManifest}
                 showStructures={showStructures}
                 syntaxGlosses={chapterGlosses}
-                translationMode={translationMode}
+                translationMode={toolSet === 'translate'}
                 images={selectedText.images}
                 l1={l1}
                 wordAssessmentMap={(toolSet === 'record' || toolSet === 'shadow') ? wordAssessmentMap : null}

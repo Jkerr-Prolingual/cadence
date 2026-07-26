@@ -81,7 +81,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   }, [position, view, structureDrillDown, syntaxGloss]);
 
   const l1Dict = getL1Dict(l1);
-  const l1Label = getL1Label(l1);
+  const l1Label = l1 === 'en' ? getL1Label('es') : getL1Label(l1);
   const lookupKey = lemma || word.toLowerCase();
   const morphLemma = lemmaMap[word.toLowerCase()];
   const manifestEntry = manifest?.entries?.[lookupKey] || manifest?.entries?.[word.toLowerCase()] || (morphLemma && manifest?.entries?.[morphLemma]);

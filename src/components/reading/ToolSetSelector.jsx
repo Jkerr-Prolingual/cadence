@@ -48,7 +48,7 @@ const ICONS = {
   ),
 };
 
-export default function ToolSetSelector({ active, onSelect, hasAudio, hasSyntaxGlosses, translationMode, l1 }) {
+export default function ToolSetSelector({ active, onSelect, hasAudio, hasSyntaxGlosses, l1 }) {
   const available = TOOL_SETS.filter(t => {
     if (t.id === 'translate') return hasSyntaxGlosses;
     if (!hasAudio) return t.id === 'timed';
@@ -60,7 +60,7 @@ export default function ToolSetSelector({ active, onSelect, hasAudio, hasSyntaxG
   return (
     <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
       {available.map(tool => {
-        const isActive = tool.id === 'translate' ? translationMode : active === tool.id;
+        const isActive = active === tool.id;
         const label = getUILabel(tool.labelKey, l1);
         return (
           <button
