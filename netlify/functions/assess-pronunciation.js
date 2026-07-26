@@ -98,15 +98,16 @@ export default async (req) => {
 
     const words = (nBest.Words || []).map((w) => ({
       word: w.Word,
-      accuracyScore: w.PronunciationAssessment?.AccuracyScore ?? null,
-      errorType: w.PronunciationAssessment?.ErrorType ?? 'None',
+      accuracyScore: w.PronunciationAssessment?.AccuracyScore ?? w.AccuracyScore ?? null,
+      errorType: w.PronunciationAssessment?.ErrorType ?? w.ErrorType ?? 'None',
     }));
 
+    const pa = nBest.PronunciationAssessment || {};
     return Response.json({
       words,
-      fluencyScore: nBest.PronunciationAssessment?.FluencyScore ?? null,
-      prosodyScore: nBest.PronunciationAssessment?.ProsodyScore ?? null,
-      completenessScore: nBest.PronunciationAssessment?.CompletenessScore ?? null,
+      fluencyScore: pa.FluencyScore ?? nBest.FluencyScore ?? null,
+      prosodyScore: pa.ProsodyScore ?? nBest.ProsodyScore ?? null,
+      completenessScore: pa.CompletenessScore ?? nBest.CompletenessScore ?? null,
     });
   } catch (err) {
     return Response.json({ error: err.message }, { status: 500 });
