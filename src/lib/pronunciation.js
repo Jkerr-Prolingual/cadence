@@ -2,7 +2,7 @@ import { tokenizeReference, alignWords } from './alignment';
 import { decodeAudioBlob, encodeWavSlice, detectSentences, wavFromBlob } from './audioUtils';
 import { cleanToken } from './wordUtils';
 
-const FLAG_THRESHOLD = 75;
+const FLAG_THRESHOLD = 70;
 const PAUSE_THRESHOLD_MS = 1000;
 const CHUNK_MIN_WORDS = 15;
 const AUDIO_BUFFER_SEC = 0.3;
@@ -411,6 +411,7 @@ export async function assessSentencePronunciation({ audioBlob, referenceText, fi
         spokenWord: w.word,
         accuracy: w.accuracyScore ?? 0,
         errorType: w.errorType || 'None',
+        phonemes: w.phonemes || [],
       });
     }
 

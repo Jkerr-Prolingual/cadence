@@ -49,7 +49,8 @@ export default async (req) => {
     const paConfig = {
       ReferenceText: cleanRef,
       GradingSystem: 'HundredMark',
-      Granularity: 'Word',
+      Granularity: 'Phoneme',
+      PhonemeAlphabet: 'IPA',
       Dimension: 'Comprehensive',
       EnableMiscue: true,
     };
@@ -100,6 +101,10 @@ export default async (req) => {
       word: w.Word,
       accuracyScore: w.PronunciationAssessment?.AccuracyScore ?? w.AccuracyScore ?? null,
       errorType: w.PronunciationAssessment?.ErrorType ?? w.ErrorType ?? 'None',
+      phonemes: (w.Phonemes || []).map((p) => ({
+        phoneme: p.Phoneme,
+        accuracyScore: p.PronunciationAssessment?.AccuracyScore ?? p.AccuracyScore ?? null,
+      })),
     }));
 
     const pa = nBest.PronunciationAssessment || {};

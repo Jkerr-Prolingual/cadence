@@ -1057,6 +1057,7 @@ export default function ReadingView() {
           syntaxGloss={popup.token.syntaxGloss || null}
           l1={l1}
           assessmentInfo={(toolSet === 'record' || toolSet === 'shadow') ? (wordAssessmentMap?.get(popup.token.wordIdx) || null) : null}
+          toolSet={toolSet}
         />
       )}
 

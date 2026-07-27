@@ -5,6 +5,8 @@ import { egpLookup } from '../../data/egpLookup';
 import { egpL1Overlays } from '../../data/egpL1Overlays';
 import { getL1Dict, getManifestTranslation, getManifestConstituents, getGlossTranslation, getGlossConstituents } from '../../lib/translations';
 import { getL1Label } from '../../lib/locales';
+import { lookupPhoneme } from '../../data/ipaPhonemes';
+import MouthDiagram from './MouthDiagram';
 
 function speakWord(text) {
   if ('speechSynthesis' in window) {
@@ -31,15 +33,17 @@ function SpeakButton({ text }) {
   );
 }
 
-export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss, l1 = 'es', assessmentInfo = null }) {
+export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss, l1 = 'es', assessmentInfo = null, toolSet = null }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
   const [view, setView] = useState(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
   const [structureDrillDown, setStructureDrillDown] = useState(false);
+  const [activePhoneme, setActivePhoneme] = useState(null);
 
   useEffect(() => {
     setView(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
     setStructureDrillDown(false);
+    setActivePhoneme(null);
   }, [word, particle, structure, syntaxGloss]);
 
   useEffect(() => {
@@ -78,7 +82,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     }
     if (y < pad) y = pad;
     setAdjusted({ x, y });
-  }, [position, view, structureDrillDown, syntaxGloss]);
+  }, [position, view, structureDrillDown, syntaxGloss, activePhoneme]);
 
   const l1Dict = getL1Dict(l1);
   const l1Label = l1 === 'en' ? getL1Label('es') : getL1Label(l1);
@@ -413,31 +417,42 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
       className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-[calc(100vw-16px)] sm:w-80 overflow-y-auto"
       style={{ left: `${adjusted.x}px`, top: `${adjusted.y}px`, maxHeight: 'calc(100vh - 16px)' }}
     >
-      {view === 'gloss' && renderGlossView()}
-      {view === 'gloss-constituents' && renderGlossConstituentsView()}
-      {view === 'particle' && renderParticleView()}
-      {view === 'structure' && renderStructureView()}
-      {view === 'word' && renderWordView()}
+      {!(toolSet === 'shadow' && assessmentInfo) && (
+        <>
+          {view === 'gloss' && renderGlossView()}
+          {view === 'gloss-constituents' && renderGlossConstituentsView()}
+          {view === 'particle' && renderParticleView()}
+          {view === 'structure' && renderStructureView()}
+          {view === 'word' && renderWordView()}
+        </>
+      )}
 
       {assessmentInfo && (
-        <div className="mt-2 pt-2 border-t border-gray-100">
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pronunciation</span>
+        <div className={toolSet === 'shadow' ? '' : 'mt-2 pt-2 border-t border-gray-100'}>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pronunciation</span>
+            {toolSet === 'shadow' && (
+              <span className="text-sm font-semibold text-gray-800">{word}</span>
+            )}
+          </div>
           {assessmentInfo.type === 'omission' ? (
             <p className="text-sm text-red-600 mt-1">Skipped</p>
-          ) : assessmentInfo.type === 'substitution' ? (
+          ) : (
             <div className="mt-1">
-              <p className="text-sm text-orange-600">
-                You said: <strong>{assessmentInfo.spokenWord}</strong>
-              </p>
+              {assessmentInfo.type === 'substitution' && (
+                <p className="text-sm text-orange-600 mb-1">
+                  You said: <strong>{assessmentInfo.spokenWord}</strong>
+                </p>
+              )}
               {assessmentInfo.accuracy != null && (
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full"
                       style={{
                         width: `${assessmentInfo.accuracy}%`,
-                        backgroundColor: assessmentInfo.accuracy >= 95 ? '#22c55e'
-                          : assessmentInfo.accuracy >= 75 ? '#eab308'
+                        backgroundColor: assessmentInfo.accuracy >= 90 ? '#22c55e'
+                          : assessmentInfo.accuracy >= 70 ? '#eab308'
                           : assessmentInfo.accuracy >= 50 ? '#f97316' : '#ef4444',
                       }}
                     />
@@ -445,23 +460,69 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                   <span className="text-xs text-gray-600 tabular-nums">{Math.round(assessmentInfo.accuracy)}%</span>
                 </div>
               )}
+              {assessmentInfo.phonemes?.length > 0 && (
+                <>
+                  <div className="flex flex-wrap gap-x-0.5 gap-y-1 mt-1.5">
+                    {assessmentInfo.phonemes.map((p, i) => (
+                      <button
+                        key={i}
+                        onClick={(e) => { e.stopPropagation(); setActivePhoneme(activePhoneme === i ? null : i); }}
+                        className="text-base font-mono leading-none px-1 py-0.5 rounded cursor-pointer transition-all"
+                        style={{
+                          color: p.accuracyScore == null ? '#6b7280'
+                            : p.accuracyScore >= 90 ? '#16a34a'
+                            : p.accuracyScore >= 70 ? '#ca8a04'
+                            : p.accuracyScore >= 50 ? '#ea580c' : '#dc2626',
+                          backgroundColor: p.accuracyScore == null ? 'transparent'
+                            : p.accuracyScore >= 90 ? '#f0fdf4'
+                            : p.accuracyScore >= 70 ? '#fefce8'
+                            : p.accuracyScore >= 50 ? '#fff7ed' : '#fef2f2',
+                          outline: activePhoneme === i ? '2px solid #3b82f6' : 'none',
+                          outlineOffset: '1px',
+                        }}
+                        aria-label={`${p.phoneme}: ${p.accuracyScore != null ? Math.round(p.accuracyScore) + '%' : 'no score'}`}
+                      >
+                        {p.phoneme}
+                      </button>
+                    ))}
+                  </div>
+                  {activePhoneme != null && assessmentInfo.phonemes[activePhoneme] && (() => {
+                    const p = assessmentInfo.phonemes[activePhoneme];
+                    const pd = lookupPhoneme(p.phoneme);
+                    const accColor = p.accuracyScore == null ? '#6b7280'
+                      : p.accuracyScore >= 90 ? '#16a34a'
+                      : p.accuracyScore >= 70 ? '#ca8a04'
+                      : p.accuracyScore >= 50 ? '#ea580c' : '#dc2626';
+                    return (
+                      <div className="mt-2 p-2.5 bg-gray-50 rounded-lg border border-gray-100">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-2xl font-mono" style={{ color: accColor }}>/{p.phoneme}/</span>
+                          {p.accuracyScore != null && (
+                            <span className="text-sm font-semibold tabular-nums" style={{ color: accColor }}>
+                              {Math.round(p.accuracyScore)}%
+                            </span>
+                          )}
+                          {pd?.example && <SpeakButton text={pd.example} />}
+                        </div>
+                        {pd ? (
+                          <>
+                            <MouthDiagram phonemeData={pd} />
+                            <p className="text-sm text-gray-700 mt-2 leading-snug">{pd.instruction}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              As in: <strong>{pd.example}</strong>{' '}
+                              <span className="text-gray-400">({pd.exampleHighlight})</span>
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">No articulation guide for this sound.</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
             </div>
-          ) : assessmentInfo.accuracy != null ? (
-            <div className="flex items-center gap-2 mt-1">
-              <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${assessmentInfo.accuracy}%`,
-                    backgroundColor: assessmentInfo.accuracy >= 95 ? '#22c55e'
-                      : assessmentInfo.accuracy >= 75 ? '#eab308'
-                      : assessmentInfo.accuracy >= 50 ? '#f97316' : '#ef4444',
-                  }}
-                />
-              </div>
-              <span className="text-xs text-gray-600 tabular-nums">{Math.round(assessmentInfo.accuracy)}%</span>
-            </div>
-          ) : null}
+          )}
           {assessmentInfo.pauseMs && (
             <p className="text-xs text-gray-500 mt-1">Pause {(assessmentInfo.pauseMs / 1000).toFixed(1)}s</p>
           )}
