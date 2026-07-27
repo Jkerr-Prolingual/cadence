@@ -1,169 +1,152 @@
-const ZONE_PATHS = {
-  bilabial: { d: 'M28,82 Q24,78 24,74 Q24,70 28,67 L32,67 Q36,70 36,74 Q36,78 32,82 Z', label: 'Lips', lx: 14, ly: 75 },
-  labiodental: { d: 'M36,68 L44,64 L44,68 L36,72 Z', label: 'Lip+Teeth', lx: 10, ly: 62 },
-  dental: { d: 'M44,62 L54,58 L54,64 L44,68 Z', label: 'Teeth', lx: 40, ly: 54 },
-  alveolar: { d: 'M54,56 Q62,50 68,48 L68,54 Q62,56 54,62 Z', label: 'Ridge', lx: 54, ly: 44 },
-  postalveolar: { d: 'M68,46 Q76,42 82,40 L82,46 Q76,48 68,52 Z', label: 'Behind ridge', lx: 68, ly: 36 },
-  palatal: { d: 'M82,38 Q92,34 102,34 L102,40 Q92,40 82,44 Z', label: 'Hard palate', lx: 82, ly: 30 },
-  velar: { d: 'M102,34 Q116,34 126,40 L126,46 Q116,40 102,40 Z', label: 'Soft palate', lx: 104, ly: 28 },
-  glottal: { d: 'M134,80 Q138,74 138,68 Q138,62 134,56 L140,56 Q144,62 144,68 Q144,74 140,80 Z', label: 'Throat', lx: 142, ly: 68 },
+const LIP_SHAPES = {
+  spread:   { upper: 'M30,58 Q75,48 120,58', lower: 'M30,62 Q75,82 120,62', outerTop: 'M26,56 Q75,44 124,56', outerBot: 'M26,64 Q75,88 124,64' },
+  open:     { upper: 'M30,56 Q75,50 120,56', lower: 'M30,64 Q75,84 120,64', outerTop: 'M26,54 Q75,46 124,54', outerBot: 'M26,66 Q75,90 124,66' },
+  rounded:  { upper: 'M42,56 Q75,50 108,56', lower: 'M42,64 Q75,80 108,64', outerTop: 'M38,54 Q75,46 112,54', outerBot: 'M38,66 Q75,84 112,66' },
+  together: { upper: 'M42,58 Q75,54 108,58', lower: 'M42,62 Q75,68 108,62', outerTop: 'M38,56 Q75,50 112,56', outerBot: 'M38,64 Q75,72 112,64' },
 };
 
-const TONGUE_PATHS = {
-  'neutral':            'M42,100 Q60,88 80,84 Q100,80 120,82 Q130,84 136,90',
-  'tip-to-ridge':       'M42,100 Q48,80 58,68 Q64,58 68,54 Q80,60 100,78 Q120,82 136,90',
-  'tip-near-ridge':     'M42,100 Q50,82 60,72 Q66,62 70,60 Q82,64 100,78 Q120,82 136,90',
-  'tip-between-teeth':  'M42,100 Q44,86 46,78 Q48,72 44,66 Q60,70 90,80 Q115,82 136,90',
-  'tip-curled-back':    'M42,100 Q52,82 64,72 Q72,66 76,62 Q74,58 70,56 Q90,68 110,80 Q125,84 136,90',
-  'blade-behind-ridge': 'M42,100 Q54,82 66,70 Q74,58 80,50 Q90,56 105,74 Q120,82 136,90',
-  'back-raised':        'M42,100 Q58,90 76,86 Q96,76 112,58 Q120,46 126,42 Q132,56 136,90',
-  'body-to-palate':     'M42,100 Q56,86 72,76 Q88,58 98,44 Q106,38 112,42 Q124,60 136,90',
-  'high-front':         'M42,100 Q48,78 56,66 Q64,56 72,52 Q84,54 100,72 Q120,82 136,90',
-  'mid-front':          'M42,100 Q52,84 64,74 Q74,66 80,64 Q92,68 106,78 Q122,84 136,90',
-  'low-front':          'M42,100 Q56,90 68,84 Q78,80 84,80 Q96,80 108,82 Q124,86 136,90',
-  'high-central':       'M42,100 Q56,84 72,70 Q84,56 92,50 Q100,52 112,64 Q126,80 136,90',
-  'mid-central':        'M42,100 Q58,86 76,78 Q90,72 98,70 Q106,72 116,78 Q128,84 136,90',
-  'low-central':        'M42,100 Q60,92 78,88 Q92,86 100,86 Q108,86 118,88 Q130,90 136,92',
-  'high-back':          'M42,100 Q58,90 76,86 Q92,82 106,70 Q116,56 124,50 Q130,58 136,90',
-  'mid-back':           'M42,100 Q58,90 76,86 Q92,82 106,76 Q116,68 124,64 Q132,72 136,90',
-  'low-back':           'M42,100 Q60,92 78,88 Q94,86 108,84 Q118,80 126,78 Q134,84 136,92',
+const TEETH_VISIBILITY = {
+  bilabial: false,
+  labiodental: 'upper',
+  dental: 'both',
+  alveolar: 'upper',
+  postalveolar: 'upper',
+  palatal: false,
+  velar: false,
+  glottal: false,
 };
 
-const VOWEL_POSITIONS = {
-  'high-front':   { cx: 64, cy: 56 },
-  'high-central': { cx: 90, cy: 52 },
-  'high-back':    { cx: 118, cy: 54 },
-  'mid-front':    { cx: 72, cy: 68 },
-  'mid-central':  { cx: 94, cy: 72 },
-  'mid-back':     { cx: 116, cy: 68 },
-  'low-front':    { cx: 78, cy: 82 },
-  'low-central':  { cx: 96, cy: 86 },
-  'low-back':     { cx: 116, cy: 82 },
+const TONGUE_CONFIGS = {
+  'neutral':            { visible: false },
+  'tip-to-ridge':       { visible: true, path: 'M50,72 Q65,62 75,58 Q85,62 100,72', label: 'Tongue tip touches the ridge behind your teeth' },
+  'tip-near-ridge':     { visible: true, path: 'M50,72 Q65,64 75,60 Q85,64 100,72', label: 'Tongue tip near the ridge' },
+  'tip-between-teeth':  { visible: true, path: 'M55,66 Q70,54 75,50 Q80,54 95,66', label: 'Tongue tip peeks between teeth', tipVisible: true },
+  'tip-curled-back':    { visible: true, path: 'M50,72 Q65,64 72,60 Q75,58 78,60 Q85,64 100,72', label: 'Tongue tip curled back' },
+  'blade-behind-ridge': { visible: true, path: 'M48,72 Q62,62 75,56 Q88,62 102,72', label: 'Tongue blade raised' },
+  'back-raised':        { visible: true, path: 'M55,72 Q68,70 75,68 Q82,66 95,60', label: 'Back of tongue raised' },
+  'body-to-palate':     { visible: true, path: 'M50,72 Q65,62 75,56 Q85,62 100,72', label: 'Tongue body raised to palate' },
+  'high-front':         { visible: true, path: 'M48,72 Q60,60 75,58 Q90,62 102,72', label: 'Tongue high and forward' },
+  'mid-front':          { visible: true, path: 'M50,72 Q62,64 75,62 Q88,64 100,72', label: 'Tongue mid-height, forward' },
+  'low-front':          { visible: false },
+  'high-central':       { visible: true, path: 'M50,72 Q65,60 75,56 Q85,60 100,72', label: 'Tongue high and centered' },
+  'mid-central':        { visible: false },
+  'low-central':        { visible: false },
+  'high-back':          { visible: true, path: 'M55,72 Q68,70 75,66 Q82,60 95,56', label: 'Tongue high and back' },
+  'mid-back':           { visible: true, path: 'M55,72 Q68,70 75,68 Q82,64 95,62', label: 'Tongue mid-height, back' },
+  'low-back':           { visible: false },
 };
 
-function getDiphthongPositions(tongue) {
-  const parts = tongue.split('-to-');
-  if (parts.length !== 2) return null;
-  const from = VOWEL_POSITIONS[parts[0]];
-  const to = VOWEL_POSITIONS[parts[1]];
-  if (!from || !to) return null;
-  return { from, to };
-}
+const ZONE_LABELS = {
+  bilabial:      'Both lips press together',
+  labiodental:   'Lower lip touches upper teeth',
+  dental:        'Tongue tip between or near teeth',
+  alveolar:      'Tongue tip at the ridge behind teeth',
+  postalveolar:  'Tongue blade behind the ridge',
+  palatal:       'Tongue body near the roof of mouth',
+  velar:         'Back of tongue at the soft palate',
+  glottal:       'Air from the throat',
+};
 
 export default function MouthDiagram({ phonemeData }) {
   if (!phonemeData) return null;
 
   const { type, zone, tongue, lips } = phonemeData;
-  const tonguePath = TONGUE_PATHS[tongue] || TONGUE_PATHS['neutral'];
-  const activeZone = zone && ZONE_PATHS[zone] ? zone : null;
+  const lipShape = LIP_SHAPES[lips] || LIP_SHAPES['open'];
+  const teethMode = zone ? TEETH_VISIBILITY[zone] : (type === 'vowel' ? false : false);
+  const tongueConfig = TONGUE_CONFIGS[tongue] || TONGUE_CONFIGS['neutral'];
+  const zoneLabel = zone ? ZONE_LABELS[zone] : null;
 
-  const isRounded = lips === 'rounded' || lips === 'together';
-  const lipGap = isRounded ? 3 : 8;
-
-  let vowelDot = null;
-  let diphthongArrow = null;
-  if (type === 'vowel' && tongue && VOWEL_POSITIONS[tongue]) {
-    vowelDot = VOWEL_POSITIONS[tongue];
-  } else if (type === 'diphthong' && tongue) {
-    diphthongArrow = getDiphthongPositions(tongue);
-  }
+  const showTeethTop = teethMode === 'upper' || teethMode === 'both';
+  const showTeethBot = teethMode === 'both';
 
   return (
-    <svg viewBox="0 0 170 130" width="160" height="124" className="mx-auto" aria-hidden="true">
-      {/* Head profile outline */}
-      <path
-        d="M60,10 Q50,10 44,16 L38,26 Q34,32 30,36 L26,40 Q22,44 22,50
-           L22,60 Q22,66 26,70 L28,72
-           Q24,72 24,74 Q24,76 28,78 L28,80 Q24,80 24,82
-           Q24,86 30,88 L36,88
-           Q34,92 34,96 Q34,102 40,108 L46,112
-           Q54,116 64,118 L70,118"
-        fill="none" stroke="#d1d5db" strokeWidth="1.5"
-      />
-      {/* Upper palate + alveolar ridge */}
-      <path
-        d="M44,64 Q48,60 54,58 Q62,54 68,52 Q76,48 82,46
-           Q92,40 102,38 Q112,36 122,38 Q130,40 134,46"
-        fill="none" stroke="#9ca3af" strokeWidth="1.5"
-      />
-      {/* Soft palate / velum */}
-      <path
-        d="M122,38 Q130,40 134,46 Q138,54 138,62 L138,80"
-        fill="none" stroke="#9ca3af" strokeWidth="1.2" strokeDasharray="3,2"
-      />
-      {/* Upper teeth */}
-      <line x1="44" y1="64" x2="44" y2="70" stroke="#9ca3af" strokeWidth="2" />
-      {/* Lower teeth */}
-      <line x1="42" y1="96" x2="42" y2="102" stroke="#9ca3af" strokeWidth="2" />
-      {/* Lower jaw */}
-      <path
-        d="M42,102 Q46,108 54,112 Q64,116 70,118"
-        fill="none" stroke="#d1d5db" strokeWidth="1.5"
-      />
-      {/* Lip markers */}
-      <circle cx="30" cy={74 - lipGap / 2} r="2.5" fill="#d1d5db" />
-      <circle cx="30" cy={74 + lipGap / 2 + 4} r="2.5" fill="#d1d5db" />
+    <div className="w-full">
+      <svg viewBox="0 0 150 110" className="w-full max-w-[280px] mx-auto" aria-hidden="true">
+        {/* Face outline - cheeks and jaw */}
+        <ellipse cx="75" cy="52" rx="68" ry="50" fill="#fef3c7" fillOpacity="0.3" stroke="#e5e7eb" strokeWidth="1" />
 
-      {/* Zone highlight */}
-      {activeZone && (
+        {/* Nose hint */}
+        <path d="M68,18 Q75,22 82,18" fill="none" stroke="#d1d5db" strokeWidth="1.2" strokeLinecap="round" />
+
+        {/* Lip outer shape */}
+        <path d={lipShape.outerTop} fill="#fca5a5" fillOpacity="0.4" stroke="none" />
+        <path d={lipShape.outerBot} fill="#fca5a5" fillOpacity="0.4" stroke="none" />
+
+        {/* Lip lines */}
+        <path d={lipShape.upper} fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+        <path d={lipShape.lower} fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+
+        {/* Mouth interior */}
         <path
-          d={ZONE_PATHS[activeZone].d}
-          fill="#3b82f6" fillOpacity="0.25"
-          stroke="#3b82f6" strokeWidth="1.5"
+          d={`${lipShape.upper} L120,60 Q75,60 30,60 Z`}
+          fill="#1f2937" fillOpacity="0.08"
         />
-      )}
-
-      {/* Zone label */}
-      {activeZone && (
-        <text
-          x={ZONE_PATHS[activeZone].lx} y={ZONE_PATHS[activeZone].ly}
-          fontSize="7" fill="#3b82f6" fontWeight="600" textAnchor="end"
-        >
-          {ZONE_PATHS[activeZone].label}
-        </text>
-      )}
-
-      {/* Tongue */}
-      <path
-        d={tonguePath}
-        fill="#fca5a5" fillOpacity="0.5"
-        stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round"
-      />
-
-      {/* Vowel position dot */}
-      {vowelDot && (
-        <circle cx={vowelDot.cx} cy={vowelDot.cy} r="5"
-          fill="#3b82f6" fillOpacity="0.3" stroke="#3b82f6" strokeWidth="1.5"
+        <path
+          d={`${lipShape.lower} L120,60 Q75,60 30,60 Z`}
+          fill="#1f2937" fillOpacity="0.12"
         />
-      )}
 
-      {/* Diphthong arrow */}
-      {diphthongArrow && (
-        <>
-          <defs>
-            <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-              <polygon points="0 0, 6 2, 0 4" fill="#3b82f6" />
-            </marker>
-          </defs>
-          <circle cx={diphthongArrow.from.cx} cy={diphthongArrow.from.cy} r="4"
-            fill="#3b82f6" fillOpacity="0.2" stroke="#3b82f6" strokeWidth="1"
-          />
-          <line
-            x1={diphthongArrow.from.cx} y1={diphthongArrow.from.cy}
-            x2={diphthongArrow.to.cx} y2={diphthongArrow.to.cy}
-            stroke="#3b82f6" strokeWidth="1.5" markerEnd="url(#arrowhead)"
-          />
-        </>
-      )}
+        {/* Upper teeth */}
+        {showTeethTop && (
+          <g>
+            {[38, 48, 58, 66, 74, 82, 90, 98, 108].map((x, i) => (
+              <rect key={i} x={x} y="54" width="7" height="6" rx="1"
+                fill="white" stroke="#d1d5db" strokeWidth="0.5"
+              />
+            ))}
+          </g>
+        )}
 
-      {/* Inactive zone labels (faint) */}
-      {!activeZone && Object.entries(ZONE_PATHS).map(([key, z]) => (
-        <text key={key} x={z.lx} y={z.ly}
-          fontSize="6" fill="#d1d5db" textAnchor="end"
-        >
-          {z.label}
-        </text>
-      ))}
-    </svg>
+        {/* Lower teeth */}
+        {showTeethBot && (
+          <g>
+            {[40, 50, 59, 67, 75, 83, 91, 100].map((x, i) => (
+              <rect key={i} x={x} y="62" width="7" height="5" rx="1"
+                fill="white" stroke="#d1d5db" strokeWidth="0.5"
+              />
+            ))}
+          </g>
+        )}
+
+        {/* Tongue */}
+        {tongueConfig.visible && tongueConfig.path && (
+          <path d={tongueConfig.path}
+            fill="#f87171" fillOpacity="0.5" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round"
+          />
+        )}
+
+        {/* Tongue tip peeking between teeth (dental) */}
+        {tongueConfig.tipVisible && (
+          <ellipse cx="75" cy="54" rx="8" ry="4" fill="#f87171" fillOpacity="0.6" stroke="#ef4444" strokeWidth="1" />
+        )}
+
+        {/* Zone highlight indicators */}
+        {zone === 'bilabial' && (
+          <>
+            <circle cx="30" cy="60" r="4" fill="#3b82f6" fillOpacity="0.3" stroke="#3b82f6" strokeWidth="1.5" />
+            <circle cx="120" cy="60" r="4" fill="#3b82f6" fillOpacity="0.3" stroke="#3b82f6" strokeWidth="1.5" />
+          </>
+        )}
+        {zone === 'labiodental' && (
+          <>
+            <line x1="35" y1="62" x2="45" y2="58" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" />
+            <line x1="105" y1="62" x2="115" y2="58" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" />
+          </>
+        )}
+        {(zone === 'dental' || zone === 'alveolar' || zone === 'postalveolar') && (
+          <circle cx="75" cy="56" r="10" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="3,2" />
+        )}
+        {zone === 'glottal' && (
+          <path d="M65,90 Q75,85 85,90" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" />
+        )}
+      </svg>
+
+      {/* Zone / tongue label below diagram */}
+      {(zoneLabel || tongueConfig.label) && (
+        <p className="text-xs text-blue-600 text-center mt-1 leading-tight">
+          {zoneLabel || tongueConfig.label}
+        </p>
+      )}
+    </div>
   );
 }

@@ -65,8 +65,28 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     };
   }, [onClose]);
 
+  const isShadowSheet = toolSet === 'shadow' && assessmentInfo;
+
   useEffect(() => {
     if (!popupRef.current || !position) return;
+    if (isShadowSheet) {
+      const vw = window.innerWidth;
+      const isMobile = vw < 640;
+      if (isMobile) {
+        setAdjusted({ x: 8, y: 'auto', bottom: 8 });
+      } else {
+        const el = popupRef.current;
+        const rect = el.getBoundingClientRect();
+        const vh = window.visualViewport?.height || window.innerHeight;
+        const pad = 8;
+        let x = Math.round((vw - rect.width) / 2);
+        if (x < pad) x = pad;
+        let y = vh - rect.height - pad;
+        if (y < pad) y = pad;
+        setAdjusted({ x, y });
+      }
+      return;
+    }
     const el = popupRef.current;
     const rect = el.getBoundingClientRect();
     const vw = window.innerWidth;
@@ -82,7 +102,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     }
     if (y < pad) y = pad;
     setAdjusted({ x, y });
-  }, [position, view, structureDrillDown, syntaxGloss, activePhoneme]);
+  }, [position, view, structureDrillDown, syntaxGloss, activePhoneme, isShadowSheet]);
 
   const l1Dict = getL1Dict(l1);
   const l1Label = l1 === 'en' ? getL1Label('es') : getL1Label(l1);
@@ -414,8 +434,13 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   return (
     <div
       ref={popupRef}
-      className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-[calc(100vw-16px)] sm:w-80 overflow-y-auto"
-      style={{ left: `${adjusted.x}px`, top: `${adjusted.y}px`, maxHeight: 'calc(100vh - 16px)' }}
+      className={`fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 overflow-y-auto ${
+        isShadowSheet ? 'w-[calc(100vw-16px)] sm:w-96' : 'w-[calc(100vw-16px)] sm:w-80'
+      }`}
+      style={adjusted.bottom != null
+        ? { left: `${adjusted.x}px`, bottom: `${adjusted.bottom}px`, maxHeight: 'calc(100vh - 16px)' }
+        : { left: `${adjusted.x}px`, top: `${adjusted.y}px`, maxHeight: 'calc(100vh - 16px)' }
+      }
     >
       {!(toolSet === 'shadow' && assessmentInfo) && (
         <>
