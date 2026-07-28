@@ -8,6 +8,8 @@ export default function ShadowReadStrip({
   loopSentenceIdx,
   currentSentenceIdx,
   sentences,
+  shadowRepeatActive,
+  onPlayPause,
   onReplay,
   onPrev,
   onNext,
@@ -30,45 +32,72 @@ export default function ShadowReadStrip({
   return (
     <div className="border-t border-gray-200 bg-white px-4 py-2 sm:py-3">
       <div className="max-w-2xl mx-auto space-y-2">
-        {/* Row 1: prev, replay, next */}
-        <div className="flex items-center justify-center gap-3">
-          <button
-            onClick={onPrev}
-            disabled={activeIdx <= 0}
-            className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-30"
-            title="Previous sentence"
-          >
-            <svg width="16" height="16" viewBox="0 0 12 12" fill="currentColor">
-              <path d="M8 1L3 6l5 5V1z" />
-            </svg>
-          </button>
+        {/* Row 1: play/pause (left), prev/repeat/next (centered) */}
+        <div className="flex items-center">
+          {/* Left: subtle play/pause */}
+          <div className="w-11 sm:w-10 shrink-0">
+            <button
+              onClick={onPlayPause}
+              className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              title={isPlaying ? 'Pause' : 'Play'}
+            >
+              {isPlaying ? (
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <rect x="2" y="1" width="3.5" height="12" rx="1" />
+                  <rect x="8.5" y="1" width="3.5" height="12" rx="1" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <path d="M3 1.5v11l9-5.5z" />
+                </svg>
+              )}
+            </button>
+          </div>
 
-          <button
-            onClick={onReplay}
-            className={`flex items-center justify-center gap-1.5 px-6 py-3 sm:py-2.5 rounded-full text-sm font-medium transition-all ${
-              isPlaying
-                ? 'bg-amber-500 text-white hover:bg-amber-600 active:bg-amber-700 shadow-sm'
-                : 'bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-700'
-            }`}
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 10a7 7 0 0 1 12.25-4.6" />
-              <path d="M17 10a7 7 0 0 1-12.25 4.6" />
-              <path d="M15.25 2.5v3h-3" />
-              <path d="M4.75 17.5v-3h3" />
-            </svg>
-          </button>
+          {/* Center: shadow navigation */}
+          <div className="flex-1 flex items-center justify-center gap-3">
+            <button
+              onClick={onPrev}
+              disabled={activeIdx <= 0}
+              className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-30"
+              title="Previous sentence"
+            >
+              <svg width="16" height="16" viewBox="0 0 12 12" fill="currentColor">
+                <path d="M8 1L3 6l5 5V1z" />
+              </svg>
+            </button>
 
-          <button
-            onClick={onNext}
-            disabled={isPlaying && activeIdx >= totalSentences - 1}
-            className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-30"
-            title="Next sentence"
-          >
-            <svg width="16" height="16" viewBox="0 0 12 12" fill="currentColor">
-              <path d="M4 1l5 5-5 5V1z" />
-            </svg>
-          </button>
+            <button
+              onClick={onReplay}
+              className={`flex items-center justify-center gap-1.5 px-6 py-3 sm:py-2.5 rounded-full text-sm font-medium transition-all ${
+                shadowRepeatActive
+                  ? 'bg-amber-500 text-white shadow-sm hover:bg-amber-600 active:bg-amber-700'
+                  : 'border-2 border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700 active:bg-gray-50'
+              }`}
+              title="Repeat sentence"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 10a7 7 0 0 1 12.25-4.6" />
+                <path d="M17 10a7 7 0 0 1-12.25 4.6" />
+                <path d="M15.25 2.5v3h-3" />
+                <path d="M4.75 17.5v-3h3" />
+              </svg>
+            </button>
+
+            <button
+              onClick={onNext}
+              disabled={isPlaying && activeIdx >= totalSentences - 1}
+              className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-30"
+              title="Next sentence"
+            >
+              <svg width="16" height="16" viewBox="0 0 12 12" fill="currentColor">
+                <path d="M4 1l5 5-5 5V1z" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Right spacer for visual balance */}
+          <div className="w-11 sm:w-10 shrink-0" />
         </div>
 
         {/* Row 2: Speed + ephemeral mic + feedback */}
@@ -143,9 +172,9 @@ export default function ShadowReadStrip({
               const hasFeedback = sentenceFeedback?.has(isLooping ? loopSentenceIdx : activeIdx);
               const acc = hasFeedback ? sentenceFeedback.get(isLooping ? loopSentenceIdx : activeIdx) : null;
               const chipColor = acc != null
-                ? (acc >= 95 ? 'bg-green-100 text-green-800 border-green-300'
-                  : acc >= 75 ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
-                  : acc >= 50 ? 'bg-orange-100 text-orange-800 border-orange-300'
+                ? (acc >= 85 ? 'bg-blue-100 text-blue-800 border-blue-300'
+                  : acc >= 70 ? 'bg-green-100 text-green-800 border-green-300'
+                  : acc >= 50 ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
                   : 'bg-red-100 text-red-800 border-red-300')
                 : '';
 

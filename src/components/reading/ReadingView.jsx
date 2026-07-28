@@ -101,6 +101,7 @@ export default function ReadingView() {
   // Shadow reading sentence tracking
   const shadowedSentencesRef = useRef(new Set());
   const shadowRepeatModeRef = useRef(true);
+  const [shadowRepeatActive, setShadowRepeatActive] = useState(false);
 
   // Pronunciation assessment
   const [assessmentStatus, setAssessmentStatus] = useState(null);
@@ -209,6 +210,7 @@ export default function ReadingView() {
       audioRef.current.pause();
       setIsPlaying(false);
     }
+    setShadowRepeatActive(false);
     if (toolSet === 'shadow' && sentences.length > 0) {
       setLoopSentenceIdx(0);
       shadowRepeatModeRef.current = true;
@@ -420,6 +422,7 @@ export default function ReadingView() {
         } else {
           audio.pause();
           setIsPlaying(false);
+          setShadowRepeatActive(false);
           audio.currentTime = getLoopStart(loopSentenceIdx);
         }
       }
@@ -514,6 +517,7 @@ export default function ReadingView() {
     if (!sentence || !hasAudio) return;
     trackShadowedSentence(idx);
     shadowRepeatModeRef.current = true;
+    setShadowRepeatActive(true);
     setLoopSentenceIdx(idx);
     const audio = audioRef.current;
     if (audio) {
@@ -527,6 +531,7 @@ export default function ReadingView() {
     const idx = loopSentenceIdx ?? Math.max(0, currentSentenceIdx);
     const prev = Math.max(0, idx - 1);
     shadowRepeatModeRef.current = false;
+    setShadowRepeatActive(false);
     trackShadowedSentence(prev);
     setLoopSentenceIdx(prev);
     const audio = audioRef.current;
@@ -542,6 +547,7 @@ export default function ReadingView() {
     const audio = audioRef.current;
     if (!audio) return;
     shadowRepeatModeRef.current = false;
+    setShadowRepeatActive(false);
     if (!isPlaying) {
       trackShadowedSentence(idx);
       audio.currentTime = getLoopStart(idx);
@@ -916,6 +922,8 @@ export default function ReadingView() {
           loopSentenceIdx={loopSentenceIdx}
           currentSentenceIdx={currentSentenceIdx}
           sentences={sentences}
+          shadowRepeatActive={shadowRepeatActive}
+          onPlayPause={handlePlayPause}
           onReplay={handleReplaySentence}
           onPrev={handleShadowPrev}
           onNext={handleShadowNext}

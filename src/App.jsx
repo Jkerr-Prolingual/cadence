@@ -7,6 +7,7 @@ import ShadowingView from './components/shadowing/ShadowingView';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
 import AdminPanel from './components/admin/AdminPanel';
 import WorkshopView from './components/workshop/WorkshopView';
+import ExercisesPage from './components/exercises/ExercisesPage';
 import LibraryPage from './components/library/LibraryPage';
 import BookChaptersPage from './components/library/BookChaptersPage';
 import LoginPage from './components/shared/LoginPage';
@@ -42,6 +43,7 @@ function AppRoutes() {
           <Route path="book/:bookId" element={<BookChaptersPage />} />
           <Route path="read" element={<ReadingView />} />
           <Route path="flashcards" element={<FlashcardPage />} />
+          <Route path="exercises" element={<ExercisesPage />} />
           <Route path="workshop" element={<WorkshopView />} />
           <Route path="teacher" element={<TeacherDashboard />} />
           <Route path="admin" element={<ProtectedRoute requireAdmin><AdminPanel /></ProtectedRoute>} />

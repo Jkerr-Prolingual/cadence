@@ -1,5 +1,5 @@
 const DB_NAME = 'relato';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 const STORES = {
   srsCards: { keyPath: 'word' },
@@ -19,6 +19,7 @@ const STORES = {
   classes: { keyPath: 'id' },
   assignments: { keyPath: 'id' },
   assignmentProgress: { keyPath: 'id' },
+  exerciseResults: { keyPath: 'textId' },
 };
 
 let dbPromise = null;

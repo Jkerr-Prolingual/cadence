@@ -1,19 +1,25 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { L1_LOCALES, getUILabel } from '../../lib/locales';
 import { resetAllProgress } from '../../lib/resetProgress';
 
-const navItems = [
-  { to: '/', label: 'Library' },
-  { to: '/read', label: 'Read' },
-  { to: '/flashcards', label: 'Flashcards' },
-  // { to: '/workshop', label: 'Workshop' },
-];
-
 export default function Layout() {
   const { user, profile, signOut, refreshProfile, isTeacher, isAdmin, isStudent, l1, textSize } = useAuth();
+
+  const navItems = useMemo(() => {
+    const items = [
+      { to: '/', label: 'Library' },
+      { to: '/read', label: 'Read' },
+      { to: '/flashcards', label: 'Flashcards' },
+    ];
+    if (l1 === 'es' || l1 === 'en') {
+      items.push({ to: '/exercises', label: 'Exercises' });
+    }
+    return items;
+  }, [l1]);
+
   const [showSettings, setShowSettings] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [joinCode, setJoinCode] = useState('');

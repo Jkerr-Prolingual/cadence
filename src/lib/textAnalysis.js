@@ -105,6 +105,7 @@ Return ONLY valid JSON (no markdown fences, no commentary) with these fields:
     {
       "word": "headword",
       "form": "form as it appears in text",
+      "cefr": "A1 | A2 | B1 | B2 | C1",
       "sentence": "verbatim sentence from text",
       "questionType": "meaning | cloze | context",
       "question": "the question stem",
@@ -114,13 +115,15 @@ Return ONLY valid JSON (no markdown fences, no commentary) with these fields:
   ],
   // 10–15 vocabulary probe questions of mixed types:
   //
-  // "meaning" — Tests contextual comprehension. Question asks what the word
-  //   means in the given sentence. ALL OPTIONS (correct + distractors) must
-  //   be in SPANISH. For polysemous words, the correct answer is the
-  //   contextual Spanish translation; distractors are other real Spanish
-  //   translations of the same English word (different senses). This forces
-  //   the learner to discriminate meaning in context.
+  // "meaning" — Tests contextual comprehension. The question field MUST be
+  //   exactly: "What does '[word]' mean in this sentence?"
+  //   ALL OPTIONS (correct + distractors) must be in SPANISH. For polysemous
+  //   words, the correct answer is the contextual Spanish translation;
+  //   distractors are other real Spanish translations of the same English
+  //   word (different senses). This forces the learner to discriminate
+  //   meaning in context.
   //   Example: word="run", sentence="She runs the company."
+  //     question="What does 'run' mean in this sentence?"
   //     correct="dirigir", distractors=["correr","funcionar","fluir"]
   //
   // "cloze" — Tests form recognition. Shows the sentence with the target
@@ -131,15 +134,19 @@ Return ONLY valid JSON (no markdown fences, no commentary) with these fields:
   //     correct="opened", distractors=["opening","opens","open"]
   //
   // "context" — Tests recognition across contexts. Shows 4 sentences and
-  //   asks which one uses the word with a specific meaning. Correct is a
-  //   verbatim sentence from the text; distractors are plausible sentences
-  //   you create.
-  //   Example: word="check", question="Which sentence uses 'check' to mean 'examinar'?"
+  //   asks which one uses the word with a specific meaning. The question
+  //   field MUST include the Spanish meaning, e.g.:
+  //   "Which sentence uses 'check' to mean 'examinar'?"
+  //   Correct is a verbatim sentence from the text; distractors are
+  //   plausible sentences you create.
+  //   Example: word="check"
+  //     question="Which sentence uses 'check' to mean 'examinar'?"
   //     correct="He checked the board carefully."
   //     distractors=["She wrote a check for $50.", ...]
   //
   // Target B1+ words primarily. Include 2–3 polysemous A2 words.
   // Distractors must be plausible for Spanish-speaking learners at A2–B2.
+  // The "cefr" field is the EFLLex CEFR level of the target word.
 
   "cognates": [
     {

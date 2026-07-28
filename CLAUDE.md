@@ -13,8 +13,8 @@ A2–B2 English learners across multiple L1 backgrounds (Spanish, Mandarin,
 Japanese, Korean), with emphasis on adolescent and young adult long-term
 English learners (LTEL) in K-12 settings.
 
-Core loop: Read extensively → Encounter vocabulary → Track depth of
-knowledge through a 5-level fluency model → Practice via flashcards
+Core loop: Read extensively → Encounter vocabulary → Check
+comprehension with per-chapter exercises → Practice via flashcards
 and shadow reading → Re-read to build fluency → Repeat.
 
 Relato is a redesign of VocabFrontier (`C:\Users\User\vocab-reader-app`).
@@ -82,7 +82,6 @@ Key reusable pieces:
 - useProgressSync (remove CEFR instrument handoff)
 - AdminPanel (keep ElevenLabs + corpus ingestion, strip island metadata)
 - textPipeline (keep tokenization + vocab profiling, strip island geometry)
-- ChallengeTest (reuse quiz structure, remove frontier triggering)
 - Story Workshop (will be redesigned)
 
 **Left behind:**
@@ -94,104 +93,58 @@ Key reusable pieces:
 
 ---
 
-## 5-Level Vocabulary Depth Model
+## Exercises (Per-Chapter Comprehension Checks)
 
-Relato measures word knowledge through a fluency development lens.
-The five levels are independent flags per student per headword — not a
-strict staircase. Each can be set in any order. A word's depth score is
-an aggregation of which levels have been achieved.
+Exercises are simple per-chapter vocabulary comprehension checks — not
+a per-word depth tracking system. The goal is to verify that the student
+understood the vocabulary in the chapter they just read. No cross-text
+transfer tracking, no per-word state machines, no multi-source flag
+reconciliation.
 
-### Level 1: Decode (Articulatory Fluency)
+### Probe pool (generated at ingestion)
 
-Can the student pronounce this word without the "tongue-twister effect"?
-Past the phonological hurdle that happens with unfamiliar words or
-challenging word combinations in L2.
+The AI analysis prompt (`textAnalysis.js`) requests 10–15 vocabulary
+probe questions per text, stored in `curated_texts.analysis.probePool`.
+AdminPanel shows a read-only preview of the generated probes.
 
-**Evidence sources:**
-- Student self-report flags (end-of-pass review: "which words still
-  feel hard to say?")
-- AI pronunciation assessment (Azure Speech — per-word accuracy scores
-  from oral read-alouds, hesitation/restart detection)
-- Teacher flags on student recordings (confirms/extends student + AI flags)
+Three question types:
 
-**Key design:** Self-report is the primary signal, not a workaround for
-missing ASR. Learners' subjective experience of articulatory difficulty
-drives downstream behavior. The act of noticing "I'm stuck" is itself
-a learning event (Schmidt-style noticing).
+**Meaning** — Tests contextual comprehension. "What does *X* mean in
+this sentence?" All options (correct + distractors) in L1. For
+polysemous words, distractors are other real L1 translations of the
+same English word, forcing the learner to discriminate meaning in
+context.
 
-**Flag UX:** During reading, tap-to-flag only (minimal interruption).
-After the pass, a follow-up screen shows flagged words and asks for
-ratings (1–5 anchored scale: 1 = said it smoothly, 5 = completely stuck).
+**Cloze** — Tests form recognition. Sentence with blank; options are
+morphological variants of the target word (e.g., "opened" / "opening" /
+"opens" / "open").
 
-### Level 2: Meaning (Contextual Comprehension)
+**Context** — Tests recognition across contexts. Four sentences shown;
+student picks the one using the word with a specific meaning. One is
+verbatim from the text; three are AI-generated distractors.
 
-Does the student know the L1 translation / meaning of this word in
-this context? Can they create an L1 approximation?
+### Student experience
 
-**Evidence sources:**
-- Student self-report (meaning-unknown flags)
-- Quiz probes (show word in original sentence context, meaning-check MCQ)
-- Lookup behavior (looked up = weak negative evidence)
+Students access exercises from the Exercises tab. Exercises are grouped
+by book/chapter. The student takes a set of MCQ questions, gets immediate
+feedback per question, and sees a summary score at the end.
 
-**Known ceiling:** L1 translation knowledge is shallow — "take = tomar"
-doesn't cover "take a chance." Accepted at A2–B1; upper levels do the
-discriminating for B2+.
+### Tracking
 
-### Level 3: Local Recognition (Same-Spot Re-read)
+Per-chapter completion: score, date, number of attempts. No per-word
+state tracking. No encounter crediting system. Results visible to
+teachers via the teacher dashboard.
 
-Can the student recognize this word at the same location in the text
-on a re-read?
+### Design constraints
 
-**Evidence sources:**
-- Pronunciation assessment on re-read (fluent production at same spot on
-  pass 2+ = dual evidence for Level 1 AND Level 3)
-- Quiz probes after re-read pass (show the sentence, meaning check)
-- Student self-report (end-of-pass confirmation on previously flagged words)
-
-**Design note:** Level 3 evidence comes from active signals (pronunciation
-assessment, quiz probes, self-report), NOT passive behavioral inference
-like "didn't look it up on pass 2." Lookup absence is weak evidence.
-
-### Level 4: Global Recognition (Whole-Text)
-
-Can the student recognize this word across the entire text, not just at
-the spot where they first encountered it?
-
-**Evidence sources:**
-- Encounter data across multiple segments of the same text without lookup
-- Quiz probes using the word in different sentences from the same text
-- Pronunciation assessment showing consistent fluency across the full text
-
-### Level 5: Cross-Text Transfer
-
-Can the student recognize this word when it appears in a different text?
-
-**Evidence sources:**
-- Encounter in a new text without lookup or flag
-- Quiz probes using the word in a novel context
-- Pronunciation assessment in a new text
-
-### Cross-Source Signal (The 2×2)
-
-Flag events from three sources (student, AI, teacher) are stored in one
-unified `flag_events` table, distinguished by `source`. The 2×2 analysis
-is computed on read, not denormalized:
-
-| | Student flagged | Student did not flag |
-|---|---|---|
-| **AI/Teacher flagged** | High-confidence difficulty | Blind spot — student doesn't notice the problem |
-| **AI/Teacher did not flag** | Subjective difficulty or over-monitoring | Strongest positive evidence |
-
-The "teacher only" cell (blind spot) is the most pedagogically valuable:
-it identifies words the student will keep mishandling because they don't
-know they're mishandling them.
-
-### WordKnowledgeState (Rollup)
-
-Per student per headword, computed from accumulated flag events and
-encounters. Each level has: status (achieved/not), first_at,
-last_confirmed_at, confidence. Not stored as derived scores — computed
-from evidence on demand.
+- **Chapter-scoped.** Exercises test comprehension of a specific chapter,
+  not cumulative word knowledge across texts.
+- **No depth model.** Relato does not track per-word mastery levels.
+  Features like pronunciation assessment, flashcards, and shadow reading
+  are valuable on their own — they do not feed into a word-level state
+  machine.
+- **Simple scoring.** Correct/incorrect per question, percentage score
+  per attempt. No weighted scoring, no confidence metrics.
 
 ---
 
@@ -276,10 +229,9 @@ and sentence-loop ephemeral recording (not saved, auto-plays back).
 useAudioRecorder hook (MediaRecorder, 32kbps opus/webm).
 
 **Shadow reading sub-mode:** When the student is actively shadowing
-(listen-then-repeat), vocabulary popups remain available but encounter
-crediting is capped at cursor-level passive credit (depth ceiling 0.10).
-Shadowing builds phonological fluency; explicit vocabulary knowledge is
-built through the primary read-and-listen mode.
+(listen-then-repeat), vocabulary popups remain available. Shadowing
+builds phonological fluency; explicit vocabulary knowledge is built
+through the primary read-and-listen mode.
 
 ### Flashcards (Leitner SRS)
 Five-box Leitner system. Intervals: Box 1 = immediate, 2 = 1 day,
@@ -293,7 +245,7 @@ Relato (carried over from VocabFrontier as a concept, not as code).
 
 ### Teacher Controls
 Class creation with join codes. Student roster. Reading progress
-visibility. Recording review with cross-source flag analysis.
+visibility. Recording review with pronunciation assessment results.
 RLS-gated: teachers see enrolled students only.
 
 ### Admin Corpus Ingestion
@@ -311,11 +263,11 @@ provenance). Series/sequence support for multi-chapter works.
 - `class_enrollments` — student ↔ class mapping
 - `books` — book containers grouping curated_texts, with `vocabulary_manifest` JSONB and `syntax_glosses` JSONB
 - `curated_texts` — admin-managed corpus texts (authoritative store), linked to books via `book_id`
-- `user_progress` — per-user JSONB for userWords and wordEncounters
+- `user_progress` — per-user reading progress JSONB
 - `reading_sessions` — per-pass records (silent/oral/shadow mode)
 - `recordings` — oral read-aloud audio files
 - `transcriptions` — STT + pronunciation assessment output
-- `flag_events` — unified flags (student/AI/teacher source)
+- `flag_events` — pronunciation assessment flags (AI-generated from Azure PA)
 - `fluency_sessions` — timed reading and shadowing session logs
 - `srs_cards` — Leitner box flashcard state (`translation` + `l1` columns)
 - `student_recordings` — shadow read recordings for teacher review
@@ -335,8 +287,8 @@ join (`classes.teacher_id = auth.uid()`). Admins read/write all rows.
 ## Multi-L1 Translation Layer
 
 Relato supports four L1 (native language) backgrounds. The L2 (English)
-is fixed. The vocabulary engine (EFLLex, particles, depth model) is
-L1-independent.
+is fixed. The vocabulary engine (EFLLex, particles, CEFR classification)
+is L1-independent.
 
 ### Supported locales
 
@@ -447,9 +399,9 @@ per-book vocabulary manifest provides context-aware overrides.
 
 ### Off-list / Unclassified Words
 Words not found in EFLLex after lemma resolution are classified as
-`unclassified`. They are still trackable and still receive depth scoring
-— they just don't get a CEFR color. This is the correct behavior for
-above-level vocabulary, proper nouns, and domain-specific terms.
+`unclassified`. They don't get a CEFR color but are still clickable
+with popups. This is the correct behavior for above-level vocabulary,
+proper nouns, and domain-specific terms.
 
 ### EFLLex Rule C — Canonical CEFR Derivation
 
@@ -558,20 +510,20 @@ Traditional word-level tracking inflates apparent cognitive load. A student
 who reads "of course" and looks it up gets an encounter event for "of",
 "course", and "of course" — but the learner is processing one unit, not
 three. The particle model fixes this: multi-word chunks are clickable units
-in the reading view, tracked as single items in the depth model, and
-credited correctly in encounter accounting.
+in the reading view and tracked as single items in flashcards and
+exercises.
 
 ### Compositionality classification
 
 Multi-word particles are classified as **compositional** or
-**non-compositional**. This classification determines encounter crediting:
+**non-compositional**. This classification drives popup behavior:
 
 - **Compositional chunk** (*bus stop*): meaning derivable from parts.
-  An encounter credits each constituent word toward its own depth score
-  (if tracked independently).
+  Popup offers drill-down to constituent words with their own
+  translations.
 - **Non-compositional chunk** (*of course*): meaning NOT derivable from
-  parts. An encounter credits ONLY the chunk — constituents receive no
-  depth credit for their independent senses.
+  parts. Popup signals that meaning is not the sum of parts — no
+  drill-down to constituent senses.
 
 The PHRASE List (Martinez & Schmitt, 2012) is the authoritative source for
 non-compositional classification — 506 entries in the graded reader
@@ -595,14 +547,13 @@ definition the learner cannot derive the chunk meaning from parts.
 
 ### Pre-known vs. tiered chunks
 
-Every registered chunk is dispositioned as either:
+During graded reader authoring, chunks are dispositioned as either:
 
-- **Pre-known** — chunk meaning at or below A2. Budget-exempt, no
-  encounter floor, but registered for accounting accuracy. Examples:
-  *have to*, *going to*, *there is/are*, *get up*.
-- **Tiered** — chunk meaning at B1+. Assigned to Core/Thematic/Peripheral
-  with encounter floor enforcement. These are chunks the text actively
-  teaches.
+- **Pre-known** — chunk meaning at or below A2. Used freely in the text
+  without budget constraints. Examples: *have to*, *going to*,
+  *there is/are*, *get up*.
+- **Tiered** — chunk meaning at B1+. The text deliberately introduces
+  and recycles these chunks. These are chunks the text actively teaches.
 
 ### Particle-aware reading view (popup interaction)
 
@@ -646,21 +597,6 @@ The particle model unifies three previously separate multi-word concepts:
 | `cefrMultiWord` (3,852 EFLLex phrases) | Static particle lookup table |
 | `textCollocates` (AI per-text collocations) | Compositional particles identified at ingestion |
 | `lexicalChunks` (AI per-text formulaic phrases, `holistic: true`) | Non-compositional particles identified at ingestion |
-
-### Encounter crediting in the depth model
-
-When a student encounters a particle in the reading view:
-
-- The particle itself receives a depth event (encounter, lookup, flag,
-  etc.) tracked against the particle as a unit.
-- If the particle is **compositional**, each constituent word that is
-  independently tracked also receives an encounter credit.
-- If the particle is **non-compositional**, constituents receive NO
-  encounter credit for their independent senses.
-
-This mirrors the graded reader framework's crediting rules (vocabulary
-framework §6) and ensures consistency between content production and
-content consumption.
 
 ---
 
@@ -741,7 +677,7 @@ from this file.
 The PHRASE List (`data/phrase_list.json`, 506 entries) is the canonical
 source for non-compositional classification. Relato should bundle or
 reference this data for particle identification during ingestion and
-for compositionality-aware encounter crediting.
+for compositionality-aware popup behavior.
 
 ---
 
@@ -1341,15 +1277,14 @@ Server-side env vars: `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`,
 Audio API (`decodeAudioBlob` + `encodeWavSlice` in `audioUtils.js`)
 before uploading chunks.
 
-**L2 accent calibration:** Azure PA scores accented-but-intelligible
-speech at 75–95, so thresholds are raised above Azure's defaults to
-surface meaningful variation for L2 learners:
-- Green: ≥95 (near-native)
-- Yellow: 75–95 (accented but intelligible, not flagged)
-- Orange: 50–75 (flagged, needs work)
-- Red: <50 (flagged, high severity)
-Flag threshold: <75. Words scoring 75–95 get yellow UI treatment but
-no flag event.
+**L2 accent calibration:** Azure PA scores native speakers in the high
+80s, so thresholds are calibrated to avoid over-flagging:
+- Blue: ≥85 (excellent — no concern)
+- Green: 70–84 (good — minor accent, intelligible, not flagged)
+- Yellow: 50–69 (needs work, flagged)
+- Red: <50 (significant difficulty, flagged)
+Flag threshold: <60. Words scoring 60–69 get yellow UI treatment and
+a low-severity flag event.
 
 ### Database Schema
 
@@ -1404,10 +1339,10 @@ accuracy % and count of words needing work. Error state with retry button.
 **TextDisplay:** Accepts `wordAssessmentMap` prop. Renders colored
 underlines on assessed words (additive — does not replace CEFR underlines
 or sentence highlighting):
-- Green: accuracy 95+ (near-native)
-- Yellow: accuracy 75–95 (accented but intelligible, not flagged)
-- Orange: accuracy 50–75 (flagged, needs work)
-- Red: accuracy < 50 or omitted (flagged, high severity)
+- Blue: accuracy 85+ (excellent — no concern)
+- Green: accuracy 70–84 (good — minor accent, intelligible)
+- Yellow: accuracy 50–69 (needs work, flagged)
+- Red: accuracy < 50 or omitted (significant difficulty, flagged)
 
 **WordPopup:** Accepts `assessmentInfo` prop. Shows pronunciation section:
 - Accuracy score
@@ -1565,12 +1500,12 @@ above Azure defaults to surface meaningful variation for L2 learners:
 
 | Color | Accuracy range | Meaning |
 |---|---|---|
-| Green | ≥ 90 | Near-native |
-| Yellow | 70–90 | Accented but intelligible (no flag) |
-| Orange | 50–70 | Needs work (flagged) |
-| Red | < 50 | High severity (flagged) |
+| Blue | ≥ 85 | Excellent — no concern |
+| Green | 70–84 | Good — minor accent, intelligible (no flag) |
+| Yellow | 50–69 | Needs work (flagged) |
+| Red | < 50 | Significant difficulty (flagged) |
 
-Flag threshold: < 70 (words below this generate flag events).
+Flag threshold: < 60 (words below this generate flag events).
 
 ### Phoneme-Level IPA Feedback
 
@@ -1598,8 +1533,8 @@ Pronunciation feedback is contextualized within the reading experience
 rather than isolated as a separate drill. The student encounters a word
 in a story, hears it in a model reading, shadows it, and gets phoneme-
 level feedback — all without leaving the text. This integrates
-pronunciation into the extensive reading loop alongside vocabulary depth
-tracking and syntax glosses.
+pronunciation into the extensive reading loop alongside vocabulary
+lookup and syntax glosses.
 
 ### Files
 

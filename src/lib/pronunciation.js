@@ -2,7 +2,7 @@ import { tokenizeReference, alignWords } from './alignment';
 import { decodeAudioBlob, encodeWavSlice, detectSentences, wavFromBlob } from './audioUtils';
 import { cleanToken } from './wordUtils';
 
-const FLAG_THRESHOLD = 70;
+const FLAG_THRESHOLD = 60;
 const PAUSE_THRESHOLD_MS = 1000;
 const CHUNK_MIN_WORDS = 15;
 const AUDIO_BUFFER_SEC = 0.3;
@@ -374,8 +374,7 @@ function generateFlagEvents({ userId, textId, alignment, azureData }) {
 function accuracyToSeverity(accuracy) {
   if (accuracy < 40) return 5;
   if (accuracy < 50) return 4;
-  if (accuracy < 65) return 3;
-  return 2;
+  return 3;
 }
 
 export async function assessSentencePronunciation({ audioBlob, referenceText, firstWordIdx, lastWordIdx, supabase, userId, textId }) {

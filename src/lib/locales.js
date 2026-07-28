@@ -66,6 +66,7 @@ export const UI_LABELS = {
     watchVideo: 'Watch video explanation',
     pause: 'Pause',
     checkPronunciation: 'Check',
+    tapPhonemes: 'Tap sounds for examples',
   },
   es: {
     listenRead: 'Escuchar y leer',
@@ -114,6 +115,7 @@ export const UI_LABELS = {
     watchVideo: 'Ver video explicativo',
     pause: 'Pausa',
     checkPronunciation: 'Evaluar',
+    tapPhonemes: 'Toca los sonidos para ver ejemplos',
   },
   zh: {
     listenRead: '听读',

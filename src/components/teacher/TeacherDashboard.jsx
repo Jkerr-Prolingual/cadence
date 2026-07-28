@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { sampleTexts } from '../../data/sampleTexts';
 import { cefrColor } from '../../lib/wordUtils';
+import ProbePreview from '../exercises/ProbePreview';
 
 function generateJoinCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -22,6 +23,7 @@ export default function TeacherDashboard() {
   const [fluencySessions, setFluencySessions] = useState([]);
   const [srsCards, setSrsCards] = useState([]);
   const [reviewLogs, setReviewLogs] = useState([]);
+  const [exerciseResults, setExerciseResults] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [showCreateAssignment, setShowCreateAssignment] = useState(false);
@@ -43,7 +45,7 @@ export default function TeacherDashboard() {
   async function loadData() {
     const [clsRes, textsRes, booksRes] = await Promise.all([
       supabase.from('classes').select('*').eq('teacher_id', user.id),
-      supabase.from('curated_texts').select('id, title, author, cefr_estimate, status, audio_urls, book_id, chapter_order')
+      supabase.from('curated_texts').select('id, title, author, cefr_estimate, status, audio_urls, book_id, chapter_order, analysis')
         .eq('status', 'published'),
       supabase.from('books').select('id, title').eq('status', 'published'),
     ]);
@@ -69,13 +71,14 @@ export default function TeacherDashboard() {
 
       const studentIds = [...new Set(enrollData.map(e => e.student_id))];
       if (studentIds.length > 0) {
-        const [profilesRes, recordingsRes, assessmentsRes, fluencyRes, cardsRes, reviewsRes] = await Promise.all([
+        const [profilesRes, recordingsRes, assessmentsRes, fluencyRes, cardsRes, reviewsRes, exerciseRes] = await Promise.all([
           supabase.from('profiles').select('id, display_name, email').in('id', studentIds),
           supabase.from('student_recordings').select('*').in('user_id', studentIds),
           supabase.from('pronunciation_assessments').select('user_id, text_id, overall_accuracy, azure_fluency_score, azure_prosody_score, azure_completeness_score').in('user_id', studentIds),
           supabase.from('fluency_sessions').select('*').in('user_id', studentIds).order('session_date', { ascending: true }),
           supabase.from('srs_cards').select('user_id, word, text_id, leitner_box, card_type, cefr, added_date, last_review_date').in('user_id', studentIds),
           supabase.from('review_log').select('user_id, word, correct, reviewed_at').in('user_id', studentIds),
+          supabase.from('exercise_results').select('user_id, text_id, score, total, completed_at, answers').in('user_id', studentIds).catch(() => ({ data: [] })),
         ]);
         if (profilesRes.error) console.error('Profiles fetch error:', profilesRes.error);
         const map = {};
@@ -86,6 +89,7 @@ export default function TeacherDashboard() {
         setFluencySessions(fluencyRes.data || []);
         setSrsCards(cardsRes.data || []);
         setReviewLogs(reviewsRes.data || []);
+        setExerciseResults(exerciseRes.data || []);
       }
     }
   }
@@ -225,6 +229,7 @@ export default function TeacherDashboard() {
                 fluencySessions={fluencySessions}
                 srsCards={srsCards}
                 reviewLogs={reviewLogs}
+                exerciseResults={exerciseResults}
                 classId={selectedClassId}
                 showCreate={showCreateAssignment}
                 onShowCreate={setShowCreateAssignment}
@@ -292,7 +297,7 @@ function ClassInfoPanel({ cls, students, onRemoveStudent, onDeleteClass }) {
   );
 }
 
-function AssignmentsPanel({ assignments, allTexts, books, students, progress, studentRecordings, fluencySessions, srsCards, reviewLogs, classId, showCreate, onShowCreate, onCreated, onDeleted }) {
+function AssignmentsPanel({ assignments, allTexts, books, students, progress, studentRecordings, fluencySessions, srsCards, reviewLogs, exerciseResults, classId, showCreate, onShowCreate, onCreated, onDeleted }) {
   const [showArchived, setShowArchived] = useState(false);
 
   const activeAssignments = assignments.filter(a => !a.archivedAt);
@@ -350,6 +355,7 @@ function AssignmentsPanel({ assignments, allTexts, books, students, progress, st
             fluencySessions={fluencySessions.filter(f => f.text_id === a.textId)}
             srsCards={srsCards.filter(c => c.text_id === a.textId)}
             reviewLogs={reviewLogs}
+            exerciseResults={exerciseResults.filter(er => er.text_id === a.textId)}
             onChanged={onDeleted}
           />
         ))}
@@ -361,10 +367,12 @@ function AssignmentsPanel({ assignments, allTexts, books, students, progress, st
 function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCancel }) {
   const [selectedTextId, setSelectedTextId] = useState('');
   const [title, setTitle] = useState('');
-  const [tasks, setTasks] = useState({ readingPass: true, flashcards: true, recordAudio: false, shadowReading: false, timedReading: false });
+  const [tasks, setTasks] = useState({ readingPass: true, flashcards: true, recordAudio: false, shadowReading: false, timedReading: false, exercises: false });
   const [dueDate, setDueDate] = useState('');
+  const [showProbePreview, setShowProbePreview] = useState(false);
   const selectedText = allTexts.find(t => t.id === selectedTextId);
   const hasAudio = selectedText?.audio_urls || selectedText?.audioUrls;
+  const hasProbes = selectedText?.analysis?.probePool?.length > 0;
 
   const bookMap = useMemo(() => {
     const map = {};
@@ -405,6 +413,7 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
         recordAudio: tasks.recordAudio,
         shadowReading: tasks.shadowReading,
         timedReading: tasks.timedReading,
+        exercises: tasks.exercises,
       },
       due_date: dueDate || null,
     });
@@ -422,6 +431,7 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
             const t = allTexts.find(x => x.id === e.target.value);
             if (t && !title) setTitle(`Read: ${t.title}`);
             if (!t?.audio_urls && !t?.audioUrls) setTasks(prev => ({ ...prev, shadowReading: false }));
+            if (!t?.analysis?.probePool?.length) setTasks(prev => ({ ...prev, exercises: false }));
           }}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
         >
@@ -517,7 +527,27 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
             />
             Timed reading
           </label>
+          <label className={`flex items-center gap-2 text-sm ${hasProbes ? 'text-gray-700' : 'text-gray-300'}`}>
+            <input
+              type="checkbox"
+              checked={tasks.exercises}
+              onChange={e => setTasks(prev => ({ ...prev, exercises: e.target.checked }))}
+              className="rounded border-gray-300"
+              disabled={!hasProbes}
+            />
+            Exercises
+            {!hasProbes && selectedTextId && <span className="text-xs text-gray-400">(no exercises)</span>}
+          </label>
         </div>
+        {hasProbes && (
+          <button
+            type="button"
+            onClick={() => setShowProbePreview(true)}
+            className="text-xs text-blue-500 hover:text-blue-700 underline mt-1 transition-colors"
+          >
+            Preview exercises ({selectedText.analysis.probePool.length} questions)
+          </button>
+        )}
       </div>
 
       <div>
@@ -545,15 +575,23 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
           Cancel
         </button>
       </div>
+
+      {showProbePreview && selectedText?.analysis?.probePool && (
+        <ProbePreview
+          probes={selectedText.analysis.probePool}
+          onClose={() => setShowProbePreview(false)}
+        />
+      )}
     </div>
   );
 }
 
-function AssignmentCard({ assignment, allTexts, students, progress, studentRecordings, pronunciationAssessments = [], fluencySessions, srsCards, reviewLogs, onChanged }) {
+function AssignmentCard({ assignment, allTexts, students, progress, studentRecordings, pronunciationAssessments = [], fluencySessions, srsCards, reviewLogs, exerciseResults = [], onChanged }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [playingStudentId, setPlayingStudentId] = useState(null);
   const [audioUrls, setAudioUrls] = useState({});
   const [expandedFlashcardStudent, setExpandedFlashcardStudent] = useState(null);
+  const [probePreview, setProbePreview] = useState(null);
   const audioElRef = useRef(null);
   const text = allTexts.find(t => t.id === assignment.textId);
   const taskList = Object.entries(assignment.tasks).filter(([, v]) => v);
@@ -562,6 +600,8 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
   const hasTimedTask = !!assignment.tasks.timedReading;
   const hasFlashcardTask = !!assignment.tasks.flashcards;
   const hasShadowTask = !!assignment.tasks.shadowReading;
+  const hasExerciseTask = !!assignment.tasks.exercises;
+  const probes = text?.analysis?.probePool;
 
   function getStudentCompletion(studentId) {
     const p = progress.find(p => p.studentId === studentId);
@@ -585,6 +625,10 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
 
   function getStudentCards(studentId) {
     return (srsCards || []).filter(c => c.user_id === studentId);
+  }
+
+  function getStudentExerciseResult(studentId) {
+    return exerciseResults.find(er => er.user_id === studentId);
   }
 
   function getStudentReviews(studentId, cardWords) {
@@ -708,13 +752,21 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
 
       {students.length > 0 && !isArchived && (
         <div className="border-t border-gray-100 px-4 py-2">
-          {(hasShadowTask || hasFlashcardTask) && (
+          {(hasShadowTask || hasFlashcardTask || hasExerciseTask) && (
             <div className="flex items-center gap-3 mb-1.5 text-[10px] text-gray-400">
               {hasShadowTask && (
                 <span>Shadow: sentences looped/total &mdash; <span className="text-green-600">green</span> &ge;75%, <span className="text-amber-600">amber</span> &lt;75%</span>
               )}
               {hasFlashcardTask && (
                 <span>Flashcards: <span className="text-green-600">green</span> = reviewed, <span className="text-amber-600">amber</span> = not yet reviewed. Click for details.</span>
+              )}
+              {hasExerciseTask && probes?.length > 0 && (
+                <button
+                  onClick={() => setProbePreview({ probes })}
+                  className="text-blue-500 hover:text-blue-700 underline transition-colors"
+                >
+                  View exercises ({probes.length})
+                </button>
               )}
             </div>
           )}
@@ -724,7 +776,7 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
                 <th className="text-left font-medium py-1">Student</th>
                 {taskList.map(([key]) => (
                   <th key={key} className="text-center font-medium py-1 w-28">
-                    {{ readingPass: 'Reading', flashcards: 'Flashcards', recordAudio: 'Recording', shadowReading: 'Shadow', timedReading: 'Timed' }[key] || key}
+                    {{ readingPass: 'Reading', flashcards: 'Flashcards', recordAudio: 'Recording', shadowReading: 'Shadow', timedReading: 'Timed', exercises: 'Exercises' }[key] || key}
                   </th>
                 ))}
                 {hasRecordTask && <th className="text-center font-medium py-1 w-20">Listen</th>}
@@ -757,7 +809,21 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
                                 expandedFlashcardStudent === s.id ? null : s.id
                               )}
                             />
-                          ) : completed[key] ? (
+                          ) : key === 'exercises' ? (() => {
+                            const er = getStudentExerciseResult(s.id);
+                            if (!er) return <span className="text-xs text-gray-300">—</span>;
+                            const pct = er.total > 0 ? er.score / er.total : 0;
+                            return (
+                              <button
+                                onClick={() => setProbePreview({ probes, studentAnswers: er.answers })}
+                                className={`text-xs font-medium tabular-nums ${
+                                  pct >= 0.8 ? 'text-green-600' : pct >= 0.6 ? 'text-amber-600' : 'text-red-500'
+                                } hover:underline`}
+                              >
+                                {er.score}/{er.total}
+                              </button>
+                            );
+                          })() : completed[key] ? (
                             <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-600 text-xs">
                               ✓
                             </span>
@@ -822,6 +888,14 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
             </tbody>
           </table>
         </div>
+      )}
+
+      {probePreview && (
+        <ProbePreview
+          probes={probePreview.probes}
+          studentAnswers={probePreview.studentAnswers}
+          onClose={() => setProbePreview(null)}
+        />
       )}
     </div>
   );
