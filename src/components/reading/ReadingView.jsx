@@ -20,6 +20,7 @@ import { logFluencySession, getFluencySessionsForText } from '../../lib/fluency'
 import { runPronunciationAssessment, buildWordAssessmentMap, assessSentencePronunciation, getWordPositions, extractChunkText, runFluencyAssessment, getPhonemeSessionsForText } from '../../lib/pronunciation';
 import { resetChapterRecording, resetChapterWpm } from '../../lib/resetProgress';
 import PhonemeSummaryReport from './PhonemeSummaryReport';
+import { getUILabel } from '../../lib/locales';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ReadingView() {
@@ -122,6 +123,8 @@ export default function ReadingView() {
   const [phonemeSession, setPhonemeSession] = useState(null);
   const [phonemeHistory, setPhonemeHistory] = useState([]);
   const [showPhonemeReport, setShowPhonemeReport] = useState(false);
+  const [selectingEndpoint, setSelectingEndpoint] = useState(false);
+  const [endpointWordIdx, setEndpointWordIdx] = useState(null);
   const fluencyTimerRef = useRef(null);
 
   // Timed reading
@@ -178,6 +181,8 @@ export default function ReadingView() {
     setFluencyProgress(null);
     setPhonemeSession(null);
     setShowPhonemeReport(false);
+    setSelectingEndpoint(false);
+    setEndpointWordIdx(null);
     if (fluencyTimerRef.current) { clearInterval(fluencyTimerRef.current); fluencyTimerRef.current = null; }
   }, [selectedTextId]);
 
@@ -737,6 +742,8 @@ export default function ReadingView() {
       setWordAssessmentMap(null);
       setPhonemeSession(null);
       setFluencyProgress(null);
+      setSelectingEndpoint(false);
+      setEndpointWordIdx(null);
       return;
     }
     setFluencyDuration(seconds);
@@ -766,7 +773,9 @@ export default function ReadingView() {
         clearInterval(fluencyTimerRef.current);
         fluencyTimerRef.current = null;
         recorder.stopRecording();
-        setRecordingMode('review');
+        setRecordingMode('idle');
+        setSelectingEndpoint(true);
+        setEndpointWordIdx(null);
       }
     }, 1000);
   }
@@ -774,7 +783,9 @@ export default function ReadingView() {
   function handleStopFluencyRecording() {
     if (fluencyTimerRef.current) { clearInterval(fluencyTimerRef.current); fluencyTimerRef.current = null; }
     recorder.stopRecording();
-    setRecordingMode('review');
+    setRecordingMode('idle');
+    setSelectingEndpoint(true);
+    setEndpointWordIdx(null);
   }
 
   function handleDiscardFluency() {
@@ -782,12 +793,30 @@ export default function ReadingView() {
     setRecordingMode('idle');
     setFluencyDuration(null);
     setFluencyCountdown(null);
+    setSelectingEndpoint(false);
+    setEndpointWordIdx(null);
+  }
+
+  function extractReferenceText(body, maxWordIdx) {
+    if (maxWordIdx == null) return body;
+    const regex = /([a-zA-ZÀ-ÿ'''-]+)|([^a-zA-ZÀ-ÿ'''-]+)/g;
+    let wordCount = 0;
+    let match;
+    while ((match = regex.exec(body)) !== null) {
+      if (match[1]) {
+        if (wordCount >= maxWordIdx) return body.slice(0, match.index + match[0].length);
+        wordCount++;
+      }
+    }
+    return body;
   }
 
   async function handleFluencyAnalysis() {
     if (!user?.id || !selectedText?.body) return;
+    if (endpointWordIdx == null) return;
     const textId = selectedTextIdRef.current;
 
+    setSelectingEndpoint(false);
     setRecordingMode('idle');
     setAssessmentStatus('processing');
     setFluencyProgress(0);
@@ -801,6 +830,7 @@ export default function ReadingView() {
       return;
     }
 
+    const referenceText = extractReferenceText(selectedText.body, endpointWordIdx);
     const storagePath = `${user.id}/${textId}.webm`;
 
     try {
@@ -823,7 +853,7 @@ export default function ReadingView() {
       const result = await runFluencyAssessment({
         userId: user.id,
         textId,
-        referenceText: selectedText.body,
+        referenceText,
         audioBlob,
         supabase,
         durationSeconds: fluencyDuration,
@@ -1025,6 +1055,10 @@ export default function ReadingView() {
   // ── Word click / popup ────────────────────────────────────────────────────────
 
   const handleWordClick = useCallback((token, position) => {
+    if (selectingEndpoint) {
+      setEndpointWordIdx(token.wordIdx);
+      return;
+    }
     if (toolSet === 'timed' && timedMode === 'active') {
       handleTimedDone(token.wordIdx + 1);
       return;
@@ -1035,7 +1069,7 @@ export default function ReadingView() {
     }
     setPopup({ token, position });
     recordEncounter(token);
-  }, [hasAudio, sentences, toolSet, timedMode]);
+  }, [hasAudio, sentences, toolSet, timedMode, selectingEndpoint]);
 
   function handleResumeAudio() {
     setPopup(null);
@@ -1152,6 +1186,9 @@ export default function ReadingView() {
           onDiscardFluency={handleDiscardFluency}
           onShowPhonemeReport={() => setShowPhonemeReport(true)}
           phonemeSession={phonemeSession}
+          selectingEndpoint={selectingEndpoint}
+          endpointWordIdx={endpointWordIdx}
+          endpointWordCount={endpointWordIdx != null ? endpointWordIdx + 1 : null}
         />
       );
     }
@@ -1228,6 +1265,18 @@ export default function ReadingView() {
                 />
               </div>
 
+              {(recordingMode === 'recording' && fluencyDuration != null) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 text-center">
+                  {getUILabel('readingBanner', l1)}
+                </div>
+              )}
+
+              {selectingEndpoint && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 text-center font-medium">
+                  {getUILabel('tapLastWord', l1)}
+                </div>
+              )}
+
               <TextDisplay
                 text={selectedText.body}
                 onWordClick={handleWordClick}
@@ -1244,6 +1293,7 @@ export default function ReadingView() {
                 l1={l1}
                 wordAssessmentMap={(toolSet === 'record' || toolSet === 'shadow') ? wordAssessmentMap : null}
                 textSize={textSize}
+                endpointWordIdx={selectingEndpoint ? endpointWordIdx : null}
               />
 
               {chapterNav && (

@@ -39,6 +39,7 @@ export default function TextDisplay({
   l1 = 'es',
   wordAssessmentMap = null,
   textSize = 'medium',
+  endpointWordIdx = null,
 }) {
   const paragraphs = useMemo(() => {
     if (!text) return [];
@@ -273,6 +274,10 @@ export default function TextDisplay({
                     : acc >= 30 ? '#f97316' : '#ef4444';
                   wordStyle = { ...wordStyle, borderBottom: `3px solid ${assessColor}`, paddingBottom: '2px' };
                 }
+              }
+
+              if (endpointWordIdx != null && token.wordIdx <= endpointWordIdx) {
+                wordStyle = { ...wordStyle, backgroundColor: '#dbeafe' };
               }
 
               const wordEl = (
