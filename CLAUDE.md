@@ -1279,12 +1279,12 @@ before uploading chunks.
 
 **L2 accent calibration:** Azure PA scores native speakers in the high
 80s, so thresholds are calibrated to avoid over-flagging:
-- Blue: ≥85 (excellent — no concern)
+- Purple: ≥85 (excellent — no concern)
 - Green: 70–84 (good — minor accent, intelligible, not flagged)
-- Yellow: 50–69 (needs work, flagged)
-- Red: <50 (significant difficulty, flagged)
-Flag threshold: <60. Words scoring 60–69 get yellow UI treatment and
-a low-severity flag event.
+- Yellow: 50–69 (needs some work, not flagged)
+- Orange: 30–49 (needs work, flagged)
+- Red: <30 (significant difficulty, flagged)
+Flag threshold: <50. Only orange and red generate flag events.
 
 ### Database Schema
 
@@ -1339,10 +1339,11 @@ accuracy % and count of words needing work. Error state with retry button.
 **TextDisplay:** Accepts `wordAssessmentMap` prop. Renders colored
 underlines on assessed words (additive — does not replace CEFR underlines
 or sentence highlighting):
-- Blue: accuracy 85+ (excellent — no concern)
+- Purple: accuracy 85+ (excellent — no concern)
 - Green: accuracy 70–84 (good — minor accent, intelligible)
-- Yellow: accuracy 50–69 (needs work, flagged)
-- Red: accuracy < 50 or omitted (significant difficulty, flagged)
+- Yellow: accuracy 50–69 (needs some work, not flagged)
+- Orange: accuracy 30–49 (needs work, flagged)
+- Red: accuracy < 30 or omitted (significant difficulty, flagged)
 
 **WordPopup:** Accepts `assessmentInfo` prop. Shows pronunciation section:
 - Accuracy score
@@ -1500,12 +1501,13 @@ above Azure defaults to surface meaningful variation for L2 learners:
 
 | Color | Accuracy range | Meaning |
 |---|---|---|
-| Blue | ≥ 85 | Excellent — no concern |
+| Purple | ≥ 85 | Excellent — no concern |
 | Green | 70–84 | Good — minor accent, intelligible (no flag) |
-| Yellow | 50–69 | Needs work (flagged) |
-| Red | < 50 | Significant difficulty (flagged) |
+| Yellow | 50–69 | Needs some work (no flag) |
+| Orange | 30–49 | Needs work (flagged) |
+| Red | < 30 | Significant difficulty (flagged) |
 
-Flag threshold: < 60 (words below this generate flag events).
+Flag threshold: < 50 (only orange and red generate flag events).
 
 ### Phoneme-Level IPA Feedback
 

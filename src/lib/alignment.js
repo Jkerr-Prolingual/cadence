@@ -1,7 +1,5 @@
 import { CONTRACTIONS } from './wordUtils';
 
-const WORD_REGEX = /[a-zA-ZÀ-ÿ'''-]+/g;
-
 function normalize(word) {
   return word.toLowerCase().replace(/[^a-zA-ZÀ-ÿ'-]/g, '');
 }

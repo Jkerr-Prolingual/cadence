@@ -172,9 +172,10 @@ export default function ShadowReadStrip({
               const hasFeedback = sentenceFeedback?.has(isLooping ? loopSentenceIdx : activeIdx);
               const acc = hasFeedback ? sentenceFeedback.get(isLooping ? loopSentenceIdx : activeIdx) : null;
               const chipColor = acc != null
-                ? (acc >= 85 ? 'bg-blue-100 text-blue-800 border-blue-300'
+                ? (acc >= 85 ? 'bg-purple-100 text-purple-800 border-purple-300'
                   : acc >= 70 ? 'bg-green-100 text-green-800 border-green-300'
                   : acc >= 50 ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                  : acc >= 30 ? 'bg-orange-100 text-orange-800 border-orange-300'
                   : 'bg-red-100 text-red-800 border-red-300')
                 : '';
 

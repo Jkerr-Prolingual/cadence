@@ -84,6 +84,7 @@ export async function resetAllProgress(userId) {
     supabase.from('flag_events').delete().eq('user_id', userId).eq('source', 'student'),
     supabase.from('fluency_sessions').delete().eq('user_id', userId),
     supabase.from('pronunciation_assessments').delete().eq('user_id', userId),
+    supabase.from('phoneme_sessions').delete().eq('user_id', userId),
     supabase.from('srs_cards').delete().eq('user_id', userId),
     supabase.from('srs_card_sources').delete().eq('user_id', userId),
   ]);

@@ -17,8 +17,9 @@ import { cleanToken } from '../../lib/wordUtils';
 import { findCurrentWord, findCurrentSentence, detectSentences, findSentenceForWord } from '../../lib/audioUtils';
 import { completeTaskForText } from '../../lib/assignments';
 import { logFluencySession, getFluencySessionsForText } from '../../lib/fluency';
-import { runPronunciationAssessment, buildWordAssessmentMap, assessSentencePronunciation, getWordPositions, extractChunkText } from '../../lib/pronunciation';
+import { runPronunciationAssessment, buildWordAssessmentMap, assessSentencePronunciation, getWordPositions, extractChunkText, runFluencyAssessment, getPhonemeSessionsForText } from '../../lib/pronunciation';
 import { resetChapterRecording, resetChapterWpm } from '../../lib/resetProgress';
+import PhonemeSummaryReport from './PhonemeSummaryReport';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ReadingView() {
@@ -114,6 +115,15 @@ export default function ReadingView() {
   const [shadowFeedbackMap, setShadowFeedbackMap] = useState(new Map());
   const [shadowFeedbackLoading, setShadowFeedbackLoading] = useState(false);
 
+  // Fluency assessment (time-based recording + phoneme analysis)
+  const [fluencyDuration, setFluencyDuration] = useState(null);
+  const [fluencyCountdown, setFluencyCountdown] = useState(null);
+  const [fluencyProgress, setFluencyProgress] = useState(null);
+  const [phonemeSession, setPhonemeSession] = useState(null);
+  const [phonemeHistory, setPhonemeHistory] = useState([]);
+  const [showPhonemeReport, setShowPhonemeReport] = useState(false);
+  const fluencyTimerRef = useRef(null);
+
   // Timed reading
   const [timedMode, setTimedMode] = useState('idle');
   const [timedStart, setTimedStart] = useState(null);
@@ -163,6 +173,12 @@ export default function ReadingView() {
     setHasRecording(false);
     setShadowFeedbackMap(new Map());
     setShadowFeedbackLoading(false);
+    setFluencyDuration(null);
+    setFluencyCountdown(null);
+    setFluencyProgress(null);
+    setPhonemeSession(null);
+    setShowPhonemeReport(false);
+    if (fluencyTimerRef.current) { clearInterval(fluencyTimerRef.current); fluencyTimerRef.current = null; }
   }, [selectedTextId]);
 
   // Load existing assessment + recording state when text changes
@@ -202,6 +218,21 @@ export default function ReadingView() {
 
     return () => { cancelled = true; };
   }, [selectedTextId, user?.id, sentences.length]);
+
+  // Load phoneme session history
+  useEffect(() => {
+    if (!user?.id || !selectedTextId) return;
+    let cancelled = false;
+    (async () => {
+      const sessions = await getPhonemeSessionsForText(supabase, user.id, selectedTextId);
+      if (cancelled) return;
+      setPhonemeHistory(sessions);
+      if (sessions.length > 0) {
+        setPhonemeSession(sessions[sessions.length - 1]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedTextId, user?.id]);
 
   // Reset tool-specific state when switching tool sets
   useEffect(() => {
@@ -578,6 +609,10 @@ export default function ReadingView() {
   }
 
   function handleStopRecording() {
+    if (fluencyDuration != null) {
+      handleStopFluencyRecording();
+      return;
+    }
     recorder.stopRecording();
     if (elapsedTimerRef.current) { clearInterval(elapsedTimerRef.current); elapsedTimerRef.current = null; }
     setRecordingMode('review');
@@ -689,6 +724,135 @@ export default function ReadingView() {
     recorder.clearRecording();
     setRecordingMode('idle');
     setSaveError(null);
+  }
+
+  // ── Fluency assessment (time-based recording) ──────────────────────────────────
+
+  function handleSelectDuration(seconds) {
+    if (seconds === null) {
+      setFluencyDuration(null);
+      setFluencyCountdown(null);
+      setAssessmentStatus(null);
+      setAssessmentData(null);
+      setWordAssessmentMap(null);
+      setPhonemeSession(null);
+      setFluencyProgress(null);
+      return;
+    }
+    setFluencyDuration(seconds);
+    setFluencyCountdown(seconds);
+    handleStartFluencyRecording(seconds);
+  }
+
+  async function handleStartFluencyRecording(durationSec) {
+    if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false); }
+    setSaveError(null);
+    setAssessmentStatus(null);
+    setAssessmentError(null);
+    setAssessmentData(null);
+    setWordAssessmentMap(null);
+    setFluencyProgress(null);
+
+    await recorder.startRecording();
+    setRecordingMode('recording');
+
+    let remaining = durationSec;
+    setFluencyCountdown(remaining);
+
+    fluencyTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      setFluencyCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(fluencyTimerRef.current);
+        fluencyTimerRef.current = null;
+        recorder.stopRecording();
+        setRecordingMode('idle');
+        handleFluencyAnalysis();
+      }
+    }, 1000);
+  }
+
+  function handleStopFluencyRecording() {
+    if (fluencyTimerRef.current) { clearInterval(fluencyTimerRef.current); fluencyTimerRef.current = null; }
+    recorder.stopRecording();
+    setRecordingMode('idle');
+    handleFluencyAnalysis();
+  }
+
+  async function handleFluencyAnalysis() {
+    if (!user?.id || !selectedText?.body) return;
+    const textId = selectedTextIdRef.current;
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const audioBlob = recorder.audioBlob;
+    if (!audioBlob) {
+      setAssessmentStatus('error');
+      setAssessmentError('No recording captured');
+      return;
+    }
+
+    const storagePath = `${user.id}/${textId}.webm`;
+    setAssessmentStatus('processing');
+    setFluencyProgress(0);
+
+    try {
+      await supabase.storage
+        .from('student-recordings')
+        .upload(storagePath, audioBlob, { contentType: 'audio/webm', upsert: true });
+
+      await supabase
+        .from('student_recordings')
+        .upsert({
+          user_id: user.id,
+          text_id: textId,
+          storage_path: storagePath,
+          duration_seconds: fluencyDuration,
+          playback_rate: 1.0,
+        }, { onConflict: 'user_id,text_id' });
+
+      setHasRecording(true);
+
+      const result = await runFluencyAssessment({
+        userId: user.id,
+        textId,
+        referenceText: selectedText.body,
+        audioBlob,
+        supabase,
+        durationSeconds: fluencyDuration,
+        onProgress: (p) => setFluencyProgress(p),
+      });
+
+      if (result.success) {
+        setAssessmentData(result.assessmentData);
+        setWordAssessmentMap(buildWordAssessmentMap(result.assessmentData, sentences));
+        setAssessmentStatus('complete');
+        setAssessmentError(null);
+        if (result.phonemeSession) {
+          setPhonemeSession(result.phonemeSession);
+          const sessions = await getPhonemeSessionsForText(supabase, user.id, textId);
+          setPhonemeHistory(sessions);
+        }
+        setFluencyProgress(1);
+      } else {
+        setAssessmentStatus('error');
+        setAssessmentError(result.error);
+      }
+
+      await supabase.storage.from('student-recordings').remove([storagePath]).catch(() => {});
+      await supabase
+        .from('student_recordings')
+        .update({ storage_path: null })
+        .eq('user_id', user.id)
+        .eq('text_id', textId)
+        .catch(() => {});
+
+    } catch (err) {
+      setAssessmentStatus('error');
+      setAssessmentError(err.message);
+    }
+
+    recorder.clearRecording();
   }
 
   // ── Sentence-loop ephemeral recording (Shadow Read) ───────────────────────────
@@ -972,6 +1136,12 @@ export default function ReadingView() {
           assessmentData={assessmentData}
           onAnalyzePronunciation={handleAnalyzePronunciation}
           onStartFresh={handleStartFresh}
+          fluencyDuration={fluencyDuration}
+          fluencyCountdown={fluencyCountdown}
+          fluencyProgress={fluencyProgress}
+          onSelectDuration={handleSelectDuration}
+          onShowPhonemeReport={() => setShowPhonemeReport(true)}
+          phonemeSession={phonemeSession}
         />
       );
     }
@@ -1172,6 +1342,15 @@ export default function ReadingView() {
                 .then(() => setChecklistKey(k => k + 1));
             }
           }}
+        />
+      )}
+
+      {showPhonemeReport && (
+        <PhonemeSummaryReport
+          phonemeSession={phonemeSession}
+          phonemeHistory={phonemeHistory}
+          l1={l1}
+          onClose={() => setShowPhonemeReport(false)}
         />
       )}
     </div>

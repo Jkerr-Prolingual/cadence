@@ -12,6 +12,7 @@
   "dependencies": {
     "@netlify/blobs": "^10.7.9",
     "@supabase/supabase-js": "^2.106.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.51.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.1",

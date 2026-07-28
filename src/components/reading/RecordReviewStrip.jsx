@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getUILabel } from '../../lib/locales';
+import { formatTime } from '../../lib/audioUtils';
 
 export default function RecordReviewStrip({
   recordingMode,
@@ -19,10 +20,150 @@ export default function RecordReviewStrip({
   assessmentData = null,
   onAnalyzePronunciation,
   onStartFresh,
+  // Fluency assessment props
+  fluencyDuration = null,
+  fluencyCountdown = null,
+  fluencyProgress = null,
+  onSelectDuration,
+  onShowPhonemeReport,
+  phonemeSession = null,
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const t = (key) => getUILabel(key, l1);
 
+  // --- Fluency: Duration picker ---
+  if (recordingMode === 'idle' && !hasRecording && onSelectDuration) {
+    return (
+      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
+        <div className="max-w-2xl mx-auto text-center space-y-3">
+          <p className="text-xs text-gray-500">{t('readInstructions')}</p>
+          <p className="text-xs font-medium text-gray-600">{t('selectDuration')}</p>
+          <div className="flex items-center justify-center gap-2">
+            {[
+              { sec: 120, label: t('twoMinutes') },
+              { sec: 180, label: t('threeMinutes') },
+              { sec: 240, label: t('fourMinutes') },
+            ].map(({ sec, label }) => (
+              <button
+                key={sec}
+                onClick={() => onSelectDuration(sec)}
+                className="px-5 py-3 sm:py-2.5 text-sm font-medium bg-red-500 text-white rounded-full hover:bg-red-600 active:bg-red-700 transition-colors"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Fluency: Recording with countdown ---
+  if (recordingMode === 'recording' && fluencyCountdown != null) {
+    return (
+      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
+        <div className="max-w-2xl mx-auto text-center space-y-3">
+          <div className="flex items-center justify-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-sm font-semibold text-red-900 tabular-nums">
+              {formatTime(fluencyCountdown)}
+            </span>
+          </div>
+          {fluencyDuration && (
+            <div className="w-48 mx-auto h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-red-500 rounded-full transition-all"
+                style={{ width: `${((fluencyDuration - fluencyCountdown) / fluencyDuration) * 100}%` }}
+              />
+            </div>
+          )}
+          <button
+            onClick={onStopRecording}
+            className="inline-flex items-center gap-2 px-5 py-3 sm:py-2.5 text-sm font-medium bg-red-500 text-white rounded-full hover:bg-red-600 active:bg-red-700 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+              <rect x="2" y="2" width="10" height="10" rx="1.5" />
+            </svg>
+            {t('stopRecording')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Fluency: Processing with progress bar ---
+  if (assessmentStatus === 'processing' && fluencyProgress != null) {
+    const pct = Math.round((fluencyProgress || 0) * 100);
+    return (
+      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
+        <div className="max-w-2xl mx-auto text-center space-y-3">
+          <div className="flex items-center justify-center gap-2">
+            <svg className="w-4 h-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+              <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+            <span className="text-sm text-gray-500">{t('analyzing')}... {pct}%</span>
+          </div>
+          <div className="w-48 mx-auto h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Fluency: Results ---
+  if (assessmentStatus === 'complete' && phonemeSession) {
+    const accuracy = assessmentData?.overall_accuracy;
+    return (
+      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
+        <div className="max-w-2xl mx-auto text-center space-y-3">
+          <div className="flex items-center justify-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-green-500">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+            </svg>
+            {accuracy != null && (
+              <span className="text-sm text-gray-700">
+                {t('accuracy')}: <strong className="tabular-nums">{Math.round(accuracy)}%</strong>
+              </span>
+            )}
+            {assessmentData?.azure_fluency_score != null && (
+              <span className="text-xs text-gray-400">
+                {t('fluency')}: {Math.round(assessmentData.azure_fluency_score)}%
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={onShowPhonemeReport}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+                <path fillRule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+              </svg>
+              {t('viewSounds')}
+            </button>
+            <button
+              onClick={() => {
+                setConfirmDelete(false);
+                onSelectDuration && onSelectDuration(null);
+              }}
+              className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+            >
+              {t('recordAgain')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Legacy: recording (no countdown) ---
   if (recordingMode === 'recording') {
     const m = Math.floor(recordingElapsed / 60);
     const s = Math.floor(recordingElapsed % 60);
@@ -87,7 +228,7 @@ export default function RecordReviewStrip({
     );
   }
 
-  // idle mode — either no recording yet, or has a saved recording
+  // idle mode — has a saved recording (legacy flow)
   if (hasRecording) {
     const isComplete = assessmentStatus === 'complete';
     const isProcessing = assessmentStatus === 'processing';
@@ -194,7 +335,7 @@ export default function RecordReviewStrip({
     );
   }
 
-  // No recording yet
+  // No recording yet (legacy — no duration picker)
   return (
     <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
       <div className="max-w-2xl mx-auto text-center space-y-3">

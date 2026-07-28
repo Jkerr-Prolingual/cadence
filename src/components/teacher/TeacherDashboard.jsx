@@ -24,6 +24,7 @@ export default function TeacherDashboard() {
   const [srsCards, setSrsCards] = useState([]);
   const [reviewLogs, setReviewLogs] = useState([]);
   const [exerciseResults, setExerciseResults] = useState([]);
+  const [phonemeSessions, setPhonemeSessions] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [showCreateAssignment, setShowCreateAssignment] = useState(false);
@@ -71,7 +72,7 @@ export default function TeacherDashboard() {
 
       const studentIds = [...new Set(enrollData.map(e => e.student_id))];
       if (studentIds.length > 0) {
-        const [profilesRes, recordingsRes, assessmentsRes, fluencyRes, cardsRes, reviewsRes, exerciseRes] = await Promise.all([
+        const [profilesRes, recordingsRes, assessmentsRes, fluencyRes, cardsRes, reviewsRes, exerciseRes, phonemeRes] = await Promise.all([
           supabase.from('profiles').select('id, display_name, email').in('id', studentIds),
           supabase.from('student_recordings').select('*').in('user_id', studentIds),
           supabase.from('pronunciation_assessments').select('user_id, text_id, overall_accuracy, azure_fluency_score, azure_prosody_score, azure_completeness_score').in('user_id', studentIds),
@@ -79,6 +80,7 @@ export default function TeacherDashboard() {
           supabase.from('srs_cards').select('user_id, word, text_id, leitner_box, card_type, cefr, added_date, last_review_date').in('user_id', studentIds),
           supabase.from('review_log').select('user_id, word, correct, reviewed_at').in('user_id', studentIds),
           supabase.from('exercise_results').select('user_id, text_id, score, total, completed_at, answers').in('user_id', studentIds).catch(() => ({ data: [] })),
+          supabase.from('phoneme_sessions').select('user_id, text_id, session_date, overall_accuracy, phoneme_medians, weak_phonemes, words_assessed').in('user_id', studentIds).order('session_date', { ascending: true }).catch(() => ({ data: [] })),
         ]);
         if (profilesRes.error) console.error('Profiles fetch error:', profilesRes.error);
         const map = {};
@@ -90,6 +92,7 @@ export default function TeacherDashboard() {
         setSrsCards(cardsRes.data || []);
         setReviewLogs(reviewsRes.data || []);
         setExerciseResults(exerciseRes.data || []);
+        setPhonemeSessions(phonemeRes.data || []);
       }
     }
   }
@@ -356,6 +359,7 @@ function AssignmentsPanel({ assignments, allTexts, books, students, progress, st
             srsCards={srsCards.filter(c => c.text_id === a.textId)}
             reviewLogs={reviewLogs}
             exerciseResults={exerciseResults.filter(er => er.text_id === a.textId)}
+            phonemeSessions={phonemeSessions.filter(ps => ps.text_id === a.textId)}
             onChanged={onDeleted}
           />
         ))}
@@ -586,7 +590,7 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
   );
 }
 
-function AssignmentCard({ assignment, allTexts, students, progress, studentRecordings, pronunciationAssessments = [], fluencySessions, srsCards, reviewLogs, exerciseResults = [], onChanged }) {
+function AssignmentCard({ assignment, allTexts, students, progress, studentRecordings, pronunciationAssessments = [], fluencySessions, srsCards, reviewLogs, exerciseResults = [], phonemeSessions = [], onChanged }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [playingStudentId, setPlayingStudentId] = useState(null);
   const [audioUrls, setAudioUrls] = useState({});
@@ -615,6 +619,10 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
 
   function getStudentAssessment(studentId) {
     return pronunciationAssessments.find(a => a.user_id === studentId);
+  }
+
+  function getStudentPhonemeSessions(studentId) {
+    return phonemeSessions.filter(ps => ps.user_id === studentId);
   }
 
   function getStudentWpmHistory(studentId) {
@@ -854,14 +862,31 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
                       )}
                       {hasRecordTask && (() => {
                         const assess = getStudentAssessment(s.id);
+                        const pSessions = getStudentPhonemeSessions(s.id);
+                        const latestPhoneme = pSessions.length > 0 ? pSessions[pSessions.length - 1] : null;
                         return (
                           <td className="py-1.5">
                             {assess ? (
-                              <div className="flex items-center gap-2 text-xs text-gray-600 tabular-nums">
-                                <span title="Accuracy">{Math.round(assess.overall_accuracy)}%</span>
-                                {assess.azure_fluency_score != null && <span className="text-gray-400" title="Fluency">F{Math.round(assess.azure_fluency_score)}</span>}
-                                {assess.azure_prosody_score != null && <span className="text-gray-400" title="Prosody">P{Math.round(assess.azure_prosody_score)}</span>}
-                                {assess.azure_completeness_score != null && <span className="text-gray-400" title="Completeness">C{Math.round(assess.azure_completeness_score)}%</span>}
+                              <div className="text-xs text-gray-600 tabular-nums">
+                                <div className="flex items-center gap-2">
+                                  <span title="Accuracy">{Math.round(assess.overall_accuracy)}%</span>
+                                  {assess.azure_fluency_score != null && <span className="text-gray-400" title="Fluency">F{Math.round(assess.azure_fluency_score)}</span>}
+                                  {assess.azure_prosody_score != null && <span className="text-gray-400" title="Prosody">P{Math.round(assess.azure_prosody_score)}</span>}
+                                  {assess.azure_completeness_score != null && <span className="text-gray-400" title="Completeness">C{Math.round(assess.azure_completeness_score)}%</span>}
+                                </div>
+                                {latestPhoneme?.weak_phonemes?.length > 0 && (
+                                  <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                    <span className="text-gray-400 text-[10px]">Weak:</span>
+                                    {latestPhoneme.weak_phonemes.slice(0, 5).map(p => (
+                                      <span key={p} className="font-mono text-[10px] px-1 py-0.5 rounded bg-orange-50 text-orange-600" title={`${p}: ${latestPhoneme.phoneme_medians?.[p] ?? '?'}%`}>
+                                        /{p}/
+                                      </span>
+                                    ))}
+                                    {latestPhoneme.weak_phonemes.length > 5 && (
+                                      <span className="text-[10px] text-gray-400">+{latestPhoneme.weak_phonemes.length - 5}</span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <span className="text-xs text-gray-300">—</span>

@@ -267,9 +267,10 @@ export default function TextDisplay({
                 const assessment = wordAssessmentMap.get(token.wordIdx);
                 if (assessment && assessment.type !== 'omission') {
                   const acc = assessment.accuracy;
-                  const assessColor = acc >= 85 ? '#3b82f6'
+                  const assessColor = acc >= 85 ? '#9333ea'
                     : acc >= 70 ? '#22c55e'
-                    : acc >= 50 ? '#eab308' : '#ef4444';
+                    : acc >= 50 ? '#eab308'
+                    : acc >= 30 ? '#f97316' : '#ef4444';
                   wordStyle = { ...wordStyle, borderBottom: `3px solid ${assessColor}`, paddingBottom: '2px' };
                 }
               }

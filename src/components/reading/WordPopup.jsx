@@ -504,9 +504,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                       className="h-full rounded-full"
                       style={{
                         width: `${assessmentInfo.accuracy}%`,
-                        backgroundColor: assessmentInfo.accuracy >= 85 ? '#3b82f6'
+                        backgroundColor: assessmentInfo.accuracy >= 85 ? '#9333ea'
                           : assessmentInfo.accuracy >= 70 ? '#22c55e'
-                          : assessmentInfo.accuracy >= 50 ? '#eab308' : '#ef4444',
+                          : assessmentInfo.accuracy >= 50 ? '#eab308'
+                          : assessmentInfo.accuracy >= 30 ? '#f97316' : '#ef4444',
                       }}
                     />
                   </div>
@@ -523,13 +524,15 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                         className="text-base font-mono leading-none px-1 py-0.5 rounded cursor-pointer transition-all"
                         style={{
                           color: p.accuracyScore == null ? '#6b7280'
-                            : p.accuracyScore >= 85 ? '#2563eb'
+                            : p.accuracyScore >= 85 ? '#7e22ce'
                             : p.accuracyScore >= 70 ? '#16a34a'
-                            : p.accuracyScore >= 50 ? '#ca8a04' : '#dc2626',
+                            : p.accuracyScore >= 50 ? '#ca8a04'
+                            : p.accuracyScore >= 30 ? '#ea580c' : '#dc2626',
                           backgroundColor: p.accuracyScore == null ? 'transparent'
-                            : p.accuracyScore >= 85 ? '#eff6ff'
+                            : p.accuracyScore >= 85 ? '#faf5ff'
                             : p.accuracyScore >= 70 ? '#f0fdf4'
-                            : p.accuracyScore >= 50 ? '#fefce8' : '#fef2f2',
+                            : p.accuracyScore >= 50 ? '#fefce8'
+                            : p.accuracyScore >= 30 ? '#fff7ed' : '#fef2f2',
                           outline: activePhoneme === i ? '2px solid #3b82f6' : 'none',
                           outlineOffset: '1px',
                         }}
@@ -546,9 +549,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                     const p = assessmentInfo.phonemes[activePhoneme];
                     const pd = lookupPhoneme(p.phoneme);
                     const accColor = p.accuracyScore == null ? '#6b7280'
-                      : p.accuracyScore >= 85 ? '#2563eb'
+                      : p.accuracyScore >= 85 ? '#7e22ce'
                       : p.accuracyScore >= 70 ? '#16a34a'
-                      : p.accuracyScore >= 50 ? '#ca8a04' : '#dc2626';
+                      : p.accuracyScore >= 50 ? '#ca8a04'
+                      : p.accuracyScore >= 30 ? '#ea580c' : '#dc2626';
                     return (
                       <div className="mt-2 p-2.5 bg-gray-50 rounded-lg border border-gray-100">
                         <div className="flex items-center gap-3 mb-2">
