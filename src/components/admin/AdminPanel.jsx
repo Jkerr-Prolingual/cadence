@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { analyzeText, titleToSlug, buildAnalysisPrompt, CEFR_LEVELS, CEFR_COLORS } from '../../lib/textAnalysis';
-import { getVoiceOptions, generateAudio } from '../../lib/elevenlabs';
+import { getVoiceOptions, generateAudio, whisperTimestampsToWordTimestamps } from '../../lib/elevenlabs';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { extractImages } from '../../lib/imageUtils';
@@ -229,6 +229,7 @@ export default function AdminPanel() {
   const [copied, setCopied] = useState(false);
 
   // Step 3: Audio & Publish
+  const [audioMode, setAudioMode] = useState('generate'); // 'generate' | 'upload'
   const [selectedVoice, setSelectedVoice] = useState('');
   const [selectedModel, setSelectedModel] = useState('eleven_multilingual_v2');
   const [audioStability, setAudioStability] = useState(0.75);
@@ -236,6 +237,7 @@ export default function AdminPanel() {
   const [audioData, setAudioData] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState(null);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
 
@@ -493,6 +495,55 @@ export default function AdminPanel() {
     setGenerating(false);
   }
 
+  async function handleUploadAudio(file) {
+    if (!file || !cleanBody) return;
+    setUploadingAudio(true);
+    setGenerateError(null);
+    try {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const storagePath = `${recordId}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('curated-text-audio')
+        .upload(storagePath, file, {
+          contentType: file.type,
+          upsert: true,
+        });
+      if (uploadError) throw uploadError;
+
+      const whisperRes = await fetch('/.netlify/functions/transcribe-curated-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath }),
+      });
+      if (!whisperRes.ok) {
+        const err = await whisperRes.json();
+        throw new Error(err.error || 'Whisper transcription failed');
+      }
+      const { words } = await whisperRes.json();
+      const audioTimestamps = whisperTimestampsToWordTimestamps(cleanBody, words);
+
+      const audioUrl = URL.createObjectURL(file);
+      setAudioData({ audioUrl, audioBlob: null, audioTimestamps, storagePath });
+
+      const existing = corpusTexts.find(t => t.id === recordId);
+      if (existing) {
+        await supabase
+          .from('curated_texts')
+          .update({
+            audio_urls: { mp3: storagePath },
+            audio_timestamps: audioTimestamps,
+            audio_voice_ids: ['uploaded'],
+            audio_generated_at: new Date().toISOString(),
+          })
+          .eq('id', recordId);
+        await loadCorpus();
+      }
+    } catch (err) {
+      setGenerateError(err.message);
+    }
+    setUploadingAudio(false);
+  }
+
   async function handleSaveChanges() {
     if (!editingTextId || !title) return;
     setSaving(true);
@@ -537,6 +588,8 @@ export default function AdminPanel() {
           });
         if (uploadError) throw uploadError;
         audioUrls = { mp3: storagePath };
+      } else if (audioData?.storagePath) {
+        audioUrls = { mp3: audioData.storagePath };
       }
 
       let coverImageUrl = existing?.coverImageUrl || null;
@@ -664,6 +717,7 @@ export default function AdminPanel() {
     setAnalysisJson('');
     setTextAnalysis(null);
     setParseError(null);
+    setAudioMode('generate');
     setAudioData(null);
     setGenerateError(null);
     setPublished(false);
@@ -1358,115 +1412,170 @@ export default function AdminPanel() {
             </div>
           ) : (
             <>
-              {/* Audio generation */}
-              <Section label="Audio Generation">
-                {voices.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    Set <code className="bg-gray-100 px-1 rounded">VITE_ELEVENLABS_VOICE_IDS</code> in .env.local (comma-separated voice IDs).
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Voice</label>
-                        <select
-                          value={selectedVoice}
-                          onChange={(e) => setSelectedVoice(e.target.value)}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                        >
-                          {voices.map(v => (
-                            <option key={v.id} value={v.id}>{v.name} ({v.id.slice(0, 8)}...)</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Model</label>
-                        <select
-                          value={selectedModel}
-                          onChange={(e) => setSelectedModel(e.target.value)}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                        >
-                          {ELEVENLABS_MODELS.map(m => (
-                            <option key={m.id} value={m.id}>{m.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+              {/* Audio */}
+              <Section label="Audio">
+                <div className="space-y-3">
+                  <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 w-fit">
+                    <button
+                      onClick={() => setAudioMode('generate')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        audioMode === 'generate' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Generate (TTS)
+                    </button>
+                    <button
+                      onClick={() => setAudioMode('upload')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        audioMode === 'upload' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Upload Audio
+                    </button>
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
-                          Stability — {audioStability.toFixed(2)}
-                        </label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.05"
-                          value={audioStability}
-                          onChange={(e) => setAudioStability(Number(e.target.value))}
-                          className="w-full accent-gray-900"
-                        />
-                        <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-                          <span>More expressive</span>
-                          <span>More consistent</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
-                          Speed — {audioSpeed.toFixed(2)}
-                        </label>
-                        <input
-                          type="range"
-                          min="0.7"
-                          max="1.2"
-                          step="0.01"
-                          value={audioSpeed}
-                          onChange={(e) => setAudioSpeed(Number(e.target.value))}
-                          className="w-full accent-gray-900"
-                        />
-                        <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-                          <span>Slower</span>
-                          <span>Faster</span>
-                        </div>
-                      </div>
-                    </div>
+                  {audioMode === 'generate' && (
+                    <>
+                      {voices.length === 0 ? (
+                        <p className="text-sm text-gray-500">
+                          Set <code className="bg-gray-100 px-1 rounded">VITE_ELEVENLABS_VOICE_IDS</code> in .env.local (comma-separated voice IDs).
+                        </p>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Voice</label>
+                              <select
+                                value={selectedVoice}
+                                onChange={(e) => setSelectedVoice(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                              >
+                                {voices.map(v => (
+                                  <option key={v.id} value={v.id}>{v.name} ({v.id.slice(0, 8)}...)</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Model</label>
+                              <select
+                                value={selectedModel}
+                                onChange={(e) => setSelectedModel(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                              >
+                                {ELEVENLABS_MODELS.map(m => (
+                                  <option key={m.id} value={m.id}>{m.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
 
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={handleGenerateAudio}
-                        disabled={generating || !rawText}
-                        className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                          generating || !rawText
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+                                Stability — {audioStability.toFixed(2)}
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={audioStability}
+                                onChange={(e) => setAudioStability(Number(e.target.value))}
+                                className="w-full accent-gray-900"
+                              />
+                              <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+                                <span>More expressive</span>
+                                <span>More consistent</span>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+                                Speed — {audioSpeed.toFixed(2)}
+                              </label>
+                              <input
+                                type="range"
+                                min="0.7"
+                                max="1.2"
+                                step="0.01"
+                                value={audioSpeed}
+                                onChange={(e) => setAudioSpeed(Number(e.target.value))}
+                                className="w-full accent-gray-900"
+                              />
+                              <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+                                <span>Slower</span>
+                                <span>Faster</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={handleGenerateAudio}
+                              disabled={generating || !rawText}
+                              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                                generating || !rawText
+                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                  : editingExisting?.hasAudio && !audioData
+                                    ? 'bg-amber-600 text-white hover:bg-amber-500'
+                                    : 'bg-gray-900 text-white hover:bg-gray-800'
+                              }`}
+                            >
+                              {generating ? 'Generating...' : editingExisting?.hasAudio && !audioData ? 'Replace Existing Audio' : 'Generate Audio'}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {audioMode === 'upload' && (
+                    <>
+                      <p className="text-xs text-gray-500">
+                        Upload a pre-recorded audio file (e.g. dubbed via ElevenLabs). Word timestamps will be extracted via Whisper.
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <label className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+                          uploadingAudio || !rawText
                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                             : editingExisting?.hasAudio && !audioData
                               ? 'bg-amber-600 text-white hover:bg-amber-500'
                               : 'bg-gray-900 text-white hover:bg-gray-800'
-                        }`}
-                      >
-                        {generating ? 'Generating...' : editingExisting?.hasAudio && !audioData ? 'Replace Existing Audio' : 'Generate Audio'}
-                      </button>
-                    </div>
-
-                    {editingExisting?.hasAudio && !audioData && (
-                      <p className="text-xs text-amber-600">Generating new audio will replace the existing file and cost ElevenLabs credits.</p>
-                    )}
-
-                    {generateError && (
-                      <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{generateError}</p>
-                    )}
-
-                    {audioData && (
-                      <div className="flex items-center gap-4 bg-green-50 px-4 py-3 rounded-lg">
-                        <audio controls src={audioData.audioUrl} className="h-8" />
-                        <span className="text-sm text-green-700">
-                          {audioData.audioTimestamps.length} word timestamps generated
-                          {corpusTexts.find(t => t.id === textId) && ' — saved to corpus'}
-                        </span>
+                        }`}>
+                          {uploadingAudio ? 'Processing...' : editingExisting?.hasAudio && !audioData ? 'Replace Existing Audio' : 'Upload Audio File'}
+                          <input
+                            type="file"
+                            accept="audio/*"
+                            className="hidden"
+                            disabled={uploadingAudio || !rawText}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleUploadAudio(file);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
                       </div>
-                    )}
-                  </div>
-                )}
+                    </>
+                  )}
+
+                  {editingExisting?.hasAudio && !audioData && (
+                    <p className="text-xs text-amber-600">New audio will replace the existing file.</p>
+                  )}
+
+                  {generateError && (
+                    <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{generateError}</p>
+                  )}
+
+                  {audioData && (
+                    <div className="flex items-center gap-4 bg-green-50 px-4 py-3 rounded-lg">
+                      <audio controls src={audioData.audioUrl} className="h-8" />
+                      <span className="text-sm text-green-700">
+                        {audioData.audioTimestamps.length} word timestamps extracted
+                        {corpusTexts.find(t => t.id === textId) && ' — saved to corpus'}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </Section>
 
               {/* Publish summary */}
@@ -1477,7 +1586,7 @@ export default function AdminPanel() {
                   <Stat label="CEFR" value={cefrEstimate} />
                   <Stat label="Words" value={analysis?.wordCount || 0} />
                   <Stat label="Analysis" value={textAnalysis ? 'Yes' : 'None'} />
-                  <Stat label="Audio" value={audioData ? 'New audio' : editingExisting?.hasAudio ? 'Existing (preserved)' : 'None'} />
+                  <Stat label="Audio" value={audioData ? (audioData.audioBlob ? 'Generated (TTS)' : 'Uploaded') : editingExisting?.hasAudio ? 'Existing (preserved)' : 'None'} />
                   <Stat label="Images" value={parsedImages.length || existingImages.length || 0} />
                 </div>
               </Section>

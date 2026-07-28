@@ -1527,3 +1527,102 @@ dedicated server, or Azure Functions. The "You said X" substitution
 feedback would also be lost (Azure PA scores pronunciation quality but
 doesn't transcribe the spoken word). When Relato's backend architecture
 evolves, this is a simplification worth pursuing.
+
+---
+
+## Shadow Read Sentence-Level Pronunciation Feedback
+
+### Overview
+
+Shadow read mode provides immediate, per-word pronunciation feedback on
+individual sentences. This is distinct from the full-text recording
+pipeline above — it assesses one sentence at a time during the
+listen-and-repeat loop, with results displayed inline before the student
+moves on.
+
+### Flow
+
+Student loops a sentence → records themselves → taps feedback button →
+sees per-word colored underlines (green/yellow/orange/red) with phoneme-
+level IPA detail on tap.
+
+### Pipeline
+
+1. Client encodes sentence recording as 16kHz mono WAV (Web Audio API)
+2. Uploads WAV to Supabase Storage (ephemeral)
+3. Calls `assess-pronunciation` Netlify function with audio URL +
+   sentence reference text
+4. Azure PA returns per-word accuracy scores + per-phoneme IPA scores
+   (`Granularity: 'Phoneme'`, `PhonemeAlphabet: 'IPA'`)
+5. Client renders colored underlines on each word in the sentence
+
+No Whisper step — single sentences don't need chunking or alignment.
+
+### Thresholds (L2-calibrated)
+
+Native speakers score in the high 80s on Azure PA. Thresholds are raised
+above Azure defaults to surface meaningful variation for L2 learners:
+
+| Color | Accuracy range | Meaning |
+|---|---|---|
+| Green | ≥ 90 | Near-native |
+| Yellow | 70–90 | Accented but intelligible (no flag) |
+| Orange | 50–70 | Needs work (flagged) |
+| Red | < 50 | High severity (flagged) |
+
+Flag threshold: < 70 (words below this generate flag events).
+
+### Phoneme-Level IPA Feedback
+
+Tapping a word with a pronunciation score opens a popup showing clickable
+IPA phonemes from Azure PA. Each phoneme is color-coded by its individual
+accuracy score. Tapping a phoneme expands an inline detail panel with:
+
+- Articulation instruction (learner-friendly, authored in
+  `src/data/ipaPhonemes.js`)
+- Front-view mouth diagram (parametric SVG in
+  `src/components/reading/MouthDiagram.jsx`) showing lip shape, tongue
+  position, teeth visibility, and articulation zone highlights
+- Example word with highlighted letters
+- MW dictionary audio for the word (high-quality, cached to IndexedDB)
+
+The ~44 English phonemes are a finite static dataset in `ipaPhonemes.js`.
+Each entry has: type (consonant/vowel/diphthong), articulation zone,
+tongue position, lip shape, example word, and instruction text. Azure
+symbol variants (g/ɡ, r/ɹ, vowels with/without length marks) are
+included as duplicate keys.
+
+### What makes this novel
+
+Pronunciation feedback is contextualized within the reading experience
+rather than isolated as a separate drill. The student encounters a word
+in a story, hears it in a model reading, shadows it, and gets phoneme-
+level feedback — all without leaving the text. This integrates
+pronunciation into the extensive reading loop alongside vocabulary depth
+tracking and syntax glosses.
+
+### Files
+
+- `src/data/ipaPhonemes.js` — ~44 phoneme articulation entries
+- `src/components/reading/MouthDiagram.jsx` — parametric front-view SVG
+- `src/lib/mwDictionary.js` — MW dictionary audio fetch + playback
+- `src/lib/pronunciation.js` — `assessSentencePronunciation()` orchestrator
+- `netlify/functions/assess-pronunciation.js` — Azure PA proxy
+- `src/components/reading/WordPopup.jsx` — phoneme display + detail panel
+- `src/components/reading/TextDisplay.jsx` — colored underline rendering
+
+### Future: Custom Phoneme Articulation Animations
+
+The current mouth diagrams are programmatic SVGs — functional but static.
+No freely licensed comprehensive animation set exists for all 44 English
+phonemes (the closest proprietary resource, University of Iowa's Sounds
+of Speech, is not user-friendly for non-linguist language learners).
+
+Building 44 custom animations (AI-assisted) is a feasible project that
+would replace `MouthDiagram.jsx` with animated assets showing tongue
+movement, airflow, and voicing. Design goals: learner-friendly (front
+view, not sagittal cross-section), culturally neutral, contextual (shown
+alongside the word and sentence where the student struggled). These would
+be produced incrementally and integrated as they're completed — the
+current SVG diagrams serve as fallback for any phoneme without a custom
+animation.

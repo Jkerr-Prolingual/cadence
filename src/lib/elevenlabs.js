@@ -60,6 +60,54 @@ export async function generateAudio(text, voiceId, options = {}) {
   return { audioUrl, audioBlob, audioTimestamps };
 }
 
+export function whisperTimestampsToWordTimestamps(text, whisperWords) {
+  const textWordRegex = /\S+/g;
+  const textWords = [];
+  let m;
+  while ((m = textWordRegex.exec(text)) !== null) {
+    textWords.push({ word: m[0], charIndex: m.index });
+  }
+
+  function normalize(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  const result = [];
+  let textIdx = 0;
+  for (const w of whisperWords) {
+    const normW = normalize(w.word);
+    if (!normW) continue;
+
+    let matched = null;
+    for (let j = textIdx; j < textWords.length && j < textIdx + 3; j++) {
+      if (normalize(textWords[j].word) === normW) {
+        matched = textWords[j];
+        textIdx = j + 1;
+        break;
+      }
+    }
+
+    if (!matched) {
+      for (let j = textIdx; j < textWords.length; j++) {
+        if (normalize(textWords[j].word) === normW) {
+          matched = textWords[j];
+          textIdx = j + 1;
+          break;
+        }
+      }
+    }
+
+    result.push({
+      word: matched?.word ?? w.word,
+      charIndex: matched?.charIndex ?? 0,
+      start: w.start,
+      end: w.end,
+    });
+  }
+
+  return result;
+}
+
 function charTimestampsToWordTimestamps(text, alignment) {
   const { characters, character_start_times_seconds, character_end_times_seconds } = alignment;
 

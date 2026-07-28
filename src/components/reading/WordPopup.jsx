@@ -6,7 +6,7 @@ import { egpL1Overlays } from '../../data/egpL1Overlays';
 import { getL1Dict, getManifestTranslation, getManifestConstituents, getGlossTranslation, getGlossConstituents } from '../../lib/translations';
 import { getL1Label } from '../../lib/locales';
 import { lookupPhoneme } from '../../data/ipaPhonemes';
-import MouthDiagram from './MouthDiagram';
+import { getMWAudioUrl, playMWAudio } from '../../lib/mwDictionary';
 
 function speakWord(text) {
   if ('speechSynthesis' in window) {
@@ -39,12 +39,20 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   const [view, setView] = useState(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
   const [structureDrillDown, setStructureDrillDown] = useState(false);
   const [activePhoneme, setActivePhoneme] = useState(null);
+  const [mwAudioUrl, setMwAudioUrl] = useState(null);
 
   useEffect(() => {
     setView(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
     setStructureDrillDown(false);
     setActivePhoneme(null);
   }, [word, particle, structure, syntaxGloss]);
+
+  useEffect(() => {
+    setMwAudioUrl(null);
+    if (!word) return;
+    const lookupWord = (lemma || word).toLowerCase();
+    getMWAudioUrl(lookupWord).then(url => { if (url) setMwAudioUrl(url); });
+  }, [word, lemma]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -457,7 +465,24 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pronunciation</span>
             {toolSet === 'shadow' && (
-              <span className="text-sm font-semibold text-gray-800">{word}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-semibold text-gray-800">{word}</span>
+                {mwAudioUrl ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); playMWAudio(mwAudioUrl); }}
+                    className="p-1 text-blue-500 hover:text-blue-700 active:text-blue-900 shrink-0"
+                    aria-label="Listen to word pronunciation"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                    </svg>
+                  </button>
+                ) : (
+                  <SpeakButton text={word} />
+                )}
+              </div>
             )}
           </div>
           {assessmentInfo.type === 'omission' ? (
@@ -527,12 +552,10 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                               {Math.round(p.accuracyScore)}%
                             </span>
                           )}
-                          {pd?.example && <SpeakButton text={pd.example} />}
                         </div>
                         {pd ? (
                           <>
-                            <MouthDiagram phonemeData={pd} />
-                            <p className="text-sm text-gray-700 mt-2 leading-snug">{pd.instruction}</p>
+                            <p className="text-sm text-gray-700 mt-1 leading-snug">{pd.instruction}</p>
                             <p className="text-xs text-gray-500 mt-1">
                               As in: <strong>{pd.example}</strong>{' '}
                               <span className="text-gray-400">({pd.exampleHighlight})</span>
