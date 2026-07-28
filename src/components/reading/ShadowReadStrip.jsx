@@ -17,6 +17,7 @@ export default function ShadowReadStrip({
   onStartLoopRecording,
   onStopLoopRecording,
   onPlayLoopRecording,
+  onDiscardLoopRecording,
   sentenceFeedback,
   feedbackLoading,
   onRequestFeedback,
@@ -60,7 +61,7 @@ export default function ShadowReadStrip({
 
           <button
             onClick={onNext}
-            disabled={activeIdx >= totalSentences - 1}
+            disabled={isPlaying && activeIdx >= totalSentences - 1}
             className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-30"
             title="Next sentence"
           >
@@ -115,15 +116,26 @@ export default function ShadowReadStrip({
               </button>
             )}
             {loopRecordingMode === 'playback' && loopRecorderAudioUrl && (
-              <button
-                onClick={onPlayLoopRecording}
-                className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center rounded-full text-green-600 border-2 border-green-200 hover:bg-green-50 active:bg-green-100 transition-colors"
-                title="Play back your recording"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                  <path d="M3 1.5v11l9-5.5z" />
-                </svg>
-              </button>
+              <>
+                <button
+                  onClick={onPlayLoopRecording}
+                  className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center rounded-full text-green-600 border-2 border-green-200 hover:bg-green-50 active:bg-green-100 transition-colors"
+                  title="Play back your recording"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                    <path d="M3 1.5v11l9-5.5z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={onDiscardLoopRecording}
+                  className="w-7 h-7 sm:w-6 sm:h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 active:bg-red-100 transition-colors"
+                  title="Discard and re-record"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5" fill="none">
+                    <path d="M2 2l6 6M8 2l-6 6" />
+                  </svg>
+                </button>
+              </>
             )}
 
             {(() => {

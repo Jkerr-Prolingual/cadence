@@ -100,6 +100,7 @@ export default function ReadingView() {
 
   // Shadow reading sentence tracking
   const shadowedSentencesRef = useRef(new Set());
+  const shadowRepeatModeRef = useRef(true);
 
   // Pronunciation assessment
   const [assessmentStatus, setAssessmentStatus] = useState(null);
@@ -210,6 +211,7 @@ export default function ReadingView() {
     }
     if (toolSet === 'shadow' && sentences.length > 0) {
       setLoopSentenceIdx(0);
+      shadowRepeatModeRef.current = true;
       if (audioRef.current) {
         audioRef.current.currentTime = getLoopStart(0);
       }
@@ -407,9 +409,19 @@ export default function ReadingView() {
       const sentence = sentences[loopSentenceIdx];
       const loopEnd = sentence.endTime + 0.05;
       if (sentence?.endTime != null && ct >= loopEnd) {
-        audio.pause();
-        setIsPlaying(false);
-        audio.currentTime = getLoopStart(loopSentenceIdx);
+        if (toolSet === 'shadow' && !shadowRepeatModeRef.current) {
+          const nextIdx = loopSentenceIdx + 1;
+          if (nextIdx < sentences.length) {
+            setLoopSentenceIdx(nextIdx);
+          } else {
+            audio.pause();
+            setIsPlaying(false);
+          }
+        } else {
+          audio.pause();
+          setIsPlaying(false);
+          audio.currentTime = getLoopStart(loopSentenceIdx);
+        }
       }
     }
   }
@@ -501,6 +513,7 @@ export default function ReadingView() {
     const sentence = sentences[idx];
     if (!sentence || !hasAudio) return;
     trackShadowedSentence(idx);
+    shadowRepeatModeRef.current = true;
     setLoopSentenceIdx(idx);
     const audio = audioRef.current;
     if (audio) {
@@ -513,24 +526,32 @@ export default function ReadingView() {
   function handleShadowPrev() {
     const idx = loopSentenceIdx ?? Math.max(0, currentSentenceIdx);
     const prev = Math.max(0, idx - 1);
+    shadowRepeatModeRef.current = false;
+    trackShadowedSentence(prev);
     setLoopSentenceIdx(prev);
     const audio = audioRef.current;
     if (audio) {
-      audio.pause();
       audio.currentTime = getLoopStart(prev);
-      setIsPlaying(false);
+      audio.play();
+      setIsPlaying(true);
     }
   }
 
   function handleShadowNext() {
     const idx = loopSentenceIdx ?? Math.max(0, currentSentenceIdx);
-    const next = Math.min(sentences.length - 1, idx + 1);
-    setLoopSentenceIdx(next);
     const audio = audioRef.current;
-    if (audio) {
-      audio.currentTime = getLoopStart(next);
+    if (!audio) return;
+    shadowRepeatModeRef.current = false;
+    if (!isPlaying) {
+      trackShadowedSentence(idx);
+      audio.currentTime = getLoopStart(idx);
       audio.play();
       setIsPlaying(true);
+    } else {
+      const next = Math.min(sentences.length - 1, idx + 1);
+      trackShadowedSentence(next);
+      setLoopSentenceIdx(next);
+      audio.currentTime = getLoopStart(next);
     }
   }
 
@@ -686,10 +707,14 @@ export default function ReadingView() {
     }
   }
 
-  useEffect(() => {
+  function handleDiscardLoopRecording() {
     if (loopPlaybackRef.current) { loopPlaybackRef.current.pause(); loopPlaybackRef.current = null; }
     loopRecorder.clearRecording();
     setLoopRecordingMode('idle');
+  }
+
+  useEffect(() => {
+    handleDiscardLoopRecording();
   }, [loopSentenceIdx]);
 
   // ── Shadow read pronunciation feedback ─────────────────────────────────────────
@@ -900,6 +925,7 @@ export default function ReadingView() {
           onStartLoopRecording={handleStartLoopRecording}
           onStopLoopRecording={handleStopLoopRecording}
           onPlayLoopRecording={handlePlayLoopRecording}
+          onDiscardLoopRecording={handleDiscardLoopRecording}
           sentenceFeedback={(() => {
             const accMap = new Map();
             for (const [sIdx, sentMap] of shadowFeedbackMap) {
