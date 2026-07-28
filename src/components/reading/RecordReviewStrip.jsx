@@ -25,6 +25,8 @@ export default function RecordReviewStrip({
   fluencyCountdown = null,
   fluencyProgress = null,
   onSelectDuration,
+  onSubmitFluency,
+  onDiscardFluency,
   onShowPhonemeReport,
   phonemeSession = null,
 }) {
@@ -32,7 +34,7 @@ export default function RecordReviewStrip({
   const t = (key) => getUILabel(key, l1);
 
   // --- Fluency: Duration picker ---
-  if (recordingMode === 'idle' && !hasRecording && onSelectDuration) {
+  if (recordingMode === 'idle' && !hasRecording && onSelectDuration && !fluencyDuration && !assessmentStatus && !phonemeSession) {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
@@ -86,6 +88,37 @@ export default function RecordReviewStrip({
             </svg>
             {t('stopRecording')}
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Fluency: Review (listen back, submit, or discard) ---
+  if (recordingMode === 'review' && fluencyDuration != null) {
+    return (
+      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
+        <div className="max-w-2xl mx-auto text-center space-y-3">
+          <p className="text-xs text-gray-500">{t('reviewPrompt')}</p>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={onListenBack}
+              className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+            >
+              {t('listenBack')}
+            </button>
+            <button
+              onClick={onSubmitFluency}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
+            >
+              {t('getFeedback')}
+            </button>
+            <button
+              onClick={onDiscardFluency}
+              className="px-4 py-2.5 sm:py-2 text-xs font-medium text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors"
+            >
+              {t('discard')}
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -766,8 +766,7 @@ export default function ReadingView() {
         clearInterval(fluencyTimerRef.current);
         fluencyTimerRef.current = null;
         recorder.stopRecording();
-        setRecordingMode('idle');
-        handleFluencyAnalysis();
+        setRecordingMode('review');
       }
     }, 1000);
   }
@@ -775,13 +774,23 @@ export default function ReadingView() {
   function handleStopFluencyRecording() {
     if (fluencyTimerRef.current) { clearInterval(fluencyTimerRef.current); fluencyTimerRef.current = null; }
     recorder.stopRecording();
+    setRecordingMode('review');
+  }
+
+  function handleDiscardFluency() {
+    recorder.clearRecording();
     setRecordingMode('idle');
-    handleFluencyAnalysis();
+    setFluencyDuration(null);
+    setFluencyCountdown(null);
   }
 
   async function handleFluencyAnalysis() {
     if (!user?.id || !selectedText?.body) return;
     const textId = selectedTextIdRef.current;
+
+    setRecordingMode('idle');
+    setAssessmentStatus('processing');
+    setFluencyProgress(0);
 
     await new Promise(r => setTimeout(r, 100));
 
@@ -793,8 +802,6 @@ export default function ReadingView() {
     }
 
     const storagePath = `${user.id}/${textId}.webm`;
-    setAssessmentStatus('processing');
-    setFluencyProgress(0);
 
     try {
       await supabase.storage
@@ -1140,6 +1147,8 @@ export default function ReadingView() {
           fluencyCountdown={fluencyCountdown}
           fluencyProgress={fluencyProgress}
           onSelectDuration={handleSelectDuration}
+          onSubmitFluency={handleFluencyAnalysis}
+          onDiscardFluency={handleDiscardFluency}
           onShowPhonemeReport={() => setShowPhonemeReport(true)}
           phonemeSession={phonemeSession}
         />
