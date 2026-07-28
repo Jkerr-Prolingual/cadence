@@ -85,13 +85,21 @@ export async function assessFullRecording({ token, region, referenceText, audioB
     };
 
     recognizer.canceled = (_, e) => {
-      recognizer.close();
       if (e.reason === SpeechSDK.CancellationReason.Error) {
+        recognizer.close();
         reject(new Error(`Azure Speech error: ${e.errorDetails}`));
+      } else {
+        recognizer.stopContinuousRecognitionAsync(
+          () => recognizer.close(),
+          () => recognizer.close()
+        );
       }
     };
 
-    recognizer.sessionStopped = () => {
+    let resolved = false;
+    const finalize = () => {
+      if (resolved) return;
+      resolved = true;
       recognizer.close();
       const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
       resolve({
@@ -102,9 +110,17 @@ export async function assessFullRecording({ token, region, referenceText, audioB
       });
     };
 
+    recognizer.sessionStopped = finalize;
+
     recognizer.startContinuousRecognitionAsync(
       () => {
-        streamAudioToSDK(wavArrayBuffer, pushStream, totalBytes, onProgress);
+        streamAudioToSDK(wavArrayBuffer, pushStream, totalBytes, onProgress, () => {
+          setTimeout(() => {
+            recognizer.stopContinuousRecognitionAsync(() => {}, () => {});
+          }, 5000);
+
+          setTimeout(() => { finalize(); }, 30000);
+        });
       },
       (err) => {
         recognizer.close();
@@ -114,7 +130,7 @@ export async function assessFullRecording({ token, region, referenceText, audioB
   });
 }
 
-function streamAudioToSDK(wavArrayBuffer, pushStream, totalBytes, onProgress) {
+function streamAudioToSDK(wavArrayBuffer, pushStream, totalBytes, onProgress, onDone) {
   const HEADER_SIZE = 44;
   const CHUNK_SIZE = 32000;
   let offset = HEADER_SIZE;
@@ -125,6 +141,7 @@ function streamAudioToSDK(wavArrayBuffer, pushStream, totalBytes, onProgress) {
     if (offset >= totalBytes) {
       pushStream.close();
       if (onProgress) onProgress(1);
+      if (onDone) onDone();
       return;
     }
 

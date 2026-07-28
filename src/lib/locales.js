@@ -120,7 +120,7 @@ export const UI_LABELS = {
     accuracy: 'Precisión',
     fluency: 'Fluidez',
     feedbackAvailable: 'Retroalimentación disponible — toca las palabras resaltadas arriba',
-    getFeedback: 'Ver retroalimentación',
+    getFeedback: 'Analizar',
     retry: 'Reintentar',
     reRecord: 'Grabar de nuevo',
     confirmDelete: 'Confirmar eliminación',
