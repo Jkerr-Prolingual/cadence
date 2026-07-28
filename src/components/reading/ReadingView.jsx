@@ -846,13 +846,14 @@ export default function ReadingView() {
         setAssessmentError(result.error);
       }
 
-      await supabase.storage.from('student-recordings').remove([storagePath]).catch(() => {});
-      await supabase
-        .from('student_recordings')
-        .update({ storage_path: null })
-        .eq('user_id', user.id)
-        .eq('text_id', textId)
-        .catch(() => {});
+      try { await supabase.storage.from('student-recordings').remove([storagePath]); } catch {}
+      try {
+        await supabase
+          .from('student_recordings')
+          .update({ storage_path: null })
+          .eq('user_id', user.id)
+          .eq('text_id', textId);
+      } catch {}
 
     } catch (err) {
       setAssessmentStatus('error');
