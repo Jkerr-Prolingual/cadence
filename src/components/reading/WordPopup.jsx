@@ -4,8 +4,9 @@ import { lemmaMap } from '../../data/lemmaMap';
 import { egpLookup } from '../../data/egpLookup';
 import { egpL1Overlays } from '../../data/egpL1Overlays';
 import { getL1Dict, getManifestTranslation, getManifestConstituents, getGlossTranslation, getGlossConstituents } from '../../lib/translations';
-import { getL1Label } from '../../lib/locales';
+import { getL1Label, getUILabel } from '../../lib/locales';
 import { lookupPhoneme } from '../../data/ipaPhonemes';
+import { getPhonemeVideo } from '../../data/phonemeVideos';
 import { getMWAudioUrl, playMWAudio } from '../../lib/mwDictionary';
 
 function speakWord(text) {
@@ -40,11 +41,13 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   const [structureDrillDown, setStructureDrillDown] = useState(false);
   const [activePhoneme, setActivePhoneme] = useState(null);
   const [mwAudioUrl, setMwAudioUrl] = useState(null);
+  const [showVideo, setShowVideo] = useState(null);
 
   useEffect(() => {
     setView(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
     setStructureDrillDown(false);
     setActivePhoneme(null);
+    setShowVideo(null);
   }, [word, particle, structure, syntaxGloss]);
 
   useEffect(() => {
@@ -463,7 +466,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
       {assessmentInfo && (
         <div className={toolSet === 'shadow' ? '' : 'mt-2 pt-2 border-t border-gray-100'}>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pronunciation</span>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{getUILabel('pronunciation', l1)}</span>
             {toolSet === 'shadow' && (
               <div className="flex items-center gap-1">
                 <span className="text-sm font-semibold text-gray-800">{word}</span>
@@ -486,12 +489,12 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
             )}
           </div>
           {assessmentInfo.type === 'omission' ? (
-            <p className="text-sm text-red-600 mt-1">Skipped</p>
+            <p className="text-sm text-red-600 mt-1">{getUILabel('skipped', l1)}</p>
           ) : (
             <div className="mt-1">
               {assessmentInfo.type === 'substitution' && (
                 <p className="text-sm text-orange-600 mb-1">
-                  You said: <strong>{assessmentInfo.spokenWord}</strong>
+                  {getUILabel('youSaid', l1)}: <strong>{assessmentInfo.spokenWord}</strong>
                 </p>
               )}
               {assessmentInfo.accuracy != null && (
@@ -555,14 +558,29 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                         </div>
                         {pd ? (
                           <>
-                            <p className="text-sm text-gray-700 mt-1 leading-snug">{pd.instruction}</p>
+                            <p className="text-sm text-gray-700 mt-1 leading-snug">{(pd.instructions?.[l1]) || pd.instruction}</p>
                             <p className="text-xs text-gray-500 mt-1">
-                              As in: <strong>{pd.example}</strong>{' '}
+                              {getUILabel('asIn', l1)}: <strong>{pd.example}</strong>{' '}
                               <span className="text-gray-400">({pd.exampleHighlight})</span>
                             </p>
+                            {l1 === 'es' && (() => {
+                              const vid = getPhonemeVideo('es', p.phoneme);
+                              if (!vid) return null;
+                              return (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setShowVideo(vid); }}
+                                  className="mt-2 flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 active:text-red-800 font-medium"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                                    <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0C.488 3.45.029 5.804 0 12c.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0C23.512 20.55 23.971 18.196 24 12c-.029-6.185-.484-8.549-4.385-8.816zM9 16V8l8 4-8 4z"/>
+                                  </svg>
+                                  {getUILabel('watchVideo', l1)}
+                                </button>
+                              );
+                            })()}
                           </>
                         ) : (
-                          <p className="text-xs text-gray-400 italic">No articulation guide for this sound.</p>
+                          <p className="text-xs text-gray-400 italic">{getUILabel('noArticulationGuide', l1)}</p>
                         )}
                       </div>
                     );
@@ -572,7 +590,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
             </div>
           )}
           {assessmentInfo.pauseMs && (
-            <p className="text-xs text-gray-500 mt-1">Pause {(assessmentInfo.pauseMs / 1000).toFixed(1)}s</p>
+            <p className="text-xs text-gray-500 mt-1">{getUILabel('pause', l1)} {(assessmentInfo.pauseMs / 1000).toFixed(1)}s</p>
           )}
         </div>
       )}
@@ -593,6 +611,37 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           </button>
         </div>
       </div>
+
+      {showVideo && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setShowVideo(null)}
+        >
+          <div
+            className="relative w-full max-w-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowVideo(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 text-sm font-medium flex items-center gap-1"
+            >
+              Close
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+              </svg>
+            </button>
+            <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+              <iframe
+                className="absolute inset-0 w-full h-full rounded-lg"
+                src={`https://www.youtube.com/embed/${showVideo.videoId}?start=${showVideo.start}&autoplay=1`}
+                title="Pronunciation video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

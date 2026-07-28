@@ -191,10 +191,15 @@ export default function ReadingView() {
         setAssessmentStatus(rec.assessment_status || null);
         setAssessmentError(rec.assessment_error || null);
       }
+
+      if (assessment && rec?.assessment_status === 'complete' && sentences.length > 0) {
+        setAssessmentData(assessment);
+        setWordAssessmentMap(buildWordAssessmentMap(assessment, sentences));
+      }
     })();
 
     return () => { cancelled = true; };
-  }, [selectedTextId, user?.id]);
+  }, [selectedTextId, user?.id, sentences.length]);
 
   // Reset tool-specific state when switching tool sets
   useEffect(() => {
@@ -203,7 +208,14 @@ export default function ReadingView() {
       audioRef.current.pause();
       setIsPlaying(false);
     }
-    setLoopSentenceIdx(null);
+    if (toolSet === 'shadow' && sentences.length > 0) {
+      setLoopSentenceIdx(0);
+      if (audioRef.current) {
+        audioRef.current.currentTime = getLoopStart(0);
+      }
+    } else {
+      setLoopSentenceIdx(null);
+    }
     if (recordingMode !== 'idle') {
       recorder.stopRecording();
       recorder.clearRecording();
@@ -395,6 +407,8 @@ export default function ReadingView() {
       const sentence = sentences[loopSentenceIdx];
       const loopEnd = sentence.endTime + 0.05;
       if (sentence?.endTime != null && ct >= loopEnd) {
+        audio.pause();
+        setIsPlaying(false);
         audio.currentTime = getLoopStart(loopSentenceIdx);
       }
     }
@@ -480,6 +494,44 @@ export default function ReadingView() {
 
   function handleClearLoop() {
     setLoopSentenceIdx(null);
+  }
+
+  function handleReplaySentence() {
+    const idx = loopSentenceIdx ?? Math.max(0, currentSentenceIdx);
+    const sentence = sentences[idx];
+    if (!sentence || !hasAudio) return;
+    trackShadowedSentence(idx);
+    setLoopSentenceIdx(idx);
+    const audio = audioRef.current;
+    if (audio) {
+      audio.currentTime = getLoopStart(idx);
+      audio.play();
+      setIsPlaying(true);
+    }
+  }
+
+  function handleShadowPrev() {
+    const idx = loopSentenceIdx ?? Math.max(0, currentSentenceIdx);
+    const prev = Math.max(0, idx - 1);
+    setLoopSentenceIdx(prev);
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = getLoopStart(prev);
+      setIsPlaying(false);
+    }
+  }
+
+  function handleShadowNext() {
+    const idx = loopSentenceIdx ?? Math.max(0, currentSentenceIdx);
+    const next = Math.min(sentences.length - 1, idx + 1);
+    setLoopSentenceIdx(next);
+    const audio = audioRef.current;
+    if (audio) {
+      audio.currentTime = getLoopStart(next);
+      audio.play();
+      setIsPlaying(true);
+    }
   }
 
   // ── Full-text recording controls (Record & Review) ────────────────────────────
@@ -839,11 +891,10 @@ export default function ReadingView() {
           loopSentenceIdx={loopSentenceIdx}
           currentSentenceIdx={currentSentenceIdx}
           sentences={sentences}
-          onPlayPause={handlePlayPause}
-          onSeek={handleSeek}
+          onReplay={handleReplaySentence}
+          onPrev={handleShadowPrev}
+          onNext={handleShadowNext}
           onSpeedChange={handleSpeedChange}
-          onLoopSentence={handleLoopByIndex}
-          onClearLoop={handleClearLoop}
           loopRecordingMode={loopRecordingMode}
           loopRecorderAudioUrl={loopRecorder.audioUrl}
           onStartLoopRecording={handleStartLoopRecording}
@@ -862,6 +913,7 @@ export default function ReadingView() {
           feedbackLoading={shadowFeedbackLoading}
           onRequestFeedback={handleRequestShadowFeedback}
           onClearFeedback={handleClearShadowFeedback}
+          l1={l1}
         />
       );
     }
@@ -880,6 +932,12 @@ export default function ReadingView() {
           saveError={saveError}
           recorderError={recorder.error}
           l1={l1}
+          hasRecording={hasRecording}
+          assessmentStatus={assessmentStatus}
+          assessmentError={assessmentError}
+          assessmentData={assessmentData}
+          onAnalyzePronunciation={handleAnalyzePronunciation}
+          onStartFresh={handleStartFresh}
         />
       );
     }

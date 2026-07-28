@@ -159,6 +159,13 @@ export default function BookChaptersPage() {
                         {cp.recording.exists && (
                           <span className="text-[10px] text-gray-400" title="Recording saved">🎤</span>
                         )}
+                        {cp.recording.assessmentStatus === 'complete' && (
+                          <span className="text-[10px] text-green-500 flex items-center gap-0.5" title="Pronunciation feedback available">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                              <path fillRule="evenodd" d="M8 15A7 7 0 108 1a7 7 0 000 14zm3.844-8.791a.75.75 0 00-1.188-.918l-3.7 4.79-1.649-1.833a.75.75 0 10-1.114 1.004l2.25 2.5a.75.75 0 001.15-.043l4.25-5.5z" clipRule="evenodd" />
+                            </svg>
+                          </span>
+                        )}
                         {cp.srs.totalCards > 0 && (
                           <span className="text-[10px] text-gray-500">
                             {cp.srs.totalCards} {cp.srs.totalCards === 1 ? 'card' : 'cards'}

@@ -17,7 +17,7 @@ export default function useChapterProgress({ chapterIds, userId }) {
           .order('session_date', { ascending: true }),
         supabase
           .from('student_recordings')
-          .select('text_id, storage_path, duration_seconds')
+          .select('text_id, storage_path, duration_seconds, assessment_status')
           .eq('user_id', userId)
           .in('text_id', chapterIds),
         supabase
@@ -49,7 +49,7 @@ export default function useChapterProgress({ chapterIds, userId }) {
       for (const id of chapterIds) {
         result[id] = {
           fluency: { sessionCount: 0, latestWpm: null, wpmHistory: [] },
-          recording: { exists: false, storagePath: null, durationSeconds: null },
+          recording: { exists: false, storagePath: null, durationSeconds: null, assessmentStatus: null },
           srs: { totalCards: 0, dueCards: 0 },
           assignments: null,
         };
@@ -72,6 +72,7 @@ export default function useChapterProgress({ chapterIds, userId }) {
           exists: true,
           storagePath: r.storage_path,
           durationSeconds: r.duration_seconds,
+          assessmentStatus: r.assessment_status || null,
         };
       }
 
