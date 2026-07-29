@@ -518,15 +518,21 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
     });
     const whisperData = await whisperRes.json();
     if (whisperData.error) throw new Error(`Whisper: ${whisperData.error}`);
+    console.log(`[fluency] Whisper: ${(whisperData.words || []).length} words, transcript: "${(whisperData.transcript || '').substring(0, 200)}..."`);
     if (onProgress) onProgress(0.2);
 
     const refTokens = tokenizeReference(referenceText);
     const alignment = alignWords(refTokens, whisperData.words || []);
+    const matchCount = alignment.filter(e => e.type === 'match').length;
+    const omitCount = alignment.filter(e => e.type === 'omission').length;
+    console.log(`[fluency] Alignment: ${alignment.length} entries (${matchCount} match, ${omitCount} omission), ref tokens: ${refTokens.length}`);
 
     const audioBuffer = await decodeAudioBlob(audioBlob);
+    console.log(`[fluency] Audio decoded: ${audioBuffer.duration.toFixed(1)}s, ${audioBuffer.length} samples`);
     const sentences = detectSentences(referenceText, null);
     const chunks = buildSentenceChunks(sentences, refTokens, CHUNK_MIN_WORDS);
     const wordPositions = getWordPositions(referenceText);
+    console.log(`[fluency] ${sentences.length} sentences → ${chunks.length} chunks:`, chunks.map(c => `[${c.firstWordIdx}-${c.lastWordIdx}]`).join(', '));
     if (onProgress) onProgress(0.3);
 
     const chunkResults = await Promise.all(chunks.map(async (chunk, idx) => {
@@ -540,6 +546,9 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
       const chunkRefText = extractChunkText(referenceText, wordPositions, chunk.firstWordIdx, chunk.lastWordIdx);
 
       try {
+        const timeRangeStr = `${timeRange.startSec.toFixed(1)}-${timeRange.endSec.toFixed(1)}s`;
+        console.log(`[fluency] chunk ${idx}: words ${chunk.firstWordIdx}-${chunk.lastWordIdx}, time ${timeRangeStr}, wav ${wavBlob.size}B, ref "${chunkRefText.substring(0, 60)}..."`);
+
         await supabase.storage
           .from('student-recordings')
           .upload(chunkPath, wavBlob, { contentType: 'audio/wav', upsert: true });
@@ -550,13 +559,11 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
           body: JSON.stringify({ storagePath: chunkPath, referenceText: chunkRefText }),
         });
         const data = await res.json();
+        console.log(`[fluency] chunk ${idx} result: ${data.words?.length || 0} words, error: ${data.error || 'none'}`);
 
         try { await supabase.storage.from('student-recordings').remove([chunkPath]); } catch {}
 
-        if (data.error) {
-          console.warn(`[fluency] chunk ${idx} error:`, data.error);
-          return null;
-        }
+        if (data.error) return null;
         return data;
       } catch (err) {
         console.warn(`[fluency] chunk ${idx} failed:`, err);
@@ -579,6 +586,8 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
       if (result.prosodyScore != null) prosodyScores.push(result.prosodyScore);
       if (result.completenessScore != null) completenessScores.push(result.completenessScore);
     }
+
+    console.log(`[fluency] Merged: ${mergedWords.length} words from ${chunkResults.filter(Boolean).length}/${chunks.length} chunks`);
 
     const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
     const azureData = mergedWords.length > 0 ? {
