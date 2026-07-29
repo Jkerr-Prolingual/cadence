@@ -4,7 +4,7 @@ import { cleanToken } from './wordUtils';
 
 const FLAG_THRESHOLD = 50;
 const PAUSE_THRESHOLD_MS = 1000;
-const CHUNK_MIN_WORDS = 15;
+const CHUNK_MIN_WORDS = 4;
 const AUDIO_BUFFER_SEC = 0.3;
 const MIN_PHONEME_INSTANCES = 5;
 
@@ -490,6 +490,28 @@ export function computePhonemeMedians(groups, minInstances = MIN_PHONEME_INSTANC
     counts[phoneme] = scores.length;
   }
   return { medians, counts };
+}
+
+export function buildPhonemeWordExamples(words) {
+  const examples = {};
+  for (const w of words) {
+    if (w.errorType === 'Insertion' || w.errorType === 'Omission') continue;
+    const seen = {};
+    for (const p of (w.phonemes || [])) {
+      if (p.accuracyScore == null) continue;
+      if (!seen[p.phoneme] || p.accuracyScore < seen[p.phoneme]) {
+        seen[p.phoneme] = p.accuracyScore;
+      }
+    }
+    for (const [phoneme, score] of Object.entries(seen)) {
+      if (!examples[phoneme]) examples[phoneme] = [];
+      examples[phoneme].push({ word: w.word, score });
+    }
+  }
+  for (const arr of Object.values(examples)) {
+    arr.sort((a, b) => a.score - b.score);
+  }
+  return examples;
 }
 
 export function identifyWeakPhonemes(medians) {

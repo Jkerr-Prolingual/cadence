@@ -19,7 +19,7 @@ function accuracyBg(score) {
   return '#fef2f2';
 }
 
-function PhonemeCard({ phoneme, median, count, l1, defaultExpanded = false }) {
+function PhonemeCard({ phoneme, median, count, l1, wordExamples = [], defaultExpanded = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const pd = ipaPhonemes[phoneme];
   const color = accuracyColor(median);
@@ -59,16 +59,32 @@ function PhonemeCard({ phoneme, median, count, l1, defaultExpanded = false }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {expanded && pd && (
+      {expanded && (
         <div className="px-3 pb-3 border-t border-gray-100">
-          <div className="flex gap-3 mt-3">
-            <div className="w-20 h-20 flex-shrink-0">
-              <MouthDiagram phonemeData={pd} />
+          {pd && (
+            <div className="flex gap-3 mt-3">
+              <div className="w-20 h-20 flex-shrink-0">
+                <MouthDiagram phonemeData={pd} />
+              </div>
+              <p className="text-sm text-gray-700 leading-snug flex-1">
+                {pd.instructions?.[l1] || pd.instruction}
+              </p>
             </div>
-            <p className="text-sm text-gray-700 leading-snug flex-1">
-              {pd.instructions?.[l1] || pd.instruction}
-            </p>
-          </div>
+          )}
+          {wordExamples.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {wordExamples.map((ex, i) => (
+                <span
+                  key={`${ex.word}-${i}`}
+                  className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full"
+                  style={{ backgroundColor: accuracyBg(ex.score), color: accuracyColor(ex.score) }}
+                >
+                  <span className="font-medium">{ex.word}</span>
+                  <span className="opacity-70">{ex.score}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -94,7 +110,7 @@ function ScoreBar({ label, value }) {
   );
 }
 
-export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, l1, onClose }) {
+export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, phonemeWordExamples, l1, onClose }) {
   const [showAll, setShowAll] = useState(false);
 
   if (!phonemeSession) return null;
@@ -155,6 +171,7 @@ export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, l
                     median={p.median}
                     count={p.count}
                     l1={l1}
+                    wordExamples={phonemeWordExamples?.[p.phoneme] || []}
                     defaultExpanded={weakEntries.length <= 3}
                   />
                 ))}
@@ -186,6 +203,7 @@ export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, l
                       median={p.median}
                       count={p.count}
                       l1={l1}
+                      wordExamples={phonemeWordExamples?.[p.phoneme] || []}
                     />
                   ))}
                 </div>

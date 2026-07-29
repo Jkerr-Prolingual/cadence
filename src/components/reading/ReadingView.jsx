@@ -17,7 +17,7 @@ import { cleanToken } from '../../lib/wordUtils';
 import { findCurrentWord, findCurrentSentence, detectSentences, findSentenceForWord } from '../../lib/audioUtils';
 import { completeTaskForText } from '../../lib/assignments';
 import { logFluencySession, getFluencySessionsForText } from '../../lib/fluency';
-import { runPronunciationAssessment, buildWordAssessmentMap, assessSentencePronunciation, getWordPositions, extractChunkText, runFluencyAssessment, getPhonemeSessionsForText } from '../../lib/pronunciation';
+import { runPronunciationAssessment, buildWordAssessmentMap, assessSentencePronunciation, getWordPositions, extractChunkText, runFluencyAssessment, getPhonemeSessionsForText, buildPhonemeWordExamples } from '../../lib/pronunciation';
 import { resetChapterRecording, resetChapterWpm } from '../../lib/resetProgress';
 import PhonemeSummaryReport from './PhonemeSummaryReport';
 import { getUILabel } from '../../lib/locales';
@@ -1410,6 +1410,7 @@ export default function ReadingView() {
         <PhonemeSummaryReport
           phonemeSession={phonemeSession}
           phonemeHistory={phonemeHistory}
+          phonemeWordExamples={assessmentData?.azure_word_scores ? buildPhonemeWordExamples(assessmentData.azure_word_scores) : null}
           l1={l1}
           onClose={() => setShowPhonemeReport(false)}
         />
