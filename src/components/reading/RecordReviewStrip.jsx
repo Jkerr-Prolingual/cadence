@@ -27,11 +27,11 @@ export default function RecordReviewStrip({
   onSelectDuration,
   onSubmitFluency,
   onDiscardFluency,
+  onSaveFluencyOnly,
+  onListenBackFluency,
+  hasFluencyBlob = false,
   onShowPhonemeReport,
   phonemeSession = null,
-  selectingEndpoint = false,
-  endpointWordIdx = null,
-  endpointWordCount = null,
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const t = (key) => getUILabel(key, l1);
@@ -96,42 +96,42 @@ export default function RecordReviewStrip({
     );
   }
 
-  // --- Fluency: Endpoint selection (tap last word you read) ---
-  if (selectingEndpoint) {
+  // --- Fluency: Review (recording done, choose save/analyze/discard) ---
+  if (hasFluencyBlob && !assessmentStatus) {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
-          {endpointWordIdx == null ? (
-            <>
-              <p className="text-sm font-medium text-amber-700">{t('tapLastWord')}</p>
+          <p className="text-xs text-gray-500">
+            {hasRecording ? t('recordingSaved') : t('reviewPrompt')}
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={onListenBackFluency}
+              className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+            >
+              {t('listenBack')}
+            </button>
+            {!hasRecording && (
               <button
-                onClick={onDiscardFluency}
-                className="px-4 py-2.5 sm:py-2 text-xs font-medium text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors"
+                onClick={onSaveFluencyOnly}
+                className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
               >
-                {t('discard')}
+                {t('saveRecording')}
               </button>
-            </>
-          ) : (
-            <>
-              <p className="text-xs text-gray-500">
-                {t('wordsSelected').replace('{n}', endpointWordCount || endpointWordIdx + 1)}
-              </p>
-              <div className="flex items-center justify-center gap-2">
-                <button
-                  onClick={onSubmitFluency}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 sm:py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
-                >
-                  {t('confirm')}
-                </button>
-                <button
-                  onClick={onDiscardFluency}
-                  className="px-4 py-2.5 sm:py-2 text-xs font-medium text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors"
-                >
-                  {t('discard')}
-                </button>
-              </div>
-            </>
-          )}
+            )}
+            <button
+              onClick={onSubmitFluency}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
+            >
+              {t('analyze')}
+            </button>
+            <button
+              onClick={onDiscardFluency}
+              className="px-4 py-2.5 sm:py-2 text-xs font-medium text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors"
+            >
+              {t('discard')}
+            </button>
+          </div>
         </div>
       </div>
     );

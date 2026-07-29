@@ -289,6 +289,7 @@ export function buildWordAssessmentMap(assessmentData, sentences = null) {
       accuracy,
       timestampMs: entry.timestampMs,
       errorType: azure?.errorType || null,
+      phonemes: azure?.phonemes || [],
       pauseMs: pauseByRefIdx.get(entry.refIdx) || null,
     });
   }
@@ -523,7 +524,7 @@ export function identifyWeakPhonemes(medians) {
 
 // --- Fluency assessment (Whisper + chunked Azure PA) ---
 
-export async function runFluencyAssessment({ userId, textId, referenceText, audioBlob, storagePath, supabase, durationSeconds, onProgress }) {
+export async function runFluencyAssessment({ userId, textId, fullText, audioBlob, storagePath, supabase, durationSeconds, onProgress }) {
   await supabase
     .from('student_recordings')
     .update({ assessment_status: 'processing', assessment_error: null })
@@ -543,15 +544,24 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
     console.log(`[fluency] Whisper: ${(whisperData.words || []).length} words, transcript: "${(whisperData.transcript || '').substring(0, 200)}..."`);
     if (onProgress) onProgress(0.2);
 
-    const refTokens = tokenizeReference(referenceText);
-    const alignment = alignWords(refTokens, whisperData.words || []);
+    const fullTokens = tokenizeReference(fullText);
+    const alignment = alignWords(fullTokens, whisperData.words || []);
+
+    const spokenEntries = alignment.filter(e => e.refIdx != null && e.spokenIdx != null);
+    const lastSpokenRefIdx = spokenEntries.length > 0 ? Math.max(...spokenEntries.map(e => e.refIdx)) : -1;
+    if (lastSpokenRefIdx < 0) throw new Error('No spoken words detected in recording');
+
     const matchCount = alignment.filter(e => e.type === 'match').length;
-    const omitCount = alignment.filter(e => e.type === 'omission').length;
-    console.log(`[fluency] Alignment: ${alignment.length} entries (${matchCount} match, ${omitCount} omission), ref tokens: ${refTokens.length}`);
+    const omitCount = alignment.filter(e => e.type === 'omission' && e.refIdx <= lastSpokenRefIdx).length;
+    console.log(`[fluency] Alignment: ${matchCount} match, ${omitCount} omission, endpoint: word ${lastSpokenRefIdx} of ${fullTokens.length}`);
+
+    const allWordPositions = getWordPositions(fullText);
+    const referenceText = extractChunkText(fullText, allWordPositions, 0, lastSpokenRefIdx);
 
     const audioBuffer = await decodeAudioBlob(audioBlob);
     console.log(`[fluency] Audio decoded: ${audioBuffer.duration.toFixed(1)}s, ${audioBuffer.length} samples`);
     const sentences = detectSentences(referenceText, null);
+    const refTokens = tokenizeReference(referenceText);
     const chunks = buildSentenceChunks(sentences, refTokens, CHUNK_MIN_WORDS);
     const wordPositions = getWordPositions(referenceText);
     console.log(`[fluency] ${sentences.length} sentences → ${chunks.length} chunks:`, chunks.map(c => `[${c.firstWordIdx}-${c.lastWordIdx}]`).join(', '));

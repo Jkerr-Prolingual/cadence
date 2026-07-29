@@ -86,7 +86,7 @@ export default function ShadowReadStrip({
 
             <button
               onClick={onNext}
-              disabled={isPlaying && activeIdx >= totalSentences - 1}
+              disabled={activeIdx >= totalSentences - 1}
               className="w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-30"
               title="Next sentence"
             >

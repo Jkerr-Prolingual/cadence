@@ -157,6 +157,46 @@ export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, p
             )}
           </div>
 
+          {/* Practice words — all words containing any weak phoneme */}
+          {weakEntries.length > 0 && phonemeWordExamples && (() => {
+            const weakSet2 = new Set(weakEntries.map(p => p.phoneme));
+            const wordMap = new Map();
+            for (const phoneme of weakSet2) {
+              for (const ex of (phonemeWordExamples[phoneme] || [])) {
+                const key = ex.word.toLowerCase();
+                if (!wordMap.has(key)) {
+                  wordMap.set(key, { word: ex.word, phonemes: [], worstScore: ex.score });
+                }
+                const entry = wordMap.get(key);
+                entry.phonemes.push({ phoneme, score: ex.score });
+                if (ex.score < entry.worstScore) entry.worstScore = ex.score;
+              }
+            }
+            const practiceWords = [...wordMap.values()].sort((a, b) => a.worstScore - b.worstScore);
+            if (practiceWords.length === 0) return null;
+            return (
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-gray-700">
+                  {getUILabel('wordsToPractice', l1)}
+                </h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {practiceWords.map((pw, i) => (
+                    <span
+                      key={`${pw.word}-${i}`}
+                      className="inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-full border"
+                      style={{ borderColor: accuracyColor(pw.worstScore) + '40', backgroundColor: accuracyBg(pw.worstScore) }}
+                    >
+                      <span className="font-medium" style={{ color: accuracyColor(pw.worstScore) }}>{pw.word}</span>
+                      <span className="text-xs opacity-60" style={{ color: accuracyColor(pw.worstScore) }}>
+                        {pw.phonemes.map(p => `/${p.phoneme}/`).join(' ')}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Weak phonemes */}
           {weakEntries.length > 0 && (
             <div className="space-y-2">

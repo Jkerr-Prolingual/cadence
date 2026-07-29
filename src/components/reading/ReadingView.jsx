@@ -123,8 +123,6 @@ export default function ReadingView() {
   const [phonemeSession, setPhonemeSession] = useState(null);
   const [phonemeHistory, setPhonemeHistory] = useState([]);
   const [showPhonemeReport, setShowPhonemeReport] = useState(false);
-  const [selectingEndpoint, setSelectingEndpoint] = useState(false);
-  const [endpointWordIdx, setEndpointWordIdx] = useState(null);
   const fluencyTimerRef = useRef(null);
 
   // Timed reading
@@ -181,8 +179,6 @@ export default function ReadingView() {
     setFluencyProgress(null);
     setPhonemeSession(null);
     setShowPhonemeReport(false);
-    setSelectingEndpoint(false);
-    setEndpointWordIdx(null);
     if (fluencyTimerRef.current) { clearInterval(fluencyTimerRef.current); fluencyTimerRef.current = null; }
   }, [selectedTextId]);
 
@@ -469,6 +465,10 @@ export default function ReadingView() {
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) {
+      if (toolSet === 'shadow') {
+        shadowRepeatModeRef.current = false;
+        setShadowRepeatActive(false);
+      }
       audio.play();
       setIsPlaying(true);
     } else {
@@ -566,34 +566,36 @@ export default function ReadingView() {
   function handleShadowPrev() {
     const idx = loopSentenceIdx ?? Math.max(0, currentSentenceIdx);
     const prev = Math.max(0, idx - 1);
-    shadowRepeatModeRef.current = false;
+    const wasPlaying = isPlaying;
     setShadowRepeatActive(false);
+    if (wasPlaying) {
+      shadowRepeatModeRef.current = false;
+    }
     trackShadowedSentence(prev);
     setLoopSentenceIdx(prev);
     const audio = audioRef.current;
     if (audio) {
       audio.currentTime = getLoopStart(prev);
-      audio.play();
-      setIsPlaying(true);
+      if (wasPlaying) {
+        audio.play();
+      }
     }
   }
 
   function handleShadowNext() {
     const idx = loopSentenceIdx ?? Math.max(0, currentSentenceIdx);
+    const next = Math.min(sentences.length - 1, idx + 1);
     const audio = audioRef.current;
     if (!audio) return;
-    shadowRepeatModeRef.current = false;
     setShadowRepeatActive(false);
-    if (!isPlaying) {
-      trackShadowedSentence(idx);
-      audio.currentTime = getLoopStart(idx);
+    if (isPlaying) {
+      shadowRepeatModeRef.current = false;
+    }
+    trackShadowedSentence(next);
+    setLoopSentenceIdx(next);
+    audio.currentTime = getLoopStart(next);
+    if (isPlaying) {
       audio.play();
-      setIsPlaying(true);
-    } else {
-      const next = Math.min(sentences.length - 1, idx + 1);
-      trackShadowedSentence(next);
-      setLoopSentenceIdx(next);
-      audio.currentTime = getLoopStart(next);
     }
   }
 
@@ -742,8 +744,6 @@ export default function ReadingView() {
       setWordAssessmentMap(null);
       setPhonemeSession(null);
       setFluencyProgress(null);
-      setSelectingEndpoint(false);
-      setEndpointWordIdx(null);
       return;
     }
     setFluencyDuration(seconds);
@@ -774,8 +774,6 @@ export default function ReadingView() {
         fluencyTimerRef.current = null;
         recorder.stopRecording();
         setRecordingMode('idle');
-        setSelectingEndpoint(true);
-        setEndpointWordIdx(null);
       }
     }, 1000);
   }
@@ -784,39 +782,56 @@ export default function ReadingView() {
     if (fluencyTimerRef.current) { clearInterval(fluencyTimerRef.current); fluencyTimerRef.current = null; }
     recorder.stopRecording();
     setRecordingMode('idle');
-    setSelectingEndpoint(true);
-    setEndpointWordIdx(null);
+  }
+
+  async function handleSaveFluencyOnly() {
+    if (!user?.id || !recorder.audioBlob) return;
+    const textId = selectedTextIdRef.current;
+    const storagePath = `${user.id}/${textId}.webm`;
+
+    try {
+      await supabase.storage
+        .from('student-recordings')
+        .upload(storagePath, recorder.audioBlob, { contentType: 'audio/webm', upsert: true });
+
+      await supabase
+        .from('student_recordings')
+        .upsert({
+          user_id: user.id,
+          text_id: textId,
+          storage_path: storagePath,
+          duration_seconds: fluencyDuration,
+          playback_rate: 1.0,
+        }, { onConflict: 'user_id,text_id' });
+
+      setHasRecording(true);
+    } catch (err) {
+      setSaveError(err.message);
+    }
+  }
+
+  function handleListenBackFluency() {
+    if (!recorder.audioBlob) return;
+    if (playbackRef.current) { playbackRef.current.pause(); }
+    const url = URL.createObjectURL(recorder.audioBlob);
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    playbackRef.current = audio;
+    audio.play();
   }
 
   function handleDiscardFluency() {
+    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; }
     recorder.clearRecording();
     setRecordingMode('idle');
     setFluencyDuration(null);
     setFluencyCountdown(null);
-    setSelectingEndpoint(false);
-    setEndpointWordIdx(null);
-  }
-
-  function extractReferenceText(body, maxWordIdx) {
-    if (maxWordIdx == null) return body;
-    const regex = /([a-zA-ZÀ-ÿ'''-]+)|([^a-zA-ZÀ-ÿ'''-]+)/g;
-    let wordCount = 0;
-    let match;
-    while ((match = regex.exec(body)) !== null) {
-      if (match[1]) {
-        if (wordCount >= maxWordIdx) return body.slice(0, match.index + match[0].length);
-        wordCount++;
-      }
-    }
-    return body;
   }
 
   async function handleFluencyAnalysis() {
     if (!user?.id || !selectedText?.body) return;
-    if (endpointWordIdx == null) return;
     const textId = selectedTextIdRef.current;
 
-    setSelectingEndpoint(false);
     setRecordingMode('idle');
     setAssessmentStatus('processing');
     setFluencyProgress(0);
@@ -830,7 +845,6 @@ export default function ReadingView() {
       return;
     }
 
-    const referenceText = extractReferenceText(selectedText.body, endpointWordIdx);
     const storagePath = `${user.id}/${textId}.webm`;
 
     try {
@@ -853,7 +867,7 @@ export default function ReadingView() {
       const result = await runFluencyAssessment({
         userId: user.id,
         textId,
-        referenceText,
+        fullText: selectedText.body,
         audioBlob,
         storagePath,
         supabase,
@@ -876,15 +890,6 @@ export default function ReadingView() {
         setAssessmentStatus('error');
         setAssessmentError(result.error);
       }
-
-      try { await supabase.storage.from('student-recordings').remove([storagePath]); } catch {}
-      try {
-        await supabase
-          .from('student_recordings')
-          .update({ storage_path: null })
-          .eq('user_id', user.id)
-          .eq('text_id', textId);
-      } catch {}
 
     } catch (err) {
       setAssessmentStatus('error');
@@ -1056,10 +1061,6 @@ export default function ReadingView() {
   // ── Word click / popup ────────────────────────────────────────────────────────
 
   const handleWordClick = useCallback((token, position) => {
-    if (selectingEndpoint) {
-      setEndpointWordIdx(token.wordIdx);
-      return;
-    }
     if (toolSet === 'timed' && timedMode === 'active') {
       handleTimedDone(token.wordIdx + 1);
       return;
@@ -1070,7 +1071,7 @@ export default function ReadingView() {
     }
     setPopup({ token, position });
     recordEncounter(token);
-  }, [hasAudio, sentences, toolSet, timedMode, selectingEndpoint]);
+  }, [hasAudio, sentences, toolSet, timedMode]);
 
   function handleResumeAudio() {
     setPopup(null);
@@ -1185,11 +1186,11 @@ export default function ReadingView() {
           onSelectDuration={handleSelectDuration}
           onSubmitFluency={handleFluencyAnalysis}
           onDiscardFluency={handleDiscardFluency}
+          onSaveFluencyOnly={handleSaveFluencyOnly}
+          onListenBackFluency={handleListenBackFluency}
+          hasFluencyBlob={!!(fluencyDuration && recorder.audioBlob && recordingMode === 'idle')}
           onShowPhonemeReport={() => setShowPhonemeReport(true)}
           phonemeSession={phonemeSession}
-          selectingEndpoint={selectingEndpoint}
-          endpointWordIdx={endpointWordIdx}
-          endpointWordCount={endpointWordIdx != null ? endpointWordIdx + 1 : null}
         />
       );
     }
@@ -1268,13 +1269,7 @@ export default function ReadingView() {
 
               {(recordingMode === 'recording' && fluencyDuration != null) && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 text-center">
-                  {getUILabel('readingBanner', l1)}
-                </div>
-              )}
-
-              {selectingEndpoint && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 text-center font-medium">
-                  {getUILabel('tapLastWord', l1)}
+                  {getUILabel('readInstructions', l1)}
                 </div>
               )}
 
@@ -1294,7 +1289,7 @@ export default function ReadingView() {
                 l1={l1}
                 wordAssessmentMap={(toolSet === 'record' || toolSet === 'shadow') ? wordAssessmentMap : null}
                 textSize={textSize}
-                endpointWordIdx={selectingEndpoint ? endpointWordIdx : null}
+                endpointWordIdx={null}
               />
 
               {chapterNav && (
