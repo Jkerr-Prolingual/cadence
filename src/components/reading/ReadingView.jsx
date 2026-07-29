@@ -831,7 +831,6 @@ export default function ReadingView() {
     }
 
     const referenceText = extractReferenceText(selectedText.body, endpointWordIdx);
-    console.log('[fluency] endpointWordIdx:', endpointWordIdx, 'refText words:', referenceText.split(/\s+/).length, 'refText preview:', referenceText.slice(0, 200));
     const storagePath = `${user.id}/${textId}.webm`;
 
     try {
@@ -1057,7 +1056,6 @@ export default function ReadingView() {
 
   const handleWordClick = useCallback((token, position) => {
     if (selectingEndpoint) {
-      console.log('[fluency] endpoint tap:', token.wordIdx, token.raw);
       setEndpointWordIdx(token.wordIdx);
       return;
     }

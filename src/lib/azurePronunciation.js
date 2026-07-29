@@ -23,16 +23,19 @@ export async function assessFullRecording({ token, region, referenceText, audioB
   const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
   speechConfig.speechRecognitionLanguage = 'en-US';
   speechConfig.outputFormat = SpeechSDK.OutputFormat.Detailed;
+  speechConfig.setProperty(
+    SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs,
+    '1500'
+  );
 
   const cleanRef = referenceText.replace(/[\r\n]+/g, ' ').trim();
   const paConfig = new SpeechSDK.PronunciationAssessmentConfig(
     cleanRef,
     SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
     SpeechSDK.PronunciationAssessmentGranularity.Phoneme,
-    true
+    false
   );
   paConfig.phonemeAlphabet = 'IPA';
-  paConfig.enableMiscue = true;
 
   const pushStream = SpeechSDK.AudioInputStream.createPushStream(
     SpeechSDK.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1)
@@ -45,6 +48,7 @@ export async function assessFullRecording({ token, region, referenceText, audioB
   const prosodyScores = [];
   const completenessScores = [];
   const totalBytes = wavArrayBuffer.byteLength;
+  let turnCount = 0;
 
   return new Promise((resolve, reject) => {
     const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
@@ -52,6 +56,7 @@ export async function assessFullRecording({ token, region, referenceText, audioB
 
     recognizer.recognized = (_, e) => {
       if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+        turnCount++;
         try {
           const detailJson = e.result.properties.getProperty(
             SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult
@@ -81,18 +86,15 @@ export async function assessFullRecording({ token, region, referenceText, audioB
         } catch (err) {
           console.warn('[azurePronunciation] Error parsing recognized result:', err);
         }
+        console.log(`[azurePronunciation] Turn ${turnCount}: ${allWords.length} words total`);
       }
     };
 
     recognizer.canceled = (_, e) => {
+      console.log('[azurePronunciation] Canceled:', e.reason, e.errorDetails || '');
       if (e.reason === SpeechSDK.CancellationReason.Error) {
         recognizer.close();
         reject(new Error(`Azure Speech error: ${e.errorDetails}`));
-      } else {
-        recognizer.stopContinuousRecognitionAsync(
-          () => recognizer.close(),
-          () => recognizer.close()
-        );
       }
     };
 
@@ -100,6 +102,7 @@ export async function assessFullRecording({ token, region, referenceText, audioB
     const finalize = () => {
       if (resolved) return;
       resolved = true;
+      console.log(`[azurePronunciation] Finalized: ${turnCount} turns, ${allWords.length} words`);
       recognizer.close();
       const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
       resolve({
@@ -110,16 +113,36 @@ export async function assessFullRecording({ token, region, referenceText, audioB
       });
     };
 
-    recognizer.sessionStopped = finalize;
+    recognizer.sessionStopped = () => {
+      console.log('[azurePronunciation] Session stopped');
+      finalize();
+    };
+
+    let streamDone = false;
+    let idleTimer = null;
+
+    const resetIdleTimer = () => {
+      if (!streamDone) return;
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        console.log('[azurePronunciation] No new events for 4s after stream end, stopping...');
+        recognizer.stopContinuousRecognitionAsync(() => {}, () => { finalize(); });
+      }, 4000);
+    };
+
+    const origRecognized = recognizer.recognized;
+    recognizer.recognized = (s, e) => {
+      origRecognized(s, e);
+      resetIdleTimer();
+    };
 
     recognizer.startContinuousRecognitionAsync(
       () => {
         streamAudioToSDK(wavArrayBuffer, pushStream, totalBytes, onProgress, () => {
-          setTimeout(() => {
-            recognizer.stopContinuousRecognitionAsync(() => {}, () => {});
-          }, 5000);
-
-          setTimeout(() => { finalize(); }, 30000);
+          console.log('[azurePronunciation] Audio streaming complete, waiting for Azure to finish...');
+          streamDone = true;
+          resetIdleTimer();
+          setTimeout(() => { finalize(); }, 60000);
         });
       },
       (err) => {
