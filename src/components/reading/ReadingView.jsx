@@ -855,6 +855,7 @@ export default function ReadingView() {
         textId,
         referenceText,
         audioBlob,
+        storagePath,
         supabase,
         durationSeconds: fluencyDuration,
         onProgress: (p) => setFluencyProgress(p),

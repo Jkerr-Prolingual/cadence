@@ -1,7 +1,6 @@
 import { tokenizeReference, alignWords } from './alignment';
 import { decodeAudioBlob, encodeWavSlice, detectSentences, wavFromBlob } from './audioUtils';
 import { cleanToken } from './wordUtils';
-import { fetchSpeechToken, assessFullRecording } from './azurePronunciation';
 
 const FLAG_THRESHOLD = 50;
 const PAUSE_THRESHOLD_MS = 1000;
@@ -500,9 +499,9 @@ export function identifyWeakPhonemes(medians) {
   return entries.slice(0, quartileSize).map(([phoneme]) => phoneme);
 }
 
-// --- Fluency assessment (SDK-based, no Whisper/chunking) ---
+// --- Fluency assessment (Whisper + chunked Azure PA) ---
 
-export async function runFluencyAssessment({ userId, textId, referenceText, audioBlob, supabase, durationSeconds, onProgress }) {
+export async function runFluencyAssessment({ userId, textId, referenceText, audioBlob, storagePath, supabase, durationSeconds, onProgress }) {
   await supabase
     .from('student_recordings')
     .update({ assessment_status: 'processing', assessment_error: null })
@@ -510,18 +509,86 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
     .eq('text_id', textId);
 
   try {
-    const { token, region } = await fetchSpeechToken();
+    if (onProgress) onProgress(0.05);
 
-    const result = await assessFullRecording({
-      token,
-      region,
-      referenceText,
-      audioBlob,
-      onProgress,
+    const whisperRes = await fetch('/.netlify/functions/transcribe-whisper', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storagePath }),
     });
+    const whisperData = await whisperRes.json();
+    if (whisperData.error) throw new Error(`Whisper: ${whisperData.error}`);
+    if (onProgress) onProgress(0.2);
 
-    const words = (result.words || []).filter(w => w.errorType !== 'Insertion');
-    const scoredWords = words.filter(w => w.accuracyScore != null && w.errorType !== 'Omission');
+    const refTokens = tokenizeReference(referenceText);
+    const alignment = alignWords(refTokens, whisperData.words || []);
+
+    const audioBuffer = await decodeAudioBlob(audioBlob);
+    const sentences = detectSentences(referenceText, null);
+    const chunks = buildSentenceChunks(sentences, refTokens, CHUNK_MIN_WORDS);
+    const wordPositions = getWordPositions(referenceText);
+    if (onProgress) onProgress(0.3);
+
+    const chunkResults = await Promise.all(chunks.map(async (chunk, idx) => {
+      const timeRange = getChunkTimeRange(chunk, alignment, whisperData.words);
+      if (!timeRange) return null;
+
+      const wavBlob = encodeWavSlice(audioBuffer, timeRange.startSec, timeRange.endSec);
+      if (!wavBlob) return null;
+
+      const chunkPath = `${userId}/${textId}_fluency_chunk${idx}.wav`;
+      const chunkRefText = extractChunkText(referenceText, wordPositions, chunk.firstWordIdx, chunk.lastWordIdx);
+
+      try {
+        await supabase.storage
+          .from('student-recordings')
+          .upload(chunkPath, wavBlob, { contentType: 'audio/wav', upsert: true });
+
+        const res = await fetch('/.netlify/functions/assess-pronunciation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storagePath: chunkPath, referenceText: chunkRefText }),
+        });
+        const data = await res.json();
+
+        try { await supabase.storage.from('student-recordings').remove([chunkPath]); } catch {}
+
+        if (data.error) {
+          console.warn(`[fluency] chunk ${idx} error:`, data.error);
+          return null;
+        }
+        return data;
+      } catch (err) {
+        console.warn(`[fluency] chunk ${idx} failed:`, err);
+        try { await supabase.storage.from('student-recordings').remove([chunkPath]); } catch {}
+        return null;
+      }
+    }));
+
+    if (onProgress) onProgress(0.8);
+
+    const mergedWords = [];
+    const fluencyScores = [];
+    const prosodyScores = [];
+    const completenessScores = [];
+
+    for (const result of chunkResults) {
+      if (!result) continue;
+      if (result.words?.length) mergedWords.push(...result.words);
+      if (result.fluencyScore != null) fluencyScores.push(result.fluencyScore);
+      if (result.prosodyScore != null) prosodyScores.push(result.prosodyScore);
+      if (result.completenessScore != null) completenessScores.push(result.completenessScore);
+    }
+
+    const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+    const azureData = mergedWords.length > 0 ? {
+      words: mergedWords,
+      fluencyScore: avg(fluencyScores),
+      prosodyScore: avg(prosodyScores),
+      completenessScore: avg(completenessScores),
+    } : null;
+
+    const scoredWords = mergedWords.filter(w => w.accuracyScore != null && w.errorType !== 'Omission' && w.errorType !== 'Insertion');
     const overallAccuracy = scoredWords.length > 0
       ? Math.round(scoredWords.reduce((a, b) => a + b.accuracyScore, 0) / scoredWords.length)
       : 0;
@@ -529,13 +596,13 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
     const assessmentRow = {
       user_id: userId,
       text_id: textId,
-      whisper_transcript: null,
-      whisper_word_timestamps: null,
-      alignment: null,
-      azure_word_scores: words,
-      azure_fluency_score: result.fluencyScore,
-      azure_prosody_score: result.prosodyScore,
-      azure_completeness_score: result.completenessScore,
+      whisper_transcript: whisperData.transcript,
+      whisper_word_timestamps: whisperData.words,
+      alignment,
+      azure_word_scores: azureData?.words || null,
+      azure_fluency_score: azureData?.fluencyScore ?? null,
+      azure_prosody_score: azureData?.prosodyScore ?? null,
+      azure_completeness_score: azureData?.completenessScore ?? null,
       overall_accuracy: overallAccuracy,
       processed_at: new Date().toISOString(),
     };
@@ -544,7 +611,7 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
       .from('pronunciation_assessments')
       .upsert(assessmentRow, { onConflict: 'user_id,text_id' });
 
-    const phonemeGroups = aggregatePhonemes(words);
+    const phonemeGroups = aggregatePhonemes(mergedWords);
     const { medians, counts } = computePhonemeMedians(phonemeGroups);
     const weakPhonemes = identifyWeakPhonemes(medians);
 
@@ -556,8 +623,8 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
         duration_seconds: durationSeconds || null,
         words_assessed: scoredWords.length,
         overall_accuracy: overallAccuracy,
-        fluency_score: result.fluencyScore,
-        prosody_score: result.prosodyScore,
+        fluency_score: azureData?.fluencyScore ?? null,
+        prosody_score: azureData?.prosodyScore ?? null,
         phoneme_medians: medians,
         phoneme_counts: counts,
         weak_phonemes: weakPhonemes,
@@ -566,7 +633,7 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
       phonemeSession = sessionRow;
     }
 
-    const flags = generateFluencyFlagEvents({ userId, textId, words });
+    const flags = generateFlagEvents({ userId, textId, alignment, azureData });
     await supabase
       .from('flag_events')
       .delete()
@@ -584,6 +651,8 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
       .eq('user_id', userId)
       .eq('text_id', textId);
 
+    if (onProgress) onProgress(1);
+
     return { success: true, assessmentData: assessmentRow, phonemeSession };
   } catch (err) {
     await supabase
@@ -593,43 +662,6 @@ export async function runFluencyAssessment({ userId, textId, referenceText, audi
       .eq('text_id', textId);
     return { success: false, error: err.message };
   }
-}
-
-function generateFluencyFlagEvents({ userId, textId, words }) {
-  const flags = [];
-  for (let i = 0; i < words.length; i++) {
-    const w = words[i];
-    if (w.errorType === 'Insertion') continue;
-
-    let flagType = null;
-    let severity = null;
-
-    if (w.errorType === 'Omission') {
-      flagType = 'skip';
-      severity = 3;
-    } else if (w.accuracyScore != null && w.accuracyScore < FLAG_THRESHOLD) {
-      flagType = 'mispronunciation';
-      severity = w.accuracyScore < 30 ? 5 : 4;
-    }
-
-    if (!flagType) continue;
-
-    flags.push({
-      student_id: userId,
-      text_id: textId,
-      headword: cleanToken(w.word),
-      surface_form: w.word,
-      word_position: i,
-      source: 'ai',
-      source_user_id: null,
-      flag_type: flagType,
-      severity,
-      audio_timestamp_ms: null,
-      ai_confidence: w.accuracyScore != null ? w.accuracyScore / 100 : null,
-      notes: w.errorType === 'Omission' ? `Word "${w.word}" was skipped` : null,
-    });
-  }
-  return flags;
 }
 
 export async function getPhonemeSessionsForText(supabase, userId, textId) {
