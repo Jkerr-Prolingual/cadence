@@ -22,8 +22,8 @@ const FEATURES = [
     ),
   },
   {
-    title: 'Translation Mode',
-    description: 'Toggle phrase-level L1 translations over the full text. Students see how English syntax maps to their native language — phrase by phrase, not word by word.',
+    title: 'Syntax Glosses',
+    description: 'Full-text phrase-level translations show how English syntax maps to the student\'s native language — from single words to full phrases.',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
@@ -50,7 +50,7 @@ const FEATURES = [
   },
   {
     title: 'Multi-L1 Support',
-    description: 'Supports Spanish, Mandarin, Japanese, and Korean speakers. Translations, syntax glosses, and vocabulary lookups adapt to each student\'s native language.',
+    description: 'Supports Spanish, Mandarin, Japanese, and Korean speakers. Translations, phrase-level glosses, and vocabulary lookups adapt to each student\'s native language.',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
@@ -77,7 +77,7 @@ const STEPS = [
     ),
   },
   {
-    number: '3', title: 'Shadow & record', description: 'Listen, repeat, and record. AI pronunciation assessment gives phoneme-level feedback.',
+    number: '3', title: 'Shadow & record', description: 'Listen, repeat, and record. Practice pronunciation with immediate playback and AI feedback.',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5.586v12.828a1 1 0 01-1.707.707L5.586 15z" />
@@ -261,13 +261,14 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
             <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-gray-900 leading-tight">
-              Students who read more{' '}
-              <span className="text-violet-600">speak better</span>
+              Students who read extensively{' '}
+              <span className="text-violet-600">acquire English faster</span>
             </h2>
             <p className="mt-5 text-lg text-gray-500 leading-relaxed max-w-lg">
-              Relato combines extensive reading with AI pronunciation assessment
-              so teachers can see what students are reading, hear how they sound,
-              and know exactly where they need help — down to the phoneme.
+              Relato is an extensive reading platform built for ESL and EFL programs.
+              Graded readers with audio, native-language support, phrase-level L1 translations,
+              shadow reading, and AI pronunciation assessment — with a teacher
+              dashboard that makes it all visible.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
@@ -301,26 +302,26 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pronunciation assessment showcase */}
+      {/* Reading experience showcase */}
       <section className="py-16 sm:py-24 bg-gray-50 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
           <div>
-            <p className="text-sm font-medium text-violet-600 mb-3">New</p>
+            <p className="text-sm font-medium text-violet-600 mb-3">The reading experience</p>
             <h3 className="text-3xl font-bold tracking-tight text-gray-900">
-              Pronunciation data you can actually use
+              Read with the support that makes input comprehensible
             </h3>
             <p className="mt-4 text-gray-500 leading-relaxed">
-              When students shadow read, Relato records and assesses their pronunciation
-              automatically. Every word gets a color-coded accuracy score. Tap a word to
-              see which phonemes are strong and which need work — with IPA symbols,
-              mouth position diagrams, and example audio.
+              Students read graded stories while listening to professional narration.
+              Every word is clickable for instant L1 translation and CEFR level.
+              Toggle phrase-level translations to see how English phrases map to structures
+              in their native language — from single words to full phrases.
             </p>
             <ul className="mt-6 space-y-3">
               {[
-                'Per-word accuracy scoring on every recorded sentence',
-                'Phoneme-level IPA breakdown with articulation guides',
-                'Visual mouth diagrams showing tongue and lip position',
-                'Color-coded overlay: purple (excellent) to red (needs work)',
+                'Tap any word for L1 translation, English definition, and CEFR level',
+                'Phrasal verbs and multi-word expressions translate as a whole phrase — then drill into each word',
+                'Phrase-level translations compare English structure to L1 — from single words to full phrases',
+                'Drill into gloss constituents to see how each piece translates in context',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2.5">
                   <svg className="w-5 h-5 text-violet-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -332,54 +333,56 @@ export default function LandingPage() {
             </ul>
           </div>
 
-          {/* Pronunciation mock UI */}
+          {/* Syntax gloss mock UI */}
           <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h4 className="text-sm font-semibold text-gray-900">Pronunciation Assessment</h4>
-                <p className="text-xs text-gray-400 mt-0.5">Shadow read — sentence mode</p>
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-gray-900">Reading View</h4>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium">Translation mode ON</span>
               </div>
-              <div className="px-4 py-4">
-                <div className="flex flex-wrap gap-x-1.5 gap-y-2 text-sm leading-relaxed">
-                  {[
-                    { word: 'She', color: 'border-purple-400', score: 92 },
-                    { word: 'walked', color: 'border-purple-400', score: 88 },
-                    { word: 'to', color: 'border-purple-400', score: 95 },
-                    { word: 'the', color: 'border-green-400', score: 78 },
-                    { word: 'library', color: 'border-yellow-400', score: 62 },
-                    { word: 'without', color: 'border-purple-400', score: 86 },
-                    { word: 'saying', color: 'border-green-400', score: 74 },
-                    { word: 'a', color: 'border-purple-400', score: 90 },
-                    { word: 'word.', color: 'border-orange-400', score: 45 },
-                  ].map((w, i) => (
-                    <span key={i} className={`border-b-2 ${w.color} pb-0.5 text-gray-700`}>
-                      {w.word}
-                    </span>
-                  ))}
+              <div className="px-4 py-4 space-y-4">
+                {/* Sentence with syntax gloss */}
+                <div>
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    <span className="border-b border-violet-200 pb-0.5">She walked to</span>{' '}
+                    <span className="border-b-2 border-violet-400 pb-0.5 font-medium">the library without saying a word.</span>
+                  </div>
+                  <div className="mt-1.5 text-xs text-violet-600 leading-relaxed">
+                    <span className="opacity-60">Ella caminó a</span>{' '}
+                    <span className="font-medium">la biblioteca sin decir una palabra.</span>
+                  </div>
+                  <span className="mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-500">prepositional phrase — complex</span>
                 </div>
 
-                {/* Phoneme detail mock */}
-                <div className="mt-4 bg-gray-50 rounded-lg p-3 border border-gray-100">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">"library"</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-medium">62%</span>
-                  </div>
-                  <div className="flex gap-2 text-xs">
+                {/* Expanded constituent drill-down */}
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Constituent breakdown</p>
+                  <div className="space-y-1.5">
                     {[
-                      { ipa: 'l', score: 88, color: 'text-purple-600 bg-purple-50' },
-                      { ipa: 'aɪ', score: 75, color: 'text-green-600 bg-green-50' },
-                      { ipa: 'b', score: 82, color: 'text-green-600 bg-green-50' },
-                      { ipa: 'ɹ', score: 35, color: 'text-orange-600 bg-orange-50' },
-                      { ipa: 'ɛ', score: 48, color: 'text-yellow-600 bg-yellow-50' },
-                      { ipa: 'ɹ', score: 38, color: 'text-orange-600 bg-orange-50' },
-                      { ipa: 'i', score: 70, color: 'text-green-600 bg-green-50' },
-                    ].map((p, i) => (
-                      <span key={i} className={`px-2 py-1 rounded font-mono font-medium ${p.color}`}>
-                        {p.ipa}
-                      </span>
+                      { en: 'the library', l1: 'la biblioteca' },
+                      { en: 'without saying', l1: 'sin decir' },
+                      { en: 'a word', l1: 'una palabra' },
+                    ].map((c, i) => (
+                      <div key={i} className="flex items-center gap-3 text-xs">
+                        <span className="text-gray-700 font-medium min-w-[120px]">{c.en}</span>
+                        <svg className="w-3 h-3 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                        <span className="text-violet-600">{c.l1}</span>
+                      </div>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-gray-400">Tap a phoneme for articulation guide + mouth diagram</p>
+                </div>
+
+                {/* Second sentence — simple */}
+                <div>
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    <span className="border-b border-gray-200 pb-0.5">Leo was already there.</span>
+                  </div>
+                  <div className="mt-1.5 text-xs text-violet-600 opacity-60 leading-relaxed">
+                    Leo ya estaba ahí.
+                  </div>
+                  <span className="mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded bg-gray-50 text-gray-400">simple clause</span>
                 </div>
               </div>
             </div>
@@ -387,11 +390,138 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Teacher dashboard showcase */}
+      {/* Shadow reading showcase */}
       <section className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
-          {/* Teacher dashboard mock UI */}
+          {/* Shadow reading mock UI */}
           <div className="order-2 lg:order-1 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h4 className="text-sm font-semibold text-gray-900">Shadow Reading</h4>
+                <p className="text-xs text-gray-400 mt-0.5">Sentence loop — listen, then repeat</p>
+              </div>
+              <div className="px-4 py-4">
+                {/* Highlighted sentence */}
+                <div className="text-sm text-gray-700 leading-relaxed bg-violet-50 rounded-lg px-3 py-2.5 border border-violet-100">
+                  <span className="text-violet-700 font-medium">She walked to the library without saying a word.</span>
+                </div>
+
+                {/* Transport controls mock */}
+                <div className="mt-4 flex items-center justify-center gap-4">
+                  <button className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
+                    </svg>
+                  </button>
+                  <button className="w-10 h-10 rounded-full bg-violet-600 flex items-center justify-center text-white">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </button>
+                  <button className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.933 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.333-4zM19.933 12.8a1 1 0 000-1.6l-5.333-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.333-4z" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Speed + record controls */}
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">0.75x</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center">
+                      <div className="w-2.5 h-2.5 rounded-full bg-white" />
+                    </div>
+                    <span className="text-[10px] text-gray-400">Record yourself</span>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="order-1 lg:order-2">
+            <p className="text-sm font-medium text-violet-600 mb-3">From input to output</p>
+            <h3 className="text-3xl font-bold tracking-tight text-gray-900">
+              Shadow reading builds spoken fluency
+            </h3>
+            <p className="mt-4 text-gray-500 leading-relaxed">
+              After reading a chapter, students loop individual sentences and shadow
+              the narrator — listening, then repeating. Speed control lets them slow
+              down difficult passages. They record themselves and listen back
+              immediately, building awareness of their own pronunciation.
+            </p>
+            <p className="mt-3 text-gray-500 leading-relaxed">
+              This is the bridge between comprehensible input and spoken production.
+              Students practice in the context of stories they've already understood,
+              not isolated drill sentences.
+            </p>
+            <ul className="mt-6 space-y-3">
+              {[
+                'Sentence-by-sentence loop with adjustable speed (0.5x–1.25x)',
+                'Record and immediately play back for self-assessment',
+                'Vocabulary popups remain available during shadow practice',
+                'AI pronunciation scoring with phoneme-level IPA feedback',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2.5">
+                  <svg className="w-5 h-5 text-violet-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm text-gray-600">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Teacher dashboard showcase */}
+      <section className="py-16 sm:py-24 bg-gray-50 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <p className="text-sm font-medium text-violet-600 mb-3">For educators</p>
+            <h3 className="text-3xl font-bold tracking-tight text-gray-900">
+              See what your students are reading — and how they sound
+            </h3>
+            <p className="mt-4 text-gray-500 leading-relaxed">
+              Relato gives ESL/EFL teachers visibility into reading progress,
+              vocabulary growth, and pronunciation development — without adding
+              grading work. When students record themselves, AI flags words that
+              need attention and scores pronunciation down to the phoneme.
+            </p>
+
+            <ul className="mt-6 space-y-3">
+              {[
+                'Create classes with simple join codes',
+                'See reading progress and chapter completion per student',
+                'Review recordings with AI-flagged pronunciation issues',
+                'Identify blind spots — words students don\'t know they\'re mispronouncing',
+                'Phoneme-level IPA data for targeted intervention',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2.5">
+                  <svg className="w-5 h-5 text-green-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm text-gray-600">{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <Link
+              to="/login?mode=signup"
+              className="mt-8 inline-flex items-center text-sm font-medium text-violet-600 hover:text-violet-700"
+            >
+              Create a teacher account
+              <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+
+          {/* Teacher dashboard mock UI */}
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100">
                 <h4 className="text-sm font-semibold text-gray-900">Class Dashboard</h4>
@@ -428,52 +558,31 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Pronunciation detail preview within dashboard */}
+              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                <p className="text-[10px] font-medium text-gray-400 mb-2">Soo-Jin K. — flagged words</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { word: 'library', score: 42, color: 'bg-orange-50 text-orange-600 border-orange-200' },
+                    { word: 'without', score: 38, color: 'bg-orange-50 text-orange-600 border-orange-200' },
+                    { word: 'walked', score: 55, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+                    { word: 'already', score: 61, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+                    { word: 'brought', score: 28, color: 'bg-red-50 text-red-600 border-red-200' },
+                  ].map((w, i) => (
+                    <span key={i} className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${w.color}`}>
+                      {w.word} {w.score}%
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div className="order-1 lg:order-2">
-            <p className="text-sm font-medium text-violet-600 mb-3">For educators</p>
-            <h3 className="text-3xl font-bold tracking-tight text-gray-900">
-              A teacher dashboard built for ESL
-            </h3>
-            <p className="mt-4 text-gray-500 leading-relaxed">
-              Relato gives ESL/EFL teachers visibility into what students are reading,
-              which words they struggle with, and how their pronunciation is developing
-              — without adding grading work.
-            </p>
-
-            <ul className="mt-6 space-y-3">
-              {[
-                'Create classes with simple join codes',
-                'See reading progress and chapter completion per student',
-                'Review recordings with AI-flagged pronunciation issues',
-                'Identify blind spots — words students don\'t know they\'re mispronouncing',
-                'Drill into phoneme-level data for targeted intervention',
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-2.5">
-                  <svg className="w-5 h-5 text-green-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm text-gray-600">{item}</span>
-                </li>
-              ))}
-            </ul>
-
-            <Link
-              to="/login?mode=signup"
-              className="mt-8 inline-flex items-center text-sm font-medium text-violet-600 hover:text-violet-700"
-            >
-              Create a teacher account
-              <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
           </div>
         </div>
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="py-16 sm:py-24 bg-gray-50 px-4 sm:px-6">
+      <section id="how-it-works" className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h3 className="text-3xl font-bold tracking-tight text-gray-900">How it works</h3>
@@ -530,58 +639,38 @@ export default function LandingPage() {
       </section>
 
       {/* Extensive reading pitch */}
-      <section className="py-16 sm:py-24 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
-          <div className="order-2 lg:order-1">
-            <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl p-8 sm:p-10 border border-violet-100">
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <p className="text-3xl font-bold text-violet-700">6,000+</p>
-                  <p className="text-sm text-gray-500 mt-1">words per story — full-length, authentic reads</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-violet-700">&lt; 300</p>
-                  <p className="text-sm text-gray-500 mt-1">unique words per book — controlled vocabulary at each CEFR level</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-violet-700">A1–C1</p>
-                  <p className="text-sm text-gray-500 mt-1">levels from beginning to advanced</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-violet-700">4 L1s</p>
-                  <p className="text-sm text-gray-500 mt-1">Spanish, Mandarin, Japanese, and Korean native language support</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="order-1 lg:order-2">
-            <h3 className="text-3xl font-bold tracking-tight text-gray-900">
-              Why extensive reading works
-            </h3>
-            <p className="mt-4 text-gray-500 leading-relaxed">
-              Research consistently shows that extensive reading — reading large amounts
-              of comprehensible text — is one of the most powerful methods for second
-              language acquisition. Students encounter vocabulary naturally, in context,
-              again and again.
-            </p>
-            <p className="mt-3 text-gray-500 leading-relaxed">
-              Relato's graded readers are built on the EFLLex vocabulary framework with
-              CEFR-classified word lists, controlled vocabulary density, and multi-word
-              expression tracking. Every book is written to keep students reading — stories
-              worth finishing at a level they can handle.
-            </p>
-            <p className="mt-3 text-gray-500 leading-relaxed">
-              Combined with pronunciation assessment and teacher visibility, Relato closes
-              the loop between reading input and spoken output — giving programs data
-              they've never had before.
-            </p>
-          </div>
+      <section className="py-16 sm:py-24 bg-gray-50 px-4 sm:px-6">
+        <div className="max-w-3xl mx-auto">
+          <h3 className="text-3xl font-bold tracking-tight text-gray-900 text-center">
+            The bridge to extensive reading
+          </h3>
+          <p className="mt-6 text-gray-500 leading-relaxed">
+            Research consistently shows that extensive reading is one of the most powerful
+            methods for second language acquisition — especially for students who already
+            have literacy in their first language. But extensive reading only works once
+            students can actually read at their level. For English learners stuck at A1–A2,
+            the gap between "I can read in my language" and "I can read enough English to
+            start acquiring through reading" is where most programs stall.
+          </p>
+          <p className="mt-3 text-gray-500 leading-relaxed">
+            Relato is built to bridge that gap. Phrase-level translations let students leverage their
+            L1 reading skills to parse English structure. Tap-to-translate keeps vocabulary
+            from blocking comprehension. Controlled vocabulary and CEFR-graded texts keep
+            cognitive load manageable. The scaffolding makes A1-level English texts
+            comprehensible enough to read extensively — and as proficiency grows, students
+            rely on it less.
+          </p>
+          <p className="mt-3 text-gray-500 leading-relaxed">
+            Once students cross that bridge, extensive reading does what decades of research
+            says it does — building vocabulary, internalizing grammar, developing listening
+            comprehension, and strengthening spoken fluency. Relato supports acquisition
+            across all four language domains, starting from the very first story.
+          </p>
         </div>
       </section>
 
       {/* Features grid */}
-      <section className="py-16 sm:py-24 bg-gray-50 px-4 sm:px-6">
+      <section className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h3 className="text-3xl font-bold tracking-tight text-gray-900">Everything students need to improve</h3>
@@ -605,7 +694,7 @@ export default function LandingPage() {
       </section>
 
       {/* Independent learners */}
-      <section className="py-16 sm:py-24 px-4 sm:px-6">
+      <section className="py-16 sm:py-24 bg-gray-50 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-sm font-medium text-violet-600 mb-3">For independent learners</p>
           <h3 className="text-3xl font-bold tracking-tight text-gray-900">
@@ -613,9 +702,9 @@ export default function LandingPage() {
           </h3>
           <p className="mt-4 text-gray-500 max-w-2xl mx-auto leading-relaxed">
             You don't need a class to use Relato. Read graded stories with audio,
-            look up words in your native language, practice pronunciation with instant
-            feedback, and build vocabulary with spaced-repetition flashcards — all at
-            your own pace.
+            look up words in your native language, compare English syntax to your
+            own, practice pronunciation with instant feedback, and build vocabulary
+            with spaced-repetition flashcards — all at your own pace.
           </p>
           <Link
             to="/login?mode=signup"
@@ -630,7 +719,7 @@ export default function LandingPage() {
       </section>
 
       {/* Print books */}
-      <section className="py-16 sm:py-24 bg-gray-50 px-4 sm:px-6">
+      <section className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-full px-4 py-1.5 mb-6">
             <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -661,7 +750,7 @@ export default function LandingPage() {
       </section>
 
       {/* Newsletter */}
-      <section className="py-16 sm:py-20 px-4 sm:px-6">
+      <section className="py-16 sm:py-20 bg-gray-50 px-4 sm:px-6">
         <div className="max-w-3xl mx-auto text-center">
           <svg className="w-6 h-6 text-violet-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
