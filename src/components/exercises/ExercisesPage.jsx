@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { cefrColor } from '../../lib/wordUtils';
 import { dbGet, dbPut } from '../../lib/db';
+import { groupTextsByBook } from '../../lib/reportUtils';
 
 function shuffleArray(arr) {
   const a = [...arr];
@@ -255,28 +256,10 @@ export default function ExercisesPage() {
     return texts.filter(t => t.analysis?.probePool?.length > 0);
   }, [texts]);
 
-  const bookMap = useMemo(() => {
-    const map = {};
-    for (const b of books) map[b.id] = b;
-    return map;
-  }, [books]);
-
-  const grouped = useMemo(() => {
-    const byBook = {};
-    const standalone = [];
-    for (const t of textsWithProbes) {
-      if (t.book_id && bookMap[t.book_id]) {
-        if (!byBook[t.book_id]) byBook[t.book_id] = [];
-        byBook[t.book_id].push(t);
-      } else {
-        standalone.push(t);
-      }
-    }
-    for (const id of Object.keys(byBook)) {
-      byBook[id].sort((a, b) => (a.chapter_order ?? 0) - (b.chapter_order ?? 0));
-    }
-    return { byBook, standalone };
-  }, [textsWithProbes, bookMap]);
+  const grouped = useMemo(
+    () => groupTextsByBook(textsWithProbes, books),
+    [textsWithProbes, books]
+  );
 
   async function handleFinish(answers) {
     const score = answers.filter(a => a.correct).length;

@@ -3,7 +3,12 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { sampleTexts } from '../../data/sampleTexts';
 import { cefrColor } from '../../lib/wordUtils';
+import { formatRelativeDate, groupTextsByBook } from '../../lib/reportUtils';
 import ProbePreview from '../exercises/ProbePreview';
+import ReportsTab from './ReportsTab';
+import getTestData from '../../hooks/useTestData';
+
+const USE_TEST_DATA = import.meta.env.VITE_USE_TEST_DATA === 'true';
 
 function generateJoinCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -26,6 +31,7 @@ export default function TeacherDashboard() {
   const [exerciseResults, setExerciseResults] = useState([]);
   const [phonemeSessions, setPhonemeSessions] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState(null);
+  const [activeTab, setActiveTab] = useState(USE_TEST_DATA ? 'reports' : 'assignments');
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [showCreateAssignment, setShowCreateAssignment] = useState(false);
   const [newClassName, setNewClassName] = useState('');
@@ -40,8 +46,31 @@ export default function TeacherDashboard() {
   }, [curatedTexts]);
 
   useEffect(() => {
-    loadData();
+    if (USE_TEST_DATA) {
+      loadTestData();
+    } else {
+      loadData();
+    }
   }, []);
+
+  function loadTestData() {
+    const td = getTestData();
+    setClasses(td.classes);
+    setSelectedClassId(td.classes[0].id);
+    setEnrollments(td.enrollments);
+    setStudentProfiles(td.studentProfiles);
+    setCuratedTexts(td.curatedTexts);
+    setBooks(td.books);
+    setAssignments(td.assignments);
+    setProgress(td.progress);
+    setFluencySessions(td.fluencySessions);
+    setPronunciationAssessments(td.pronunciationAssessments);
+    setPhonemeSessions(td.phonemeSessions);
+    setSrsCards(td.srsCards);
+    setExerciseResults(td.exerciseResults);
+    setStudentRecordings(td.studentRecordings);
+    setReviewLogs([]);
+  }
 
   async function loadData() {
     const [clsRes, textsRes, booksRes] = await Promise.all([
@@ -77,7 +106,7 @@ export default function TeacherDashboard() {
           supabase.from('student_recordings').select('*').in('user_id', studentIds),
           supabase.from('pronunciation_assessments').select('user_id, text_id, overall_accuracy, azure_fluency_score, azure_prosody_score, azure_completeness_score').in('user_id', studentIds),
           supabase.from('fluency_sessions').select('*').in('user_id', studentIds).order('session_date', { ascending: true }),
-          supabase.from('srs_cards').select('user_id, word, text_id, leitner_box, card_type, cefr, added_date, last_review_date').in('user_id', studentIds),
+          supabase.from('srs_cards').select('user_id, word, text_id, leitner_box, card_type, cefr, added_date, last_review_date, next_review_date').in('user_id', studentIds),
           supabase.from('review_log').select('user_id, word, correct, reviewed_at').in('user_id', studentIds),
           supabase.from('exercise_results').select('user_id, text_id, score, total, completed_at, answers').in('user_id', studentIds).catch(() => ({ data: [] })),
           supabase.from('phoneme_sessions').select('user_id, text_id, session_date, overall_accuracy, phoneme_medians, weak_phonemes, words_assessed').in('user_id', studentIds).order('session_date', { ascending: true }).catch(() => ({ data: [] })),
@@ -209,38 +238,82 @@ export default function TeacherDashboard() {
         )}
 
         {selectedClass && (
-          <div className="grid grid-cols-3 gap-6">
-            {/* Left column: class info & students */}
-            <div className="col-span-1 space-y-4">
-              <ClassInfoPanel
-                cls={selectedClass}
-                students={classStudents}
-                onRemoveStudent={handleRemoveStudent}
-                onDeleteClass={() => handleDeleteClass(selectedClass.id)}
-              />
+          <>
+            {/* Tab toggle */}
+            <div className="flex gap-1 mb-6 border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('assignments')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'assignments'
+                    ? 'border-gray-900 text-gray-900'
+                    : 'border-transparent text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                Assignments
+              </button>
+              <button
+                onClick={() => setActiveTab('reports')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'reports'
+                    ? 'border-gray-900 text-gray-900'
+                    : 'border-transparent text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                Reports
+              </button>
             </div>
 
-            {/* Right column: assignments & progress */}
-            <div className="col-span-2 space-y-4">
-              <AssignmentsPanel
+            {activeTab === 'assignments' && (
+              <div className="grid grid-cols-3 gap-6">
+                {/* Left column: class info & students */}
+                <div className="col-span-1 space-y-4">
+                  <ClassInfoPanel
+                    cls={selectedClass}
+                    students={classStudents}
+                    onRemoveStudent={handleRemoveStudent}
+                    onDeleteClass={() => handleDeleteClass(selectedClass.id)}
+                  />
+                </div>
+
+                {/* Right column: assignments & progress */}
+                <div className="col-span-2 space-y-4">
+                  <AssignmentsPanel
+                    assignments={classAssignments}
+                    allTexts={allTexts}
+                    books={books}
+                    students={classStudents}
+                    progress={progress}
+                    studentRecordings={studentRecordings}
+                    fluencySessions={fluencySessions}
+                    srsCards={srsCards}
+                    reviewLogs={reviewLogs}
+                    exerciseResults={exerciseResults}
+                    classId={selectedClassId}
+                    showCreate={showCreateAssignment}
+                    onShowCreate={setShowCreateAssignment}
+                    onCreated={loadData}
+                    onDeleted={loadData}
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'reports' && (
+              <ReportsTab
+                students={classStudents}
                 assignments={classAssignments}
                 allTexts={allTexts}
                 books={books}
-                students={classStudents}
+                fluencySessions={fluencySessions}
+                pronunciationAssessments={pronunciationAssessments}
+                phonemeSessions={phonemeSessions}
+                srsCards={srsCards}
+                exerciseResults={exerciseResults}
                 progress={progress}
                 studentRecordings={studentRecordings}
-                fluencySessions={fluencySessions}
-                srsCards={srsCards}
-                reviewLogs={reviewLogs}
-                exerciseResults={exerciseResults}
-                classId={selectedClassId}
-                showCreate={showCreateAssignment}
-                onShowCreate={setShowCreateAssignment}
-                onCreated={loadData}
-                onDeleted={loadData}
               />
-            </div>
-          </div>
+            )}
+          </>
         )}
 
         {!selectedClass && !showCreateClass && (
@@ -378,28 +451,10 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
   const hasAudio = selectedText?.audio_urls || selectedText?.audioUrls;
   const hasProbes = selectedText?.analysis?.probePool?.length > 0;
 
-  const bookMap = useMemo(() => {
-    const map = {};
-    for (const b of books) map[b.id] = b.title;
-    return map;
-  }, [books]);
-
-  const { bookTexts, standaloneTexts } = useMemo(() => {
-    const byBook = {};
-    const standalone = [];
-    for (const t of allTexts) {
-      if (t.book_id && bookMap[t.book_id]) {
-        if (!byBook[t.book_id]) byBook[t.book_id] = [];
-        byBook[t.book_id].push(t);
-      } else {
-        standalone.push(t);
-      }
-    }
-    for (const id of Object.keys(byBook)) {
-      byBook[id].sort((a, b) => (a.chapter_order ?? 0) - (b.chapter_order ?? 0));
-    }
-    return { bookTexts: byBook, standaloneTexts: standalone };
-  }, [allTexts, bookMap]);
+  const { byBook: bookTexts, standalone: standaloneTexts, bookMap } = useMemo(
+    () => groupTextsByBook(allTexts, books),
+    [allTexts, books]
+  );
 
   async function handleCreate() {
     if (!selectedTextId) return;
@@ -627,7 +682,7 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
 
   function getStudentWpmHistory(studentId) {
     return fluencySessions
-      .filter(f => f.student_id === studentId)
+      .filter(f => f.user_id === studentId)
       .map(f => f.wpm);
   }
 
@@ -1063,17 +1118,6 @@ function LeitnerBox({ box }) {
   );
 }
 
-function formatRelativeDate(dateStr) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return 'today';
-  if (diffDays === 1) return 'yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  return date.toLocaleDateString();
-}
 
 function WpmTimeline({ readings }) {
   if (readings.length === 0) {

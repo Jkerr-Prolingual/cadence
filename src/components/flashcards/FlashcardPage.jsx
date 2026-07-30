@@ -3,32 +3,8 @@ import { getAllSrsCards, getDueSrsCards } from '../../lib/srs';
 import { cefrColor } from '../../lib/wordUtils';
 import { supabase } from '../../lib/supabase';
 import LeitnerReview from './LeitnerReview';
-
-function BoxDistribution({ cards }) {
-  const boxes = [1, 2, 3, 4, 5];
-  const counts = boxes.map(b => cards.filter(c => c.box === b).length);
-  const max = Math.max(...counts, 1);
-
-  return (
-    <div className="flex items-end gap-2 h-24">
-      {boxes.map((box, i) => (
-        <div key={box} className="flex-1 flex flex-col items-center gap-1">
-          <span className="text-xs text-gray-500">{counts[i]}</span>
-          <div
-            className="w-full bg-gray-200 rounded-t"
-            style={{
-              height: `${Math.max((counts[i] / max) * 100, 4)}%`,
-              backgroundColor: counts[i] > 0
-                ? ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#16a34a'][i]
-                : '#e5e7eb',
-            }}
-          />
-          <span className="text-xs text-gray-400">{box}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+import BoxDistribution from '../shared/BoxDistribution';
+import FlashcardSummaryStrip from './FlashcardSummaryStrip';
 
 function CardList({ cards }) {
   if (cards.length === 0) return null;
@@ -73,6 +49,8 @@ export default function FlashcardPage() {
   const [allCards, setAllCards] = useState([]);
   const [dueCards, setDueCards] = useState([]);
   const [cardSources, setCardSources] = useState([]);
+  const [textBookMap, setTextBookMap] = useState({});
+  const [bookTitles, setBookTitles] = useState({});
   const [reviewing, setReviewing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedFolder, setSelectedFolder] = useState('all');
@@ -89,11 +67,20 @@ export default function FlashcardPage() {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: sources } = await supabase
-          .from('srs_card_sources')
-          .select('word, text_id, text_title')
-          .eq('user_id', user.id);
-        setCardSources(sources || []);
+        const [sourcesRes, textsRes, booksRes] = await Promise.all([
+          supabase.from('srs_card_sources').select('word, text_id, text_title').eq('user_id', user.id),
+          supabase.from('curated_texts').select('id, book_id, chapter_order').eq('status', 'published'),
+          supabase.from('books').select('id, title').eq('status', 'published'),
+        ]);
+        setCardSources(sourcesRes.data || []);
+        const tbMap = {};
+        for (const t of (textsRes.data || [])) {
+          if (t.book_id) tbMap[t.id] = { bookId: t.book_id, order: t.chapter_order ?? 0 };
+        }
+        setTextBookMap(tbMap);
+        const btMap = {};
+        for (const b of (booksRes.data || [])) btMap[b.id] = b.title;
+        setBookTitles(btMap);
       }
     } catch {}
     setLoading(false);
@@ -147,10 +134,35 @@ export default function FlashcardPage() {
       .sort(([a], [b]) => {
         if (a === '_unassigned') return 1;
         if (b === '_unassigned') return -1;
+        const aInfo = textBookMap[a];
+        const bInfo = textBookMap[b];
+        if (aInfo && bInfo) {
+          if (aInfo.bookId !== bInfo.bookId) return aInfo.bookId.localeCompare(bInfo.bookId);
+          return aInfo.order - bInfo.order;
+        }
         return 0;
       })
       .map(([key, val]) => ({ key, ...val }));
-  }, [allCards, dueCards, cardSources]);
+  }, [allCards, dueCards, cardSources, textBookMap]);
+
+  const bookGroups = useMemo(() => {
+    const groups = {};
+    for (const folder of folders) {
+      const info = textBookMap[folder.key];
+      const bookId = info?.bookId || '_no_book';
+      if (!groups[bookId]) {
+        groups[bookId] = {
+          bookId,
+          title: bookTitles[bookId] || null,
+          folders: [],
+        };
+      }
+      groups[bookId].folders.push(folder);
+    }
+    return Object.values(groups);
+  }, [folders, textBookMap, bookTitles]);
+
+  const hasMultipleBooks = bookGroups.filter(g => g.bookId !== '_no_book').length > 1;
 
   const filteredCards = useMemo(() => {
     if (selectedFolder === 'all') return allCards;
@@ -206,7 +218,7 @@ export default function FlashcardPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
           <div>
             <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Flashcards</h2>
             <p className="text-sm text-gray-500 mt-1">
@@ -226,38 +238,53 @@ export default function FlashcardPage() {
           </button>
         </div>
 
-        {/* Folder tabs */}
+        <FlashcardSummaryStrip allCards={allCards} dueCards={dueCards} />
+
+        {/* Folder tabs — grouped by book when multiple books exist */}
         {folders.length > 1 && (
-          <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-none">
-            <button
-              onClick={() => setSelectedFolder('all')}
-              className={`flex-shrink-0 px-3 py-2 sm:py-1.5 rounded-md text-sm font-medium transition-colors border ${
-                selectedFolder === 'all'
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 active:bg-gray-50'
-              }`}
-            >
-              All ({allCards.length})
-            </button>
-            {folders.map(folder => (
+          <div className="mb-6 space-y-3">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
               <button
-                key={folder.key}
-                onClick={() => setSelectedFolder(folder.key)}
+                onClick={() => setSelectedFolder('all')}
                 className={`flex-shrink-0 px-3 py-2 sm:py-1.5 rounded-md text-sm font-medium transition-colors border ${
-                  selectedFolder === folder.key
+                  selectedFolder === 'all'
                     ? 'bg-gray-900 text-white border-gray-900'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 active:bg-gray-50'
                 }`}
               >
-                {folder.title}
-                <span className="ml-1.5 text-xs opacity-70">
-                  {folder.cards.length}
-                  {folder.dueCount > 0 && (
-                    <span className="ml-1 text-amber-500 font-semibold">{folder.dueCount} due</span>
-                  )}
-                </span>
+                All ({allCards.length})
               </button>
-            ))}
+            </div>
+            {hasMultipleBooks ? (
+              bookGroups.map(group => (
+                <div key={group.bookId}>
+                  {group.title && (
+                    <p className="text-xs font-medium text-gray-400 mb-1.5 px-1">{group.title}</p>
+                  )}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    {group.folders.map(folder => (
+                      <FolderTab
+                        key={folder.key}
+                        folder={folder}
+                        selected={selectedFolder === folder.key}
+                        onSelect={() => setSelectedFolder(folder.key)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {folders.map(folder => (
+                  <FolderTab
+                    key={folder.key}
+                    folder={folder}
+                    selected={selectedFolder === folder.key}
+                    onSelect={() => setSelectedFolder(folder.key)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -272,5 +299,26 @@ export default function FlashcardPage() {
         <CardList cards={filteredCards} />
       </div>
     </div>
+  );
+}
+
+function FolderTab({ folder, selected, onSelect }) {
+  return (
+    <button
+      onClick={onSelect}
+      className={`flex-shrink-0 px-3 py-2 sm:py-1.5 rounded-md text-sm font-medium transition-colors border ${
+        selected
+          ? 'bg-gray-900 text-white border-gray-900'
+          : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 active:bg-gray-50'
+      }`}
+    >
+      {folder.title}
+      <span className="ml-1.5 text-xs opacity-70">
+        {folder.cards.length}
+        {folder.dueCount > 0 && (
+          <span className="ml-1 text-amber-500 font-semibold">{folder.dueCount} due</span>
+        )}
+      </span>
+    </button>
   );
 }

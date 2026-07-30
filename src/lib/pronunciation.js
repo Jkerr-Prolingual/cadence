@@ -506,7 +506,7 @@ export function buildPhonemeWordExamples(words) {
     }
     for (const [phoneme, score] of Object.entries(seen)) {
       if (!examples[phoneme]) examples[phoneme] = [];
-      examples[phoneme].push({ word: w.word, score });
+      examples[phoneme].push({ word: w.word, score, wordAccuracy: w.accuracyScore ?? score });
     }
   }
   for (const arr of Object.values(examples)) {

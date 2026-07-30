@@ -2,28 +2,48 @@ import { useState } from 'react';
 import { ipaPhonemes } from '../../data/ipaPhonemes';
 import MouthDiagram from './MouthDiagram';
 import { getUILabel } from '../../lib/locales';
+import { accuracyColor, accuracyBg } from '../../lib/reportUtils';
 
-function accuracyColor(score) {
-  if (score >= 85) return '#7e22ce';
-  if (score >= 70) return '#16a34a';
-  if (score >= 50) return '#ca8a04';
-  if (score >= 30) return '#ea580c';
-  return '#dc2626';
-}
-
-function accuracyBg(score) {
-  if (score >= 85) return '#faf5ff';
-  if (score >= 70) return '#f0fdf4';
-  if (score >= 50) return '#fefce8';
-  if (score >= 30) return '#fff7ed';
-  return '#fef2f2';
+function WordInstanceList({ instances }) {
+  return (
+    <div className="flex flex-wrap gap-1 mt-1 ml-1">
+      {instances.map((inst, i) => (
+        <span
+          key={i}
+          className="text-xs tabular-nums px-1.5 py-0.5 rounded"
+          style={{ backgroundColor: accuracyBg(inst.wordAccuracy), color: accuracyColor(inst.wordAccuracy) }}
+        >
+          {inst.wordAccuracy}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function PhonemeCard({ phoneme, median, count, l1, wordExamples = [], defaultExpanded = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [expandedWord, setExpandedWord] = useState(null);
   const pd = ipaPhonemes[phoneme];
   const color = accuracyColor(median);
   const bg = accuracyBg(median);
+
+  const groupedWords = [];
+  if (wordExamples.length > 0) {
+    const wordMap = new Map();
+    for (const ex of wordExamples) {
+      const key = ex.word.toLowerCase();
+      if (!wordMap.has(key)) {
+        wordMap.set(key, { word: ex.word, instances: [] });
+      }
+      wordMap.get(key).instances.push(ex);
+    }
+    for (const entry of wordMap.values()) {
+      const scores = entry.instances.map(i => i.wordAccuracy);
+      entry.avgWordAccuracy = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+      groupedWords.push(entry);
+    }
+    groupedWords.sort((a, b) => a.avgWordAccuracy - b.avgWordAccuracy);
+  }
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -71,18 +91,37 @@ function PhonemeCard({ phoneme, median, count, l1, wordExamples = [], defaultExp
               </p>
             </div>
           )}
-          {wordExamples.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {wordExamples.map((ex, i) => (
-                <span
-                  key={`${ex.word}-${i}`}
-                  className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full"
-                  style={{ backgroundColor: accuracyBg(ex.score), color: accuracyColor(ex.score) }}
-                >
-                  <span className="font-medium">{ex.word}</span>
-                  <span className="opacity-70">{ex.score}</span>
-                </span>
-              ))}
+          {groupedWords.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {groupedWords.map((gw, i) => {
+                const isExpanded = expandedWord === gw.word.toLowerCase();
+                const hasMultiple = gw.instances.length > 1;
+                return (
+                  <div key={`${gw.word}-${i}`}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (hasMultiple) {
+                          setExpandedWord(isExpanded ? null : gw.word.toLowerCase());
+                        }
+                      }}
+                      className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${hasMultiple ? 'cursor-pointer' : 'cursor-default'}`}
+                      style={{ backgroundColor: accuracyBg(gw.avgWordAccuracy), color: accuracyColor(gw.avgWordAccuracy) }}
+                    >
+                      <span className="font-medium">{gw.word}</span>
+                      <span className="opacity-70 tabular-nums">{gw.avgWordAccuracy}</span>
+                      {hasMultiple && (
+                        <span className="opacity-50 text-[10px]">
+                          ×{gw.instances.length}
+                        </span>
+                      )}
+                    </button>
+                    {isExpanded && hasMultiple && (
+                      <WordInstanceList instances={gw.instances} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -91,7 +130,7 @@ function PhonemeCard({ phoneme, median, count, l1, wordExamples = [], defaultExp
   );
 }
 
-function ScoreBar({ label, value }) {
+export function ScoreBar({ label, value }) {
   if (value == null) return null;
   const color = accuracyColor(value);
   return (
@@ -157,47 +196,7 @@ export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, p
             )}
           </div>
 
-          {/* Practice words — all words containing any weak phoneme */}
-          {weakEntries.length > 0 && phonemeWordExamples && (() => {
-            const weakSet2 = new Set(weakEntries.map(p => p.phoneme));
-            const wordMap = new Map();
-            for (const phoneme of weakSet2) {
-              for (const ex of (phonemeWordExamples[phoneme] || [])) {
-                const key = ex.word.toLowerCase();
-                if (!wordMap.has(key)) {
-                  wordMap.set(key, { word: ex.word, phonemes: [], worstScore: ex.score });
-                }
-                const entry = wordMap.get(key);
-                entry.phonemes.push({ phoneme, score: ex.score });
-                if (ex.score < entry.worstScore) entry.worstScore = ex.score;
-              }
-            }
-            const practiceWords = [...wordMap.values()].sort((a, b) => a.worstScore - b.worstScore);
-            if (practiceWords.length === 0) return null;
-            return (
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-gray-700">
-                  {getUILabel('wordsToPractice', l1)}
-                </h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {practiceWords.map((pw, i) => (
-                    <span
-                      key={`${pw.word}-${i}`}
-                      className="inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-full border"
-                      style={{ borderColor: accuracyColor(pw.worstScore) + '40', backgroundColor: accuracyBg(pw.worstScore) }}
-                    >
-                      <span className="font-medium" style={{ color: accuracyColor(pw.worstScore) }}>{pw.word}</span>
-                      <span className="text-xs opacity-60" style={{ color: accuracyColor(pw.worstScore) }}>
-                        {pw.phonemes.map(p => `/${p.phoneme}/`).join(' ')}
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Weak phonemes */}
+          {/* Sounds that need work */}
           {weakEntries.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-gray-700">
