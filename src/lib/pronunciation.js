@@ -398,10 +398,7 @@ function accuracyToSeverity(accuracy) {
 }
 
 export async function assessSentencePronunciation({ audioBlob, referenceText, firstWordIdx, lastWordIdx, supabase, userId, textId }) {
-  console.log('[shadow-feedback] audioBlob size:', audioBlob.size, 'type:', audioBlob.type);
-  console.log('[shadow-feedback] referenceText:', JSON.stringify(referenceText));
   const wavBlob = await wavFromBlob(audioBlob);
-  console.log('[shadow-feedback] wavBlob size:', wavBlob.size);
   const tempPath = `${userId}/shadow_${textId}_${Date.now()}.wav`;
 
   await supabase.storage
@@ -415,7 +412,6 @@ export async function assessSentencePronunciation({ audioBlob, referenceText, fi
       body: JSON.stringify({ storagePath: tempPath, referenceText }),
     });
     const data = await res.json();
-    console.log('[shadow-feedback] Azure response:', JSON.stringify(data));
     if (data.error) throw new Error(data.error);
 
     const map = new Map();
@@ -465,7 +461,7 @@ function computeOverallAccuracy(alignment, azureData) {
 
 // --- Phoneme aggregation ---
 
-export function aggregatePhonemes(words) {
+function aggregatePhonemes(words) {
   const groups = new Map();
   for (const w of words) {
     if (w.errorType === 'Insertion' || w.errorType === 'Omission') continue;
@@ -478,7 +474,7 @@ export function aggregatePhonemes(words) {
   return groups;
 }
 
-export function computePhonemeMedians(groups, minInstances = MIN_PHONEME_INSTANCES) {
+function computePhonemeMedians(groups, minInstances = MIN_PHONEME_INSTANCES) {
   const medians = {};
   const counts = {};
   for (const [phoneme, scores] of groups) {
@@ -515,7 +511,7 @@ export function buildPhonemeWordExamples(words) {
   return examples;
 }
 
-export function identifyWeakPhonemes(medians) {
+function identifyWeakPhonemes(medians) {
   const entries = Object.entries(medians).sort((a, b) => a[1] - b[1]);
   if (entries.length === 0) return [];
   const quartileSize = Math.max(1, Math.ceil(entries.length / 4));
@@ -541,7 +537,6 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
     });
     const whisperData = await whisperRes.json();
     if (whisperData.error) throw new Error(`Whisper: ${whisperData.error}`);
-    console.log(`[fluency] Whisper: ${(whisperData.words || []).length} words, transcript: "${(whisperData.transcript || '').substring(0, 200)}..."`);
     if (onProgress) onProgress(0.2);
 
     const fullTokens = tokenizeReference(fullText);
@@ -551,20 +546,14 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
     const lastSpokenRefIdx = spokenEntries.length > 0 ? Math.max(...spokenEntries.map(e => e.refIdx)) : -1;
     if (lastSpokenRefIdx < 0) throw new Error('No spoken words detected in recording');
 
-    const matchCount = alignment.filter(e => e.type === 'match').length;
-    const omitCount = alignment.filter(e => e.type === 'omission' && e.refIdx <= lastSpokenRefIdx).length;
-    console.log(`[fluency] Alignment: ${matchCount} match, ${omitCount} omission, endpoint: word ${lastSpokenRefIdx} of ${fullTokens.length}`);
-
     const allWordPositions = getWordPositions(fullText);
     const referenceText = extractChunkText(fullText, allWordPositions, 0, lastSpokenRefIdx);
 
     const audioBuffer = await decodeAudioBlob(audioBlob);
-    console.log(`[fluency] Audio decoded: ${audioBuffer.duration.toFixed(1)}s, ${audioBuffer.length} samples`);
     const sentences = detectSentences(referenceText, null);
     const refTokens = tokenizeReference(referenceText);
     const chunks = buildSentenceChunks(sentences, refTokens, CHUNK_MIN_WORDS);
     const wordPositions = getWordPositions(referenceText);
-    console.log(`[fluency] ${sentences.length} sentences → ${chunks.length} chunks:`, chunks.map(c => `[${c.firstWordIdx}-${c.lastWordIdx}]`).join(', '));
     if (onProgress) onProgress(0.3);
 
     const chunkResults = await Promise.all(chunks.map(async (chunk, idx) => {
@@ -578,9 +567,6 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
       const chunkRefText = extractChunkText(referenceText, wordPositions, chunk.firstWordIdx, chunk.lastWordIdx);
 
       try {
-        const timeRangeStr = `${timeRange.startSec.toFixed(1)}-${timeRange.endSec.toFixed(1)}s`;
-        console.log(`[fluency] chunk ${idx}: words ${chunk.firstWordIdx}-${chunk.lastWordIdx}, time ${timeRangeStr}, wav ${wavBlob.size}B, ref "${chunkRefText.substring(0, 60)}..."`);
-
         await supabase.storage
           .from('student-recordings')
           .upload(chunkPath, wavBlob, { contentType: 'audio/wav', upsert: true });
@@ -591,7 +577,6 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
           body: JSON.stringify({ storagePath: chunkPath, referenceText: chunkRefText }),
         });
         const data = await res.json();
-        console.log(`[fluency] chunk ${idx} result: ${data.words?.length || 0} words, error: ${data.error || 'none'}`);
 
         try { await supabase.storage.from('student-recordings').remove([chunkPath]); } catch {}
 
@@ -618,8 +603,6 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
       if (result.prosodyScore != null) prosodyScores.push(result.prosodyScore);
       if (result.completenessScore != null) completenessScores.push(result.completenessScore);
     }
-
-    console.log(`[fluency] Merged: ${mergedWords.length} words from ${chunkResults.filter(Boolean).length}/${chunks.length} chunks`);
 
     const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
     const azureData = mergedWords.length > 0 ? {

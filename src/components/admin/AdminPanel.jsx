@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { analyzeText, titleToSlug, buildAnalysisPrompt, CEFR_LEVELS, CEFR_COLORS } from '../../lib/textAnalysis';
+import { analyzeText, titleToSlug } from '../../lib/textAnalysis';
+import { CEFR_LEVELS, CEFR_COLORS } from '../../lib/wordUtils';
 import { getVoiceOptions, generateAudio, whisperTimestampsToWordTimestamps } from '../../lib/elevenlabs';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -219,6 +220,7 @@ export default function AdminPanel() {
   const [bookCoverPreview, setBookCoverPreview] = useState(null);
   const [bookManifestJson, setBookManifestJson] = useState('');
   const [bookSyntaxGlossesJson, setBookSyntaxGlossesJson] = useState('');
+  const [bookExercisesJson, setBookExercisesJson] = useState('');
   const [savingBook, setSavingBook] = useState(false);
   const [bookError, setBookError] = useState(null);
 
@@ -226,7 +228,6 @@ export default function AdminPanel() {
   const [analysisJson, setAnalysisJson] = useState('');
   const [textAnalysis, setTextAnalysis] = useState(null);
   const [parseError, setParseError] = useState(null);
-  const [copied, setCopied] = useState(false);
 
   // Step 3: Audio & Publish
   const [audioMode, setAudioMode] = useState('generate'); // 'generate' | 'upload'
@@ -330,6 +331,7 @@ export default function AdminPanel() {
     setBookCoverPreview(null);
     setBookManifestJson('');
     setBookSyntaxGlossesJson('');
+    setBookExercisesJson('');
     setBookError(null);
   }
 
@@ -376,6 +378,17 @@ export default function AdminPanel() {
           throw new Error(`Invalid syntax glosses JSON: ${parseErr.message}`);
         }
       }
+      let parsedExercises = null;
+      if (bookExercisesJson.trim()) {
+        try {
+          parsedExercises = JSON.parse(bookExercisesJson);
+          if (!parsedExercises.chapters || typeof parsedExercises.chapters !== 'object') {
+            throw new Error('Exercises must have a "chapters" object');
+          }
+        } catch (parseErr) {
+          throw new Error(`Invalid exercises JSON: ${parseErr.message}`);
+        }
+      }
       const record = {
         id,
         title: bookTitle,
@@ -385,6 +398,7 @@ export default function AdminPanel() {
         cover_image_url: coverImageUrl,
         vocabulary_manifest: parsedManifest,
         syntax_glosses: parsedSyntaxGlosses,
+        exercises: parsedExercises,
         status: 'published',
       };
       const { error } = await supabase.from('books').upsert(record, { onConflict: 'id' });
@@ -424,15 +438,8 @@ export default function AdminPanel() {
     setBookCoverPreview(book.cover_image_url || null);
     setBookManifestJson(book.vocabulary_manifest ? JSON.stringify(book.vocabulary_manifest, null, 2) : '');
     setBookSyntaxGlossesJson(book.syntax_glosses ? JSON.stringify(book.syntax_glosses, null, 2) : '');
+    setBookExercisesJson(book.exercises ? JSON.stringify(book.exercises, null, 2) : '');
     setShowBookForm(true);
-  }
-
-  function handleCopyPrompt() {
-    if (!title || !cleanBody) return;
-    const prompt = buildAnalysisPrompt(title, cleanBody, cefrEstimate);
-    navigator.clipboard.writeText(prompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   function handleParseJson() {
@@ -789,6 +796,11 @@ export default function AdminPanel() {
                         const locales = detectGlossLocales(book.syntax_glosses);
                         return <span className="text-xs text-purple-600" title={`${count} syntax glosses${locales.length > 0 ? ` (${locales.join(', ')})` : ''}`}>glosses{locales.length > 0 ? ` [${locales.join(',')}]` : ''}</span>;
                       })()}
+                      {book.exercises && (() => {
+                        const count = Object.values(book.exercises.chapters || {}).reduce((s, ch) => s + ch.length, 0);
+                        const chCount = Object.keys(book.exercises.chapters || {}).length;
+                        return <span className="text-xs text-amber-600" title={`${count} exercises across ${chCount} chapters`}>exercises ({count})</span>;
+                      })()}
                     </div>
                     <span className="text-gray-400 text-xs ml-2">{isExpanded ? '▲' : '▼'}</span>
                   </button>
@@ -993,6 +1005,26 @@ export default function AdminPanel() {
                   const glossCount = Object.values(parsed.chapters || {}).reduce((sum, ch) => sum + ch.length, 0);
                   const locales = detectGlossLocales(parsed);
                   return <p className="text-xs text-green-600 mt-1">{glossCount} glosses across {chapterCount} chapters{locales.length > 0 ? ` — locales: ${locales.join(', ')}` : ''}</p>;
+                } catch {
+                  return <p className="text-xs text-red-500 mt-1">Invalid JSON</p>;
+                }
+              })()}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Exercises (JSON)</label>
+              <textarea
+                value={bookExercisesJson}
+                onChange={(e) => setBookExercisesJson(e.target.value)}
+                placeholder='Paste exercises.json from the graded readers project...'
+                rows={4}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-gray-900 resize-y"
+              />
+              {bookExercisesJson.trim() && (() => {
+                try {
+                  const parsed = JSON.parse(bookExercisesJson);
+                  const chapterCount = Object.keys(parsed.chapters || {}).length;
+                  const probeCount = Object.values(parsed.chapters || {}).reduce((sum, ch) => sum + ch.length, 0);
+                  return <p className="text-xs text-green-600 mt-1">{probeCount} probes across {chapterCount} chapters</p>;
                 } catch {
                   return <p className="text-xs text-red-500 mt-1">Invalid JSON</p>;
                 }
@@ -1324,21 +1356,6 @@ export default function AdminPanel() {
               Go back to Step 1 and enter a title and text first.
             </p>
           )}
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleCopyPrompt}
-              disabled={!canAdvance}
-              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                canAdvance ? 'bg-gray-900 text-white hover:bg-gray-800' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {copied ? 'Copied!' : 'Copy Analysis Prompt'}
-            </button>
-            <span className="text-xs text-gray-400">
-              Paste into Claude or ChatGPT, then paste the JSON response below
-            </span>
-          </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-500 uppercase mb-1">

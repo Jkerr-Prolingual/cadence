@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { sampleTexts } from '../../data/sampleTexts';
 import { cefrColor } from '../../lib/wordUtils';
 import { formatRelativeDate, groupTextsByBook } from '../../lib/reportUtils';
+import { getBookProbesForText } from '../../lib/exercises';
 import ProbePreview from '../exercises/ProbePreview';
 import ReportsTab from './ReportsTab';
-import getTestData from '../../hooks/useTestData';
-
-const USE_TEST_DATA = import.meta.env.VITE_USE_TEST_DATA === 'true';
 
 function generateJoinCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -31,53 +28,29 @@ export default function TeacherDashboard() {
   const [exerciseResults, setExerciseResults] = useState([]);
   const [phonemeSessions, setPhonemeSessions] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState(null);
-  const [activeTab, setActiveTab] = useState(USE_TEST_DATA ? 'reports' : 'assignments');
+  const [activeTab, setActiveTab] = useState('assignments');
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [showCreateAssignment, setShowCreateAssignment] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [createError, setCreateError] = useState(null);
 
   const allTexts = useMemo(() => {
-    const curated = curatedTexts.map(t => ({
+    return curatedTexts.map(t => ({
       ...t,
       cefr: t.cefr_estimate || t.cefr,
     }));
-    return [...sampleTexts, ...curated];
   }, [curatedTexts]);
 
   useEffect(() => {
-    if (USE_TEST_DATA) {
-      loadTestData();
-    } else {
-      loadData();
-    }
+    loadData();
   }, []);
-
-  function loadTestData() {
-    const td = getTestData();
-    setClasses(td.classes);
-    setSelectedClassId(td.classes[0].id);
-    setEnrollments(td.enrollments);
-    setStudentProfiles(td.studentProfiles);
-    setCuratedTexts(td.curatedTexts);
-    setBooks(td.books);
-    setAssignments(td.assignments);
-    setProgress(td.progress);
-    setFluencySessions(td.fluencySessions);
-    setPronunciationAssessments(td.pronunciationAssessments);
-    setPhonemeSessions(td.phonemeSessions);
-    setSrsCards(td.srsCards);
-    setExerciseResults(td.exerciseResults);
-    setStudentRecordings(td.studentRecordings);
-    setReviewLogs([]);
-  }
 
   async function loadData() {
     const [clsRes, textsRes, booksRes] = await Promise.all([
       supabase.from('classes').select('*').eq('teacher_id', user.id),
       supabase.from('curated_texts').select('id, title, author, cefr_estimate, status, audio_urls, book_id, chapter_order, analysis')
         .eq('status', 'published'),
-      supabase.from('books').select('id, title').eq('status', 'published'),
+      supabase.from('books').select('id, title, exercises').eq('status', 'published'),
     ]);
     const cls = clsRes.data || [];
     setClasses(cls);
@@ -424,6 +397,7 @@ function AssignmentsPanel({ assignments, allTexts, books, students, progress, st
             key={a.id}
             assignment={a}
             allTexts={allTexts}
+            books={books}
             students={students}
             progress={progress.filter(p => p.assignmentId === a.id)}
             studentRecordings={studentRecordings.filter(r => r.text_id === a.textId)}
@@ -449,7 +423,7 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
   const [showProbePreview, setShowProbePreview] = useState(false);
   const selectedText = allTexts.find(t => t.id === selectedTextId);
   const hasAudio = selectedText?.audio_urls || selectedText?.audioUrls;
-  const hasProbes = selectedText?.analysis?.probePool?.length > 0;
+  const hasProbes = getBookProbesForText(books, selectedText, 'es').length > 0;
 
   const { byBook: bookTexts, standalone: standaloneTexts, bookMap } = useMemo(
     () => groupTextsByBook(allTexts, books),
@@ -490,7 +464,7 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
             const t = allTexts.find(x => x.id === e.target.value);
             if (t && !title) setTitle(`Read: ${t.title}`);
             if (!t?.audio_urls && !t?.audioUrls) setTasks(prev => ({ ...prev, shadowReading: false }));
-            if (!t?.analysis?.probePool?.length) setTasks(prev => ({ ...prev, exercises: false }));
+            if (getBookProbesForText(books, t, 'es').length === 0) setTasks(prev => ({ ...prev, exercises: false }));
           }}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
         >
@@ -604,7 +578,7 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
             onClick={() => setShowProbePreview(true)}
             className="text-xs text-blue-500 hover:text-blue-700 underline mt-1 transition-colors"
           >
-            Preview exercises ({selectedText.analysis.probePool.length} questions)
+            Preview exercises ({getBookProbesForText(books, selectedText, 'es').length} questions)
           </button>
         )}
       </div>
@@ -635,9 +609,9 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
         </button>
       </div>
 
-      {showProbePreview && selectedText?.analysis?.probePool && (
+      {showProbePreview && (
         <ProbePreview
-          probes={selectedText.analysis.probePool}
+          probes={getBookProbesForText(books, selectedText, 'es')}
           onClose={() => setShowProbePreview(false)}
         />
       )}
@@ -645,7 +619,7 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
   );
 }
 
-function AssignmentCard({ assignment, allTexts, students, progress, studentRecordings, pronunciationAssessments = [], fluencySessions, srsCards, reviewLogs, exerciseResults = [], phonemeSessions = [], onChanged }) {
+function AssignmentCard({ assignment, allTexts, books = [], students, progress, studentRecordings, pronunciationAssessments = [], fluencySessions, srsCards, reviewLogs, exerciseResults = [], phonemeSessions = [], onChanged }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [playingStudentId, setPlayingStudentId] = useState(null);
   const [audioUrls, setAudioUrls] = useState({});
@@ -660,7 +634,7 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
   const hasFlashcardTask = !!assignment.tasks.flashcards;
   const hasShadowTask = !!assignment.tasks.shadowReading;
   const hasExerciseTask = !!assignment.tasks.exercises;
-  const probes = text?.analysis?.probePool;
+  const probes = getBookProbesForText(books, text, 'es');
 
   function getStudentCompletion(studentId) {
     const p = progress.find(p => p.studentId === studentId);
@@ -823,7 +797,7 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
               {hasFlashcardTask && (
                 <span>Flashcards: <span className="text-green-600">green</span> = reviewed, <span className="text-amber-600">amber</span> = not yet reviewed. Click for details.</span>
               )}
-              {hasExerciseTask && probes?.length > 0 && (
+              {hasExerciseTask && probes.length > 0 && (
                 <button
                   onClick={() => setProbePreview({ probes })}
                   className="text-blue-500 hover:text-blue-700 underline transition-colors"
@@ -927,7 +901,6 @@ function AssignmentCard({ assignment, allTexts, students, progress, studentRecor
                                   <span title="Accuracy">{Math.round(assess.overall_accuracy)}%</span>
                                   {assess.azure_fluency_score != null && <span className="text-gray-400" title="Fluency">F{Math.round(assess.azure_fluency_score)}</span>}
                                   {assess.azure_prosody_score != null && <span className="text-gray-400" title="Prosody">P{Math.round(assess.azure_prosody_score)}</span>}
-                                  {assess.azure_completeness_score != null && <span className="text-gray-400" title="Completeness">C{Math.round(assess.azure_completeness_score)}%</span>}
                                 </div>
                                 {latestPhoneme?.weak_phonemes?.length > 0 && (
                                   <div className="flex items-center gap-1 mt-0.5 flex-wrap">

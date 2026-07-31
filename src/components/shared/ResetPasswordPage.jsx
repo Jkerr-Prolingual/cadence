@@ -36,7 +36,7 @@ export default function ResetPasswordPage() {
     setError(null);
 
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden.');
+      setError('Passwords do not match.');
       return;
     }
 
@@ -56,15 +56,15 @@ export default function ResetPasswordPage() {
         <div className="w-full max-w-sm text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-gray-900 mb-2">Relato</h1>
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <p className="text-sm text-gray-700 font-medium">Contraseña actualizada</p>
+            <p className="text-sm text-gray-700 font-medium">Password updated</p>
             <p className="text-sm text-gray-500 mt-2">
-              Tu contraseña se ha cambiado correctamente.
+              Your password has been changed successfully.
             </p>
             <button
               onClick={() => navigate('/')}
               className="mt-4 w-full py-2 px-4 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800"
             >
-              Continuar
+              Continue
             </button>
           </div>
         </div>
@@ -80,19 +80,19 @@ export default function ResetPasswordPage() {
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             {expired ? (
               <>
-                <p className="text-sm text-gray-700 font-medium">Enlace inválido o expirado</p>
+                <p className="text-sm text-gray-700 font-medium">Invalid or expired link</p>
                 <p className="text-sm text-gray-500 mt-2">
-                  Solicita un nuevo enlace desde la página de inicio de sesión.
+                  Request a new link from the login page.
                 </p>
                 <button
                   onClick={() => navigate('/login')}
                   className="mt-4 text-sm text-gray-500 hover:text-gray-700"
                 >
-                  Ir a iniciar sesión
+                  Go to login
                 </button>
               </>
             ) : (
-              <p className="text-sm text-gray-500">Verificando enlace...</p>
+              <p className="text-sm text-gray-500">Verifying link...</p>
             )}
           </div>
         </div>
@@ -105,12 +105,12 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Relato</h1>
-          <p className="text-sm text-gray-500 mt-1">Nueva contraseña</p>
+          <p className="text-sm text-gray-500 mt-1">New password</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nueva contraseña</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
             <input
               type="password"
               value={password}
@@ -122,7 +122,7 @@ export default function ResetPasswordPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar contraseña</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
             <input
               type="password"
               value={confirmPassword}
@@ -140,7 +140,7 @@ export default function ResetPasswordPage() {
             disabled={loading}
             className="w-full py-2 px-4 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
           >
-            {loading ? '...' : 'Cambiar contraseña'}
+            {loading ? '...' : 'Change password'}
           </button>
         </form>
       </div>

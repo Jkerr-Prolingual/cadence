@@ -181,6 +181,11 @@ export default function RecordReviewStrip({
                 {t('fluency')}: {Math.round(assessmentData.azure_fluency_score)}%
               </span>
             )}
+            {assessmentData?.azure_prosody_score != null && (
+              <span className="text-xs text-gray-400">
+                {t('prosody')}: {Math.round(assessmentData.azure_prosody_score)}%
+              </span>
+            )}
           </div>
 
           <div className="flex items-center justify-center gap-2">
@@ -305,6 +310,11 @@ export default function RecordReviewStrip({
               {assessmentData?.azure_fluency_score != null && (
                 <span className="text-xs text-gray-400">
                   {t('fluency')}: {Math.round(assessmentData.azure_fluency_score)}%
+                </span>
+              )}
+              {assessmentData?.azure_prosody_score != null && (
+                <span className="text-xs text-gray-400">
+                  {t('prosody')}: {Math.round(assessmentData.azure_prosody_score)}%
                 </span>
               )}
             </div>

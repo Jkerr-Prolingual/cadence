@@ -2,18 +2,20 @@ import { useState, useEffect, useMemo } from 'react';
 import { getAllSrsCards, getDueSrsCards } from '../../lib/srs';
 import { cefrColor } from '../../lib/wordUtils';
 import { supabase } from '../../lib/supabase';
+import { getUILabel } from '../../lib/locales';
+import { useAuth } from '../../context/AuthContext';
 import LeitnerReview from './LeitnerReview';
 import BoxDistribution from '../shared/BoxDistribution';
 import FlashcardSummaryStrip from './FlashcardSummaryStrip';
 
-function CardList({ cards }) {
+function CardList({ cards, l1 }) {
   if (cards.length === 0) return null;
 
   const sorted = [...cards].sort((a, b) => (a.box || 1) - (b.box || 1));
 
   return (
     <div className="mt-6">
-      <h3 className="text-sm font-medium text-gray-700 mb-3">All cards</h3>
+      <h3 className="text-sm font-medium text-gray-700 mb-3">{getUILabel('allCards', l1)}</h3>
       <div className="space-y-1">
         {sorted.map(card => {
           const color = cefrColor(card.cefr);
@@ -46,6 +48,7 @@ function CardList({ cards }) {
 }
 
 export default function FlashcardPage() {
+  const { l1 } = useAuth();
   const [allCards, setAllCards] = useState([]);
   const [dueCards, setDueCards] = useState([]);
   const [cardSources, setCardSources] = useState([]);
@@ -206,9 +209,9 @@ export default function FlashcardPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="text-center py-16 text-gray-400">
-          <p className="text-sm font-medium text-gray-600">No flashcards yet.</p>
+          <p className="text-sm font-medium text-gray-600">{getUILabel('noFlashcardsYet', l1)}</p>
           <p className="text-xs mt-2 max-w-xs mx-auto">
-            Click any word while reading, then tap "+ Flashcard" to add it to your review deck.
+            {getUILabel('noFlashcardsHint', l1)}
           </p>
         </div>
       </div>
@@ -220,9 +223,9 @@ export default function FlashcardPage() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
           <div>
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Flashcards</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">{getUILabel('flashcards', l1)}</h2>
             <p className="text-sm text-gray-500 mt-1">
-              {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} · {filteredDueCount} due for review
+              {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} · {filteredDueCount} {getUILabel('dueForReview', l1)}
             </p>
           </div>
           <button
@@ -238,7 +241,7 @@ export default function FlashcardPage() {
           </button>
         </div>
 
-        <FlashcardSummaryStrip allCards={allCards} dueCards={dueCards} />
+        <FlashcardSummaryStrip allCards={allCards} dueCards={dueCards} l1={l1} />
 
         {/* Folder tabs — grouped by book when multiple books exist */}
         {folders.length > 1 && (
@@ -291,12 +294,12 @@ export default function FlashcardPage() {
         {/* Single folder — show title as header instead of tabs */}
         {folders.length === 1 && folders[0].textId && (
           <p className="text-xs text-gray-400 mb-4">
-            From: {folders[0].title}
+            {getUILabel('from', l1)}: {folders[0].title}
           </p>
         )}
 
         <BoxDistribution cards={filteredCards} />
-        <CardList cards={filteredCards} />
+        <CardList cards={filteredCards} l1={l1} />
       </div>
     </div>
   );

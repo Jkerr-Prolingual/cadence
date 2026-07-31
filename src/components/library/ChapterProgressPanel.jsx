@@ -43,14 +43,14 @@ export default function ChapterProgressPanel({ chapterProgress, textId, userId, 
       {fluency.sessionCount > 0 && (
         <div>
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-            Timed reads
+            {getUILabel('timedReads', l1)}
           </p>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">
               {fluency.wpmHistory.join(' → ')} WPM
             </span>
             <span className="text-xs text-gray-400">
-              ({fluency.sessionCount} {fluency.sessionCount === 1 ? 'pass' : 'passes'})
+              ({fluency.sessionCount} {getUILabel(fluency.sessionCount === 1 ? 'pass' : 'passes', l1)})
             </span>
           </div>
         </div>
@@ -60,16 +60,16 @@ export default function ChapterProgressPanel({ chapterProgress, textId, userId, 
       {recording.exists && (
         <div>
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-            Your recording
+            {getUILabel('yourRecording', l1)}
           </p>
           <div className="flex items-center gap-3">
             {loadingAudio ? (
-              <span className="text-xs text-gray-400">Loading audio...</span>
+              <span className="text-xs text-gray-400">{getUILabel('loadingAudio', l1)}</span>
             ) : audioUrl ? (
               <audio ref={audioRef} src={audioUrl} controls preload="none"
                 className="h-8 w-full max-w-xs" />
             ) : (
-              <span className="text-xs text-gray-400">Audio unavailable</span>
+              <span className="text-xs text-gray-400">{getUILabel('audioUnavailable', l1)}</span>
             )}
             {recording.durationSeconds > 0 && (
               <span className="text-xs text-gray-400 flex-shrink-0">
@@ -84,14 +84,14 @@ export default function ChapterProgressPanel({ chapterProgress, textId, userId, 
       {srs.totalCards > 0 && (
         <div>
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-            Flashcards
+            {getUILabel('flashcards', l1)}
           </p>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-700">
-              {srs.totalCards} {srs.totalCards === 1 ? 'card' : 'cards'}
+              {srs.totalCards} {getUILabel(srs.totalCards === 1 ? 'card' : 'cards', l1)}
               {srs.dueCards > 0 && (
                 <span className="text-amber-600 ml-1 font-medium">
-                  ({srs.dueCards} due)
+                  ({srs.dueCards} {getUILabel('due', l1)})
                 </span>
               )}
             </span>
@@ -99,7 +99,7 @@ export default function ChapterProgressPanel({ chapterProgress, textId, userId, 
               onClick={() => navigate('/flashcards')}
               className="text-xs px-2.5 py-1 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 transition-colors"
             >
-              Practice
+              {getUILabel('practice', l1)}
             </button>
           </div>
         </div>
@@ -109,14 +109,14 @@ export default function ChapterProgressPanel({ chapterProgress, textId, userId, 
       {assignments && assignments.total > 0 && (
         <div>
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-            Assignment
+            {getUILabel('assignment', l1)}
           </p>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">
-              {assignments.completed}/{assignments.total} tasks
+              {assignments.completed}/{assignments.total} {getUILabel('tasks', l1)}
             </span>
             {assignments.completed === assignments.total && (
-              <span className="text-green-600 text-xs font-medium">✓ Complete</span>
+              <span className="text-green-600 text-xs font-medium">✓ {getUILabel('complete', l1)}</span>
             )}
           </div>
         </div>

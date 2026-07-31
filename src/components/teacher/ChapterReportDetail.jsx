@@ -28,11 +28,11 @@ export default function ChapterReportDetail({ detail, studentRecordings }) {
       {detail.assessment && (
         <div className="border border-gray-200 rounded-lg p-4 space-y-3">
           <h3 className="text-sm font-semibold text-gray-700">Pronunciation Assessment</h3>
+          <p className="text-[11px] text-gray-400 leading-snug">These scores measure connected speech across the full reading, not individual words.</p>
           <div className="space-y-2 max-w-md">
-            <ScoreBar label="Accuracy" value={detail.assessment.accuracy} />
-            <ScoreBar label="Fluency" value={detail.assessment.fluency} />
-            <ScoreBar label="Prosody" value={detail.assessment.prosody} />
-            <ScoreBar label="Complete" value={detail.assessment.completeness} />
+            <ScoreBar label="Accuracy" value={detail.assessment.accuracy} description="How closely each word matches expected pronunciation" />
+            <ScoreBar label="Fluency" value={detail.assessment.fluency} description="Smoothness and natural pacing across the reading" />
+            <ScoreBar label="Prosody" value={detail.assessment.prosody} description="Intonation, stress, and rhythm patterns" />
           </div>
           <p className="text-xs text-gray-400">
             Assessed {formatRelativeDate(detail.assessment.processedAt)}

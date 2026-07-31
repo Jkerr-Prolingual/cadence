@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { cefrColor } from '../../lib/wordUtils';
 import { dbGet, dbPut } from '../../lib/db';
 import { groupTextsByBook } from '../../lib/reportUtils';
+import { getUILabel } from '../../lib/locales';
+import { getBookProbesForText } from '../../lib/exercises';
 
 function shuffleArray(arr) {
   const a = [...arr];
@@ -14,7 +16,7 @@ function shuffleArray(arr) {
   return a;
 }
 
-function QuestionCard({ probe, index, total, onAnswer, answered, selectedIdx, correctIdx }) {
+function QuestionCard({ probe, index, total, onAnswer, answered, selectedIdx, correctIdx, l1 }) {
   const isCorrect = answered && selectedIdx === correctIdx;
   const options = useMemo(() => {
     if (probe._shuffledOptions) return probe._shuffledOptions;
@@ -27,7 +29,7 @@ function QuestionCard({ probe, index, total, onAnswer, answered, selectedIdx, co
 
   if (!probe._shuffledOptions) probe._shuffledOptions = options;
 
-  const typeLabels = { meaning: 'Meaning', cloze: 'Fill in the blank', context: 'Context' };
+  const typeLabels = { meaning: getUILabel('exerciseMeaning', l1), cloze: getUILabel('exerciseCloze', l1), context: getUILabel('exerciseContext', l1) };
 
   return (
     <div className="space-y-4">
@@ -81,14 +83,14 @@ function QuestionCard({ probe, index, total, onAnswer, answered, selectedIdx, co
 
       {answered && probe.questionType === 'meaning' && !isCorrect && (
         <p className="text-xs text-gray-500">
-          <span className="font-medium">{probe.word}</span> means <span className="font-medium">{probe.correct}</span> in this context.
+          <span className="font-medium">{probe.word}</span> {getUILabel('meansInContext', l1)} <span className="font-medium">{probe.correct}</span> {getUILabel('inThisContext', l1)}
         </p>
       )}
     </div>
   );
 }
 
-function ExerciseRunner({ probes, textTitle, onFinish }) {
+function ExerciseRunner({ probes, textTitle, onFinish, l1 }) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState([]);
   const [selectedIdx, setSelectedIdx] = useState(null);
@@ -123,7 +125,7 @@ function ExerciseRunner({ probes, textTitle, onFinish }) {
           <h2 className="text-sm font-medium text-gray-500">{textTitle}</h2>
           {answers.length > 0 && (
             <span className="text-xs text-gray-400">
-              {score}/{answers.length} correct
+              {score}/{answers.length} {getUILabel('outOfCorrect', l1)}
             </span>
           )}
         </div>
@@ -143,6 +145,7 @@ function ExerciseRunner({ probes, textTitle, onFinish }) {
         onAnswer={handleAnswer}
         answered={answered}
         selectedIdx={selectedIdx}
+        l1={l1}
       />
 
       {answered && (
@@ -151,7 +154,7 @@ function ExerciseRunner({ probes, textTitle, onFinish }) {
             onClick={handleNext}
             className="px-6 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
           >
-            {isLast ? 'See results' : 'Next'}
+            {getUILabel(isLast ? 'seeResults' : 'next', l1)}
           </button>
         </div>
       )}
@@ -159,7 +162,7 @@ function ExerciseRunner({ probes, textTitle, onFinish }) {
   );
 }
 
-function ResultsSummary({ score, total, answers, probes, onRetry, onBack }) {
+function ResultsSummary({ score, total, answers, probes, onRetry, onBack, l1 }) {
   const pct = Math.round((score / total) * 100);
   const color = pct >= 80 ? 'text-green-600' : pct >= 60 ? 'text-amber-600' : 'text-red-600';
 
@@ -167,7 +170,7 @@ function ResultsSummary({ score, total, answers, probes, onRetry, onBack }) {
     <div className="max-w-xl mx-auto">
       <div className="text-center mb-8">
         <p className={`text-5xl font-bold ${color}`}>{pct}%</p>
-        <p className="text-sm text-gray-500 mt-2">{score} out of {total} correct</p>
+        <p className="text-sm text-gray-500 mt-2">{score} / {total} {getUILabel('outOfCorrect', l1)}</p>
       </div>
 
       <div className="space-y-2 mb-8">
@@ -207,13 +210,13 @@ function ResultsSummary({ score, total, answers, probes, onRetry, onBack }) {
           onClick={onBack}
           className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
         >
-          Back to exercises
+          {getUILabel('backToExercises', l1)}
         </button>
         <button
           onClick={onRetry}
           className="px-6 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
         >
-          Try again
+          {getUILabel('tryAgain', l1)}
         </button>
       </div>
     </div>
@@ -236,15 +239,17 @@ export default function ExercisesPage() {
   async function loadData() {
     const [textsRes, booksRes] = await Promise.all([
       supabase.from('curated_texts')
-        .select('id, title, author, cefr_estimate, book_id, chapter_order, analysis')
+        .select('id, title, author, cefr_estimate, book_id, chapter_order')
         .eq('status', 'published'),
-      supabase.from('books').select('id, title').eq('status', 'published'),
+      supabase.from('books').select('id, title, exercises').eq('status', 'published'),
     ]);
-    setTexts(textsRes.data || []);
-    setBooks(booksRes.data || []);
+    const booksData = booksRes.data || [];
+    const textsData = textsRes.data || [];
+    setTexts(textsData);
+    setBooks(booksData);
 
     const resultMap = {};
-    for (const t of (textsRes.data || [])) {
+    for (const t of textsData) {
       const saved = await dbGet('exerciseResults', t.id);
       if (saved) resultMap[t.id] = saved;
     }
@@ -253,8 +258,8 @@ export default function ExercisesPage() {
   }
 
   const textsWithProbes = useMemo(() => {
-    return texts.filter(t => t.analysis?.probePool?.length > 0);
-  }, [texts]);
+    return texts.filter(t => getBookProbesForText(books, t, l1).length > 0);
+  }, [texts, books, l1]);
 
   const grouped = useMemo(
     () => groupTextsByBook(textsWithProbes, books),
@@ -289,7 +294,7 @@ export default function ExercisesPage() {
   }
 
   function handleStartExercise(text) {
-    const probes = text.analysis.probePool.map(p => ({ ...p }));
+    const probes = getBookProbesForText(books, text, l1).map(p => ({ ...p }));
     setActiveExercise({ textId: text.id, title: text.title, probes: shuffleArray(probes) });
     setResults(null);
   }
@@ -324,6 +329,7 @@ export default function ExercisesPage() {
             probes={results.probes}
             onRetry={handleRetry}
             onBack={handleBack}
+            l1={l1}
           />
         </div>
       </div>
@@ -338,12 +344,13 @@ export default function ExercisesPage() {
             onClick={handleBack}
             className="text-xs text-gray-400 hover:text-gray-600 mb-4 transition-colors"
           >
-            ← Back to exercises
+            ← {getUILabel('backToExercises', l1)}
           </button>
           <ExerciseRunner
             probes={activeExercise.probes}
             textTitle={activeExercise.title}
             onFinish={handleFinish}
+            l1={l1}
           />
         </div>
       </div>
@@ -354,8 +361,8 @@ export default function ExercisesPage() {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center text-gray-400">
-          <p className="text-lg">No exercises available</p>
-          <p className="text-sm mt-2">Exercises will appear here when texts with vocabulary probes are published.</p>
+          <p className="text-lg">{getUILabel('noExercisesAvailable', l1)}</p>
+          <p className="text-sm mt-2">{getUILabel('noExercisesHint', l1)}</p>
         </div>
       </div>
     );
@@ -364,14 +371,14 @@ export default function ExercisesPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <h1 className="text-xl font-semibold text-gray-900 mb-6">Exercises</h1>
+        <h1 className="text-xl font-semibold text-gray-900 mb-6">{getUILabel('exercises', l1)}</h1>
 
         {books.filter(b => grouped.byBook[b.id]?.length).map(book => (
           <div key={book.id} className="mb-8">
             <h2 className="text-sm font-semibold text-gray-700 mb-3">{book.title}</h2>
             <div className="space-y-2">
               {grouped.byBook[book.id].map(text => {
-                const probeCount = text.analysis.probePool.length;
+                const probeCount = getBookProbesForText(books, text, l1).length;
                 const saved = savedResults[text.id];
                 return (
                   <button
@@ -388,7 +395,7 @@ export default function ExercisesPage() {
                         <p className="text-sm text-gray-900 truncate">
                           {text.chapter_order != null ? `Ch. ${text.chapter_order}: ` : ''}{text.title}
                         </p>
-                        <p className="text-xs text-gray-400">{probeCount} questions</p>
+                        <p className="text-xs text-gray-400">{probeCount} {getUILabel('questions', l1)}</p>
                       </div>
                     </div>
                     {saved ? (
@@ -399,7 +406,7 @@ export default function ExercisesPage() {
                         {saved.score}/{saved.total}
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-300 flex-shrink-0">Not started</span>
+                      <span className="text-xs text-gray-300 flex-shrink-0">{getUILabel('notStarted', l1)}</span>
                     )}
                   </button>
                 );
@@ -410,10 +417,10 @@ export default function ExercisesPage() {
 
         {grouped.standalone.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">Other texts</h2>
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">{getUILabel('otherTexts', l1)}</h2>
             <div className="space-y-2">
               {grouped.standalone.map(text => {
-                const probeCount = text.analysis.probePool.length;
+                const probeCount = getBookProbesForText(books, text, l1).length;
                 const saved = savedResults[text.id];
                 return (
                   <button
@@ -428,7 +435,7 @@ export default function ExercisesPage() {
                       />
                       <div className="min-w-0">
                         <p className="text-sm text-gray-900 truncate">{text.title}</p>
-                        <p className="text-xs text-gray-400">{probeCount} questions</p>
+                        <p className="text-xs text-gray-400">{probeCount} {getUILabel('questions', l1)}</p>
                       </div>
                     </div>
                     {saved ? (
@@ -439,7 +446,7 @@ export default function ExercisesPage() {
                         {saved.score}/{saved.total}
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-300 flex-shrink-0">Not started</span>
+                      <span className="text-xs text-gray-300 flex-shrink-0">{getUILabel('notStarted', l1)}</span>
                     )}
                   </button>
                 );

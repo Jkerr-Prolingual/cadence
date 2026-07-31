@@ -31,15 +31,6 @@ export function cleanToken(raw) {
   return raw.replace(/[^a-zA-ZÀ-ÿ'-]/g, '').toLowerCase();
 }
 
-export function tokenizeText(text) {
-  return text.split(/(\s+|(?=[.,!?;:"""''()[\]{}\-—–/])|(?<=[.,!?;:"""''()[\]{}\-—–/]))/)
-    .filter(t => t && t.trim().length > 0);
-}
-
-export function expandContraction(token) {
-  const lower = token.toLowerCase();
-  return CONTRACTIONS[lower] || null;
-}
 
 /**
  * Look up CEFR level for a word. Tries direct match first, then lemma.
@@ -76,9 +67,5 @@ export function cefrColor(level) {
  * Check if a word is a function word (A1 level, not worth tracking depth on).
  * Used to filter out "the", "is", "a", etc. from depth tracking.
  */
-export function isFunctionWord(word) {
-  const { cefr } = lookupCefr(word);
-  return cefr === 'A1';
-}
 
 export { cefrMultiWord };

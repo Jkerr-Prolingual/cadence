@@ -148,15 +148,6 @@ export async function upsertSrsCard(cardData) {
   return { isNew: !existing, existingTextTitle: existing?.text_title || null };
 }
 
-export async function getCardSources(userId, word) {
-  const { data } = await supabase
-    .from('srs_card_sources')
-    .select('text_id, text_title, added_at')
-    .eq('user_id', userId)
-    .eq('word', word)
-    .order('added_at', { ascending: true });
-  return data || [];
-}
 
 function fromSupabase(row) {
   return {

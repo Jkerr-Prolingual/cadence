@@ -15,10 +15,6 @@ export function getL1Dict(l1) {
   return dictionaries[l1] || {};
 }
 
-export function registerDict(l1, dict) {
-  dictionaries[l1] = dict;
-}
-
 export function getManifestTranslation(entry, l1) {
   if (!entry) return null;
   if (entry.translations?.[l1]) return entry.translations[l1];

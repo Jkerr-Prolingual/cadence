@@ -2,17 +2,18 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { getAssignments, getProgress, toggleTask } from '../../lib/assignments';
+import { getUILabel } from '../../lib/locales';
 
-const TASK_LABELS = {
-  readingPass: 'Complete a reading pass',
-  flashcards: 'Create flashcards from new words',
-  recordAudio: 'Record a read-aloud',
-  shadowReading: 'Shadow reading practice',
-  timedReading: 'Complete a timed reading',
+const TASK_LABEL_KEYS = {
+  readingPass: 'taskReadingPass',
+  flashcards: 'taskFlashcards',
+  recordAudio: 'taskRecordAudio',
+  shadowReading: 'taskShadowReading',
+  timedReading: 'taskTimedReading',
 };
 
 export default function AssignmentChecklist({ textId, refreshKey, onSelectText }) {
-  const { user } = useAuth();
+  const { user, l1 } = useAuth();
   const [allAssignments, setAllAssignments] = useState([]);
   const [progress, setProgress] = useState([]);
 
@@ -70,7 +71,7 @@ export default function AssignmentChecklist({ textId, refreshKey, onSelectText }
     <div className="border-b border-gray-100 bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-          Assignments
+          {getUILabel('assignments', l1)}
         </h3>
         <div className="space-y-2">
           {activeAssignments.map(assignment => {
@@ -98,7 +99,7 @@ export default function AssignmentChecklist({ textId, refreshKey, onSelectText }
                   </span>
                   {assignment.dueDate && (
                     <span className="text-xs text-gray-400 flex-shrink-0">
-                      Due {assignment.dueDate}
+                      {getUILabel('dueLabel', l1)} {assignment.dueDate}
                     </span>
                   )}
                 </div>
@@ -116,7 +117,7 @@ export default function AssignmentChecklist({ textId, refreshKey, onSelectText }
                         className="rounded border-gray-300 text-gray-900 w-4 h-4 sm:w-3.5 sm:h-3.5"
                       />
                       <span className={completed[key] ? 'line-through text-gray-400' : ''}>
-                        {TASK_LABELS[key] || key}
+                        {getUILabel(TASK_LABEL_KEYS[key], l1) || key}
                       </span>
                     </label>
                   ))}

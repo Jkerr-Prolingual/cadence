@@ -99,16 +99,6 @@ export async function dbGetAll(storeName) {
   });
 }
 
-export async function dbDelete(storeName, key) {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    const req = tx.objectStore(storeName).delete(key);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
 export async function dbAdd(storeName, value) {
   const db = await getDB();
   return new Promise((resolve, reject) => {
@@ -119,13 +109,3 @@ export async function dbAdd(storeName, value) {
   });
 }
 
-export async function dbGetByIndex(storeName, indexName, key) {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readonly');
-    const idx = tx.objectStore(storeName).index(indexName);
-    const req = idx.getAll(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}

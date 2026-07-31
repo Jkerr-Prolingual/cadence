@@ -58,9 +58,9 @@ export default function BookChaptersPage() {
     return (
       <div className="h-full overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-          <p className="text-gray-400">Book not found.</p>
+          <p className="text-gray-400">{getUILabel('bookNotFound', l1)}</p>
           <button onClick={() => navigate('/')} className="mt-4 text-sm text-blue-600 hover:text-blue-800">
-            Back to Library
+            {getUILabel('backToLibrary', l1)}
           </button>
         </div>
       </div>
@@ -78,7 +78,7 @@ export default function BookChaptersPage() {
           onClick={() => navigate('/')}
           className="text-sm text-gray-500 hover:text-gray-700 mb-6 flex items-center gap-1"
         >
-          <span>&larr;</span> Library
+          <span>&larr;</span> {getUILabel('navLibrary', l1)}
         </button>
 
         <div className="flex gap-6 mb-8">
@@ -111,10 +111,10 @@ export default function BookChaptersPage() {
                 </span>
               )}
               <span className="text-xs text-gray-400">
-                {chapters.length} {chapters.length === 1 ? 'chapter' : 'chapters'}
+                {chapters.length} {getUILabel('chapters', l1)}
               </span>
               {totalWords > 0 && (
-                <span className="text-xs text-gray-400">{totalWords.toLocaleString()} words</span>
+                <span className="text-xs text-gray-400">{totalWords.toLocaleString()} {getUILabel('wordsCount', l1)}</span>
               )}
             </div>
 
@@ -168,9 +168,9 @@ export default function BookChaptersPage() {
                         )}
                         {cp.srs.totalCards > 0 && (
                           <span className="text-[10px] text-gray-500">
-                            {cp.srs.totalCards} {cp.srs.totalCards === 1 ? 'card' : 'cards'}
+                            {cp.srs.totalCards} {getUILabel('cards', l1)}
                             {cp.srs.dueCards > 0 && (
-                              <span className="text-amber-600 ml-0.5">({cp.srs.dueCards} due)</span>
+                              <span className="text-amber-600 ml-0.5">({cp.srs.dueCards} {getUILabel('due', l1)})</span>
                             )}
                           </span>
                         )}
@@ -178,7 +178,7 @@ export default function BookChaptersPage() {
                           <span className={`text-[10px] font-medium ${
                             cp.assignments.completed === cp.assignments.total ? 'text-green-600' : 'text-gray-500'
                           }`}>
-                            {cp.assignments.completed}/{cp.assignments.total} tasks
+                            {cp.assignments.completed}/{cp.assignments.total} {getUILabel('tasks', l1)}
                           </span>
                         )}
                       </div>
@@ -193,7 +193,7 @@ export default function BookChaptersPage() {
                     </span>
                   )}
                   {ch.word_count > 0 && (
-                    <span className="text-xs text-gray-400 hidden sm:inline">{ch.word_count} words</span>
+                    <span className="text-xs text-gray-400 hidden sm:inline">{ch.word_count} {getUILabel('wordsCount', l1)}</span>
                   )}
                   {hasActivity && (
                     <span
@@ -231,7 +231,7 @@ export default function BookChaptersPage() {
 
         {chapters.length === 0 && (
           <div className="text-center text-gray-400 py-12">
-            No chapters published yet.
+            {getUILabel('noChaptersYet', l1)}
           </div>
         )}
       </div>

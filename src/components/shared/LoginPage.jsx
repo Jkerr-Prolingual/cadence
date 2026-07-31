@@ -57,16 +57,16 @@ export default function LoginPage() {
         <div className="w-full max-w-sm text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-gray-900 mb-2">Relato</h1>
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <p className="text-sm text-gray-700 font-medium">Revisa tu correo</p>
+            <p className="text-sm text-gray-700 font-medium">Check your email</p>
             <p className="text-sm text-gray-500 mt-2">
-              Enviamos un enlace de confirmación a <strong>{email}</strong>.
-              Haz clic en él para activar tu cuenta.
+              We sent a confirmation link to <strong>{email}</strong>.
+              Click it to activate your account.
             </p>
             <button
               onClick={() => { setSignupDone(false); setMode('login'); }}
               className="mt-4 text-sm text-gray-500 hover:text-gray-700"
             >
-              Volver a iniciar sesión
+              Back to log in
             </button>
           </div>
         </div>
@@ -80,15 +80,15 @@ export default function LoginPage() {
         <div className="w-full max-w-sm text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-gray-900 mb-2">Relato</h1>
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <p className="text-sm text-gray-700 font-medium">Revisa tu correo</p>
+            <p className="text-sm text-gray-700 font-medium">Check your email</p>
             <p className="text-sm text-gray-500 mt-2">
-              Si existe una cuenta con <strong>{email}</strong>, recibirás un enlace para restablecer tu contraseña.
+              If an account exists for <strong>{email}</strong>, you'll receive a link to reset your password.
             </p>
             <button
               onClick={() => { setResetSent(false); setMode('login'); }}
               className="mt-4 text-sm text-gray-500 hover:text-gray-700"
             >
-              Volver a iniciar sesión
+              Back to log in
             </button>
           </div>
         </div>
@@ -101,12 +101,12 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Relato</h1>
-          <p className="text-sm text-gray-500 mt-1">leer, escuchar, y aprender inglés</p>
+          <p className="text-sm text-gray-500 mt-1">read, listen, and learn English</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
               type="email"
               value={email}
@@ -118,7 +118,7 @@ export default function LoginPage() {
 
           {mode !== 'forgot' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
               <input
                 type="password"
                 value={password}
@@ -133,7 +133,7 @@ export default function LoginPage() {
           {mode === 'signup' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre para mostrar</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Display name</label>
                 <input
                   type="text"
                   value={displayName}
@@ -144,9 +144,9 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Soy...</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">I am a...</label>
                 <div className="flex gap-2">
-                  {[{ value: 'student', label: 'Estudiante' }, { value: 'teacher', label: 'Maestro/a' }].map((r) => (
+                  {[{ value: 'student', label: 'Student' }, { value: 'teacher', label: 'Teacher' }].map((r) => (
                     <button
                       key={r.value}
                       type="button"
@@ -192,7 +192,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-2 px-4 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
           >
-            {loading ? '...' : mode === 'login' ? 'Iniciar sesión' : mode === 'forgot' ? 'Enviar enlace' : 'Crear cuenta'}
+            {loading ? '...' : mode === 'login' ? 'Log in' : mode === 'forgot' ? 'Send reset link' : 'Create account'}
           </button>
 
           {mode === 'login' && (
@@ -201,7 +201,7 @@ export default function LoginPage() {
               onClick={() => { setMode('forgot'); setError(null); }}
               className="w-full text-sm text-gray-500 hover:text-gray-700"
             >
-              ¿Olvidaste tu contraseña?
+              Forgot your password?
             </button>
           )}
 
@@ -210,7 +210,7 @@ export default function LoginPage() {
             onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(null); }}
             className="w-full text-sm text-gray-500 hover:text-gray-700"
           >
-            {mode === 'forgot' ? 'Volver a iniciar sesión' : mode === 'login' ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
+            {mode === 'forgot' ? 'Back to log in' : mode === 'login' ? 'Don\'t have an account? Sign up' : 'Already have an account? Log in'}
           </button>
         </form>
       </div>

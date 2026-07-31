@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build *)",
+      "Bash(npm run lint *)",
+      "Bash(npx vite build *)",
+      "Bash(npx eslint *)",
+      "PowerShell(npm run build *)",
+      "PowerShell(npx vite build *)"
+    ]
+  }
+}

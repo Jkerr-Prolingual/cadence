@@ -3,7 +3,7 @@ import { upsertSrsCard } from '../../lib/srs';
 import { cefrColor } from '../../lib/wordUtils';
 import { searchImages } from '../../lib/imageSearch';
 import { getL1Dict } from '../../lib/translations';
-import { getL1EnglishLabel } from '../../lib/locales';
+import { getL1EnglishLabel, getUILabel } from '../../lib/locales';
 
 function ImagePicker({ initialQuery, selectedUrl, onSelect }) {
   const [query, setQuery] = useState(initialQuery);
@@ -141,10 +141,10 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
     if (!selected) return;
 
     const wordCount = selected.split(/\s+/).filter(Boolean).length;
-    if (wordCount < 3) { setSelectionError('Select at least 3 words.'); return; }
-    if (wordCount > 15) { setSelectionError('Keep it under 15 words.'); return; }
+    if (wordCount < 3) { setSelectionError(getUILabel('selectAtLeast3', l1)); return; }
+    if (wordCount > 15) { setSelectionError(getUILabel('keepUnder15', l1)); return; }
     if (!isStructure && !selected.toLowerCase().includes(word.toLowerCase())) {
-      setSelectionError(`Must include "${word}".`);
+      setSelectionError(`${getUILabel('mustInclude', l1)} "${word}".`);
       return;
     }
 
@@ -209,7 +209,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
                 className="text-gray-400 hover:text-gray-600 text-lg leading-none">‹</button>
             )}
             <span className="font-semibold text-sm text-gray-800">
-              {isStructure ? 'Add grammar card' : `Add flashcard — "${word}"`}
+              {isStructure ? getUILabel('addGrammarCard', l1) : `${getUILabel('addFlashcardFor', l1)} — "${word}"`}
             </span>
             {cefr && (
               <span className="text-xs font-bold px-1.5 py-0.5 rounded"
@@ -231,8 +231,8 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
               >
                 <span className="text-xl mt-0.5">{l1.toUpperCase()}</span>
                 <div>
-                  <div className="text-sm font-semibold text-gray-800">Word / {l1EnglishLabel} Translation</div>
-                  <div className="text-xs text-gray-500 mt-0.5">English word on front, {l1EnglishLabel.toLowerCase()} translation on back</div>
+                  <div className="text-sm font-semibold text-gray-800">{getUILabel('wordTranslationType', l1)}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{getUILabel('wordTranslationDesc', l1)}</div>
                 </div>
               </button>
               <button
@@ -242,8 +242,8 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
               >
                 <span className="text-xl mt-0.5">___</span>
                 <div>
-                  <div className="text-sm font-semibold text-gray-800">Cloze Deletion</div>
-                  <div className="text-xs text-gray-500 mt-0.5">Fill-in-the-blank from the sentence in the text</div>
+                  <div className="text-sm font-semibold text-gray-800">{getUILabel('clozeDeletion', l1)}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{getUILabel('clozeDeletionDesc', l1)}</div>
                 </div>
               </button>
             </div>
@@ -268,7 +268,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
                 />
                 {!back && (
-                  <p className="text-xs text-gray-400 mt-1">No bundled translation — type one in</p>
+                  <p className="text-xs text-gray-400 mt-1">{getUILabel('noTranslationHint', l1)}</p>
                 )}
               </div>
               <ImagePicker
@@ -284,7 +284,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
                     : 'bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed'
                 }`}
               >
-                {saved ? (saveMessage || 'Saved!') : 'Add to Review Deck'}
+                {saved ? (saveMessage || 'Saved!') : getUILabel('addToReviewDeck', l1)}
               </button>
             </div>
           )}
@@ -294,8 +294,8 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1">
                   {isStructure
-                    ? 'Highlight the part you want to blank out'
-                    : <>Highlight a phrase containing <strong className="text-gray-800">"{word}"</strong></>
+                    ? getUILabel('highlightPart', l1)
+                    : <>{getUILabel('highlightPhrase', l1)} <strong className="text-gray-800">"{word}"</strong></>
                   }
                 </p>
                 <div
@@ -345,7 +345,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
                     : 'bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed'
                 }`}
               >
-                {saved ? (saveMessage || 'Saved!') : 'Add to Review Deck'}
+                {saved ? (saveMessage || 'Saved!') : getUILabel('addToReviewDeck', l1)}
               </button>
             </div>
           )}

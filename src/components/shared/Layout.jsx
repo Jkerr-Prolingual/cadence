@@ -10,12 +10,12 @@ export default function Layout() {
 
   const navItems = useMemo(() => {
     const items = [
-      { to: '/', label: 'Library' },
-      { to: '/read', label: 'Read' },
-      { to: '/flashcards', label: 'Flashcards' },
+      { to: '/', label: getUILabel('navLibrary', l1) },
+      { to: '/read', label: getUILabel('navRead', l1) },
+      { to: '/flashcards', label: getUILabel('navFlashcards', l1) },
     ];
     if (l1 === 'es' || l1 === 'en') {
-      items.push({ to: '/exercises', label: 'Exercises' });
+      items.push({ to: '/exercises', label: getUILabel('navExercises', l1) });
     }
     return items;
   }, [l1]);
@@ -67,7 +67,7 @@ export default function Layout() {
         <div className="flex items-center gap-6">
           <h1 className="text-xl font-semibold tracking-tight text-gray-900">Relato</h1>
           <span className="text-xs text-gray-400 hidden sm:inline">
-            leer, escuchar, y aprender inglés
+            {getUILabel('tagline', l1)}
           </span>
         </div>
         <div className="flex items-center gap-4">
@@ -115,7 +115,7 @@ export default function Layout() {
                   <p className="text-xs text-gray-400 capitalize">{profile?.role || 'student'}</p>
                 </div>
                 <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-xs font-medium text-gray-500 mb-1.5">My language</p>
+                  <p className="text-xs font-medium text-gray-500 mb-1.5">{getUILabel('myLanguage', l1)}</p>
                   <div className="grid grid-cols-2 gap-1">
                     {Object.values(L1_LOCALES).map((loc) => (
                       <button
@@ -169,7 +169,7 @@ export default function Layout() {
                         onClick={() => { setShowJoin(true); setJoinName(profile?.display_name || ''); }}
                         className="text-sm text-gray-700 hover:text-gray-900"
                       >
-                        Join a class
+                        {getUILabel('joinClass', l1)}
                       </button>
                     ) : (
                       <div className="space-y-2">
@@ -177,7 +177,7 @@ export default function Layout() {
                           type="text"
                           value={joinName}
                           onChange={e => setJoinName(e.target.value)}
-                          placeholder="Your name (for your teacher)"
+                          placeholder={getUILabel('yourNameForTeacher', l1)}
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
                           autoFocus
                         />
@@ -187,7 +187,7 @@ export default function Layout() {
                             value={joinCode}
                             onChange={e => setJoinCode(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleJoinClass()}
-                            placeholder="Class code"
+                            placeholder={getUILabel('classCode', l1)}
                             className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
                           />
                           <button onClick={handleJoinClass} disabled={joinStatus === 'loading'} className="px-2 py-1 text-sm bg-gray-900 text-white rounded hover:bg-gray-800 disabled:opacity-50">Join</button>

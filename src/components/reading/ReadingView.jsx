@@ -11,7 +11,6 @@ import RecordReviewStrip from './RecordReviewStrip';
 import TimedReadStrip from './TimedReadStrip';
 import AssignmentChecklist from './AssignmentChecklist';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
-import { sampleTexts } from '../../data/sampleTexts';
 import { supabase } from '../../lib/supabase';
 import { cleanToken } from '../../lib/wordUtils';
 import { findCurrentWord, findCurrentSentence, detectSentences, findSentenceForWord } from '../../lib/audioUtils';
@@ -36,7 +35,7 @@ export default function ReadingView() {
       ...t,
       cefr: t.cefr_estimate || t.cefr,
     }));
-    return [...sampleTexts, ...curated];
+    return curated;
   }, [curatedTexts]);
 
   const selectorTexts = useMemo(() => {
@@ -354,10 +353,6 @@ export default function ReadingView() {
     if (!bookManifest?.entries) return false;
     return Object.values(bookManifest.entries).some(e => e.type === 'structure');
   }, [bookManifest]);
-
-  // useEffect(() => {
-  //   setShowStructures(isTeacher && manifestHasStructures);
-  // }, [manifestHasStructures, isTeacher]);
 
   // Timed reading: tick every second while active
   useEffect(() => {
@@ -1216,8 +1211,8 @@ export default function ReadingView() {
     if (!hasAudio) {
       return (
         <div className="border-t border-gray-100 px-4 py-2 flex items-center justify-between text-xs text-gray-400">
-          <span>{Object.keys(encounters).length} words encountered</span>
-          <span>Click any word to look it up</span>
+          <span>{Object.keys(encounters).length} {getUILabel('wordsEncountered', l1)}</span>
+          <span>{getUILabel('clickToLookUp', l1)}</span>
         </div>
       );
     }
@@ -1307,7 +1302,7 @@ export default function ReadingView() {
                         onClick={() => navigate(`/book/${chapterNav.bookId}`)}
                         className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1"
                       >
-                        <span>&larr;</span> All chapters
+                        <span>&larr;</span> {getUILabel('allChapters', l1)}
                       </button>
                     )}
                   </div>
@@ -1327,7 +1322,7 @@ export default function ReadingView() {
                         onClick={() => navigate(`/book/${chapterNav.bookId}`)}
                         className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1"
                       >
-                        All chapters <span>&rarr;</span>
+                        {getUILabel('allChapters', l1)} <span>&rarr;</span>
                       </button>
                     )}
                   </div>

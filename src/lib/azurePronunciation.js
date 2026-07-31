@@ -48,7 +48,6 @@ export async function assessFullRecording({ token, region, referenceText, audioB
   const prosodyScores = [];
   const completenessScores = [];
   const totalBytes = wavArrayBuffer.byteLength;
-  let turnCount = 0;
 
   return new Promise((resolve, reject) => {
     const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
@@ -56,7 +55,6 @@ export async function assessFullRecording({ token, region, referenceText, audioB
 
     recognizer.recognized = (_, e) => {
       if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-        turnCount++;
         try {
           const detailJson = e.result.properties.getProperty(
             SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult
@@ -86,12 +84,10 @@ export async function assessFullRecording({ token, region, referenceText, audioB
         } catch (err) {
           console.warn('[azurePronunciation] Error parsing recognized result:', err);
         }
-        console.log(`[azurePronunciation] Turn ${turnCount}: ${allWords.length} words total`);
       }
     };
 
     recognizer.canceled = (_, e) => {
-      console.log('[azurePronunciation] Canceled:', e.reason, e.errorDetails || '');
       if (e.reason === SpeechSDK.CancellationReason.Error) {
         recognizer.close();
         reject(new Error(`Azure Speech error: ${e.errorDetails}`));
@@ -102,7 +98,6 @@ export async function assessFullRecording({ token, region, referenceText, audioB
     const finalize = () => {
       if (resolved) return;
       resolved = true;
-      console.log(`[azurePronunciation] Finalized: ${turnCount} turns, ${allWords.length} words`);
       recognizer.close();
       const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
       resolve({
@@ -114,7 +109,6 @@ export async function assessFullRecording({ token, region, referenceText, audioB
     };
 
     recognizer.sessionStopped = () => {
-      console.log('[azurePronunciation] Session stopped');
       finalize();
     };
 
@@ -125,7 +119,6 @@ export async function assessFullRecording({ token, region, referenceText, audioB
       if (!streamDone) return;
       clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
-        console.log('[azurePronunciation] No new events for 4s after stream end, stopping...');
         recognizer.stopContinuousRecognitionAsync(() => {}, () => { finalize(); });
       }, 4000);
     };
@@ -139,7 +132,6 @@ export async function assessFullRecording({ token, region, referenceText, audioB
     recognizer.startContinuousRecognitionAsync(
       () => {
         streamAudioToSDK(wavArrayBuffer, pushStream, totalBytes, onProgress, () => {
-          console.log('[azurePronunciation] Audio streaming complete, waiting for Azure to finish...');
           streamDone = true;
           resetIdleTimer();
           setTimeout(() => { finalize(); }, 60000);

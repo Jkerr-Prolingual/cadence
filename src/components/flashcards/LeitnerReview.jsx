@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { getDueSrsCards, getAllSrsCards, reviewSrsCard, logReviewEvent } from '../../lib/srs';
 import { cefrColor } from '../../lib/wordUtils';
+import { getUILabel } from '../../lib/locales';
+import { useAuth } from '../../context/AuthContext';
 
 const RESPONSE_BUTTONS = [
-  { score: 5, label: 'Perfect', sub: 'effortless', bg: 'bg-green-600 text-white border-green-500' },
-  { score: 4, label: 'Got it', sub: 'with effort', bg: 'bg-green-100 text-green-800 border-green-400' },
-  { score: 3, label: 'Barely', sub: 'just remembered', bg: 'bg-amber-50 text-amber-800 border-amber-400' },
-  { score: 2, label: 'Almost', sub: 'nearly had it', bg: 'bg-orange-50 text-orange-800 border-orange-300' },
-  { score: 1, label: 'Forgot', sub: 'knew it before', bg: 'bg-gray-100 text-gray-600 border-gray-300' },
-  { score: 0, label: 'Never', sub: "didn't know", bg: 'bg-gray-50 text-gray-400 border-gray-200' },
+  { score: 5, bg: 'bg-green-600 text-white border-green-500' },
+  { score: 4, bg: 'bg-green-100 text-green-800 border-green-400' },
+  { score: 3, bg: 'bg-amber-50 text-amber-800 border-amber-400' },
+  { score: 2, bg: 'bg-orange-50 text-orange-800 border-orange-300' },
+  { score: 1, bg: 'bg-gray-100 text-gray-600 border-gray-300' },
+  { score: 0, bg: 'bg-gray-50 text-gray-400 border-gray-200' },
 ];
 
-function ReviewCard({ card, onResponse }) {
+function ReviewCard({ card, onResponse, l1 }) {
   const [flipped, setFlipped] = useState(false);
   const color = cefrColor(card.cefr);
   const isCloze = card.cardType === 'cloze';
@@ -29,7 +31,7 @@ function ReviewCard({ card, onResponse }) {
           </>
         )}
         <span>·</span>
-        <span>{isCloze ? 'cloze' : 'ES'}</span>
+        <span>{isCloze ? 'cloze' : (card.l1 || l1 || 'es').toUpperCase()}</span>
       </div>
 
       <div
@@ -58,7 +60,7 @@ function ReviewCard({ card, onResponse }) {
             <p className={`font-semibold text-gray-800 text-center relative ${isCloze ? 'text-base leading-relaxed' : 'text-2xl'}`}>
               {frontText}
             </p>
-            <span className="text-xs text-gray-400 absolute bottom-3">Tap to reveal</span>
+            <span className="text-xs text-gray-400 absolute bottom-3">{getUILabel('tapToReveal', l1)}</span>
           </div>
 
           <div
@@ -79,16 +81,16 @@ function ReviewCard({ card, onResponse }) {
 
       {flipped && (
         <div className="w-full max-w-md space-y-2">
-          <p className="text-xs text-gray-400 text-center mb-3">How well did you know it?</p>
+          <p className="text-xs text-gray-400 text-center mb-3">{getUILabel('howWellKnewIt', l1)}</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {RESPONSE_BUTTONS.map(({ score, label, sub, bg }) => (
+            {RESPONSE_BUTTONS.map(({ score, bg }) => (
               <button
                 key={score}
                 onClick={() => onResponse(score)}
                 className={`px-2 py-3 rounded-xl border-2 text-center transition-colors hover:opacity-90 active:opacity-80 ${bg}`}
               >
-                <div className="text-sm font-semibold">{label}</div>
-                <div className="text-xs opacity-75 mt-0.5">{sub}</div>
+                <div className="text-sm font-semibold">{getUILabel(`srsScore${score}`, l1)}</div>
+                <div className="text-xs opacity-75 mt-0.5">{getUILabel(`srsScore${score}Sub`, l1)}</div>
               </button>
             ))}
           </div>
@@ -99,6 +101,7 @@ function ReviewCard({ card, onResponse }) {
 }
 
 export default function LeitnerReview({ onComplete, textId }) {
+  const { l1 } = useAuth();
   const [cards, setCards] = useState(null);
   const [idx, setIdx] = useState(0);
   const [results, setResults] = useState([]);
@@ -163,15 +166,15 @@ export default function LeitnerReview({ onComplete, textId }) {
   if (cards.length === 0) {
     return (
       <div className="text-center py-16 text-gray-400">
-        <p className="text-sm font-medium text-gray-600">No cards due right now.</p>
+        <p className="text-sm font-medium text-gray-600">{getUILabel('noCardsDue', l1)}</p>
         <p className="text-xs mt-2 max-w-xs mx-auto">
-          Keep reading and looking up words — they'll appear here for review.
+          {getUILabel('noCardsDueHint', l1)}
         </p>
         <button
           onClick={handleReviewAll}
           className="mt-6 px-5 py-2.5 rounded-xl border border-gray-300 bg-gray-100 text-sm text-gray-600 hover:bg-gray-200 transition-colors"
         >
-          Review all cards anyway
+          {getUILabel('reviewAllAnyway', l1)}
         </button>
       </div>
     );
@@ -185,9 +188,9 @@ export default function LeitnerReview({ onComplete, textId }) {
     return (
       <div className="max-w-md mx-auto">
         <div className="text-center mb-6">
-          <div className="text-xl font-bold text-gray-900">Review complete</div>
+          <div className="text-xl font-bold text-gray-900">{getUILabel('reviewComplete', l1)}</div>
           <div className="text-sm text-gray-500 mt-1">
-            {cards.length} card{cards.length !== 1 ? 's' : ''} reviewed
+            {cards.length} {getUILabel('cardsReviewed', l1)}
           </div>
         </div>
 
@@ -195,7 +198,7 @@ export default function LeitnerReview({ onComplete, textId }) {
           {advancing > 0 && (
             <div className="flex items-center justify-between px-4 py-3 bg-green-50 rounded-lg border border-green-100">
               <span className="text-sm font-medium text-green-800">
-                {advancing} word{advancing !== 1 ? 's' : ''} moving up
+                {advancing} {getUILabel('wordsMovingUp', l1)}
               </span>
               <span className="text-green-600 font-bold text-lg">↑</span>
             </div>
@@ -203,7 +206,7 @@ export default function LeitnerReview({ onComplete, textId }) {
           {held > 0 && (
             <div className="flex items-center justify-between px-4 py-3 bg-amber-50 rounded-lg border border-amber-100">
               <span className="text-sm font-medium text-amber-800">
-                {held} word{held !== 1 ? 's' : ''} holding position
+                {held} {getUILabel('wordsHolding', l1)}
               </span>
               <span className="text-amber-500 font-bold text-lg">=</span>
             </div>
@@ -211,7 +214,7 @@ export default function LeitnerReview({ onComplete, textId }) {
           {struggling > 0 && (
             <div className="flex items-center justify-between px-4 py-3 bg-gray-100 rounded-lg border border-gray-200">
               <span className="text-sm font-medium text-gray-600">
-                {struggling} word{struggling !== 1 ? 's' : ''} need more practice
+                {struggling} {getUILabel('wordsNeedPractice', l1)}
               </span>
               <span className="text-gray-400 font-bold text-lg">↓</span>
             </div>
@@ -219,7 +222,7 @@ export default function LeitnerReview({ onComplete, textId }) {
           {dueTomorrow > 0 && (
             <div className="flex items-center justify-between px-4 py-3 bg-blue-50 rounded-lg border border-blue-100">
               <span className="text-sm font-medium text-blue-800">
-                {dueTomorrow} card{dueTomorrow !== 1 ? 's' : ''} due tomorrow
+                {dueTomorrow} {getUILabel('cardsDueTomorrow', l1)}
               </span>
             </div>
           )}
@@ -253,6 +256,7 @@ export default function LeitnerReview({ onComplete, textId }) {
         key={currentCard.word}
         card={currentCard}
         onResponse={handleResponse}
+        l1={l1}
       />
     </div>
   );

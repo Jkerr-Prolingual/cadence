@@ -24,7 +24,7 @@ export default function TimedReadStrip({
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
           <p className="text-xs text-gray-500">
-            Read at your natural pace. The clock starts when you tap the button. Tap any word to mark where you stopped.
+            {getUILabel('timedReadInstruction', l1)}
           </p>
           <button
             onClick={onStart}
@@ -36,7 +36,7 @@ export default function TimedReadStrip({
               <line x1="8" y1="1" x2="8" y2="3" />
               <line x1="6" y1="1" x2="10" y2="1" />
             </svg>
-            Start the clock
+            {getUILabel('startTheClock', l1)}
           </button>
           {wpmHistory.length > 0 && onClearHistory && (
             <button
@@ -63,7 +63,7 @@ export default function TimedReadStrip({
             <span className="text-sm font-semibold text-red-900 tabular-nums">
               {formatElapsed(elapsed)}
             </span>
-            <span className="text-xs text-red-700 hidden sm:inline">Tap any word to mark where you stopped</span>
+            <span className="text-xs text-red-700 hidden sm:inline">{getUILabel('tapWordToMark', l1)}</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
@@ -76,7 +76,7 @@ export default function TimedReadStrip({
               onClick={onDone}
               className="px-4 py-2 sm:py-1.5 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
             >
-              Done reading
+              {getUILabel('doneReading', l1)}
             </button>
           </div>
         </div>
@@ -90,11 +90,11 @@ export default function TimedReadStrip({
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
         <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm sm:mx-4 overflow-hidden">
           <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Reading complete</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{getUILabel('readingComplete', l1)}</h3>
             <p className="text-sm text-gray-500 mt-1">
               {tooFast
-                ? 'That seems too fast to be a real reading — try again?'
-                : 'Save this session to your fluency record?'}
+                ? getUILabel('tooFastWarning', l1)
+                : getUILabel('saveToFluencyRecord', l1)}
             </p>
           </div>
 
@@ -103,13 +103,13 @@ export default function TimedReadStrip({
               <p className="text-2xl font-bold text-gray-900 tabular-nums">
                 {formatElapsed(result.elapsed)}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">Time</p>
+              <p className="text-xs text-gray-500 mt-0.5">{getUILabel('time', l1)}</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-900 tabular-nums">
                 {result.wordsRead.toLocaleString()}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">Words</p>
+              <p className="text-xs text-gray-500 mt-0.5">{getUILabel('words', l1)}</p>
             </div>
             <div className="text-center">
               <p className={`text-2xl font-bold tabular-nums ${tooFast ? 'text-red-600' : 'text-gray-900'}`}>
@@ -121,7 +121,7 @@ export default function TimedReadStrip({
 
           {wpmHistory.length > 0 && (
             <div className="px-4 sm:px-6 py-3 border-t border-gray-100">
-              <p className="text-xs text-gray-500 mb-2">Previous sessions</p>
+              <p className="text-xs text-gray-500 mb-2">{getUILabel('previousSessions', l1)}</p>
               <div className="flex items-end gap-1 h-10">
                 {wpmHistory.map((wpm, i) => {
                   const max = Math.max(...wpmHistory, result.wpm);
@@ -159,7 +159,7 @@ export default function TimedReadStrip({
                 onClick={onSave}
                 className="flex-1 px-4 py-2.5 sm:py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
               >
-                Save session
+                {getUILabel('saveSession', l1)}
               </button>
             )}
           </div>

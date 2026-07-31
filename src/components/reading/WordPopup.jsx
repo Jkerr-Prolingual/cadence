@@ -159,8 +159,8 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         {particle.compositionality && (
           <div className="text-xs text-gray-400 mb-2">
             {particle.compositionality === 'non-compositional'
-              ? 'Meaning as a unit — not from individual words'
-              : 'Compositional phrase'}
+              ? getUILabel('meaningAsUnit', l1)
+              : getUILabel('compositionalPhrase', l1)}
           </div>
         )}
 
@@ -170,7 +170,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
             <p className="text-base text-gray-800 mt-0.5">{particleTranslation}</p>
           </div>
         ) : (
-          <p className="text-base text-gray-400 italic mb-2">No translation available</p>
+          <p className="text-base text-gray-400 italic mb-2">{getUILabel('noTranslation', l1)}</p>
         )}
 
         {particle.note && l1 === 'es' && (
@@ -181,7 +181,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           onClick={() => setView('word')}
           className="text-xs text-blue-500 hover:text-blue-700 mb-1"
         >
-          See individual words &darr;
+          {getUILabel('seeIndividualWords', l1)} &darr;
         </button>
       </>
     );
@@ -225,7 +225,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                     {cSpanish ? (
                       <p className="text-base text-gray-700 mt-0.5">{cSpanish}</p>
                     ) : (
-                      <p className="text-sm text-gray-400 italic mt-0.5">No translation</p>
+                      <p className="text-sm text-gray-400 italic mt-0.5">{getUILabel('noTranslation', l1)}</p>
                     )}
                   </div>
                 </div>
@@ -272,7 +272,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
             <p className="text-base text-gray-800 mt-0.5">{wordTranslation}</p>
           </div>
         ) : (
-          <p className="text-base text-gray-400 italic">No translation available</p>
+          <p className="text-base text-gray-400 italic">{getUILabel('noTranslation', l1)}</p>
         )}
 
         {manifestEntry?.note && l1 === 'es' && (
@@ -325,7 +325,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
 
           {overlay.examples?.[l1]?.length > 0 && (
             <div className="mb-1">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Examples</span>
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{getUILabel('examples', l1)}</span>
               <div className="mt-1 space-y-1.5">
                 {overlay.examples[l1].map((ex, i) => (
                   <div key={i} className="text-xs">
@@ -363,7 +363,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
             onClick={() => setStructureDrillDown(true)}
             className="text-xs text-blue-500 hover:text-blue-700 mb-1"
           >
-            Learn more &rsaquo;
+            {getUILabel('learnMore', l1)} &rsaquo;
           </button>
         )}
       </>
@@ -392,7 +392,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
             onClick={() => setView('gloss-constituents')}
             className="text-xs text-blue-500 hover:text-blue-700 mb-1"
           >
-            See individual words &darr;
+            {getUILabel('seeIndividualWords', l1)} &darr;
           </button>
         )}
       </>
@@ -412,7 +412,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
           onClick={() => setView('gloss')}
           className="text-xs text-blue-500 hover:text-blue-700 mb-2 flex items-center gap-1"
         >
-          &uarr; Back to phrase
+          &uarr; {getUILabel('backToPhrase', l1)}
         </button>
 
         <div className="space-y-2">

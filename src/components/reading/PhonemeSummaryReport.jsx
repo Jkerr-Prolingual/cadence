@@ -130,12 +130,17 @@ function PhonemeCard({ phoneme, median, count, l1, wordExamples = [], defaultExp
   );
 }
 
-export function ScoreBar({ label, value }) {
+export function ScoreBar({ label, value, description }) {
   if (value == null) return null;
   const color = accuracyColor(value);
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-gray-500 w-16">{label}</span>
+      <span
+        className={`text-xs text-gray-500 w-16 ${description ? 'border-b border-dotted border-gray-300 cursor-help' : ''}`}
+        title={description || undefined}
+      >
+        {label}
+      </span>
       <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all"
@@ -188,9 +193,10 @@ export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, p
           {/* Overall scores */}
           <div className="space-y-2">
             <h3 className="text-sm font-medium text-gray-700">{getUILabel('overallScores', l1)}</h3>
-            <ScoreBar label={getUILabel('accuracy', l1)} value={overall_accuracy} />
-            <ScoreBar label={getUILabel('fluency', l1)} value={fluency_score} />
-            <ScoreBar label={getUILabel('prosody', l1)} value={prosody_score} />
+            <p className="text-[11px] text-gray-400 leading-snug">{getUILabel('scoresIntroStudent', l1)}</p>
+            <ScoreBar label={getUILabel('accuracy', l1)} value={overall_accuracy} description={getUILabel('accuracyDesc', l1)} />
+            <ScoreBar label={getUILabel('fluency', l1)} value={fluency_score} description={getUILabel('fluencyDesc', l1)} />
+            <ScoreBar label={getUILabel('prosody', l1)} value={prosody_score} description={getUILabel('prosodyDesc', l1)} />
             {words_assessed != null && (
               <p className="text-xs text-gray-400">{words_assessed} {getUILabel('wordsAssessed', l1)}</p>
             )}

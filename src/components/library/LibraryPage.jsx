@@ -4,10 +4,11 @@ import { supabase } from '../../lib/supabase';
 import { CEFR_LEVELS, CEFR_COLORS } from '../../lib/wordUtils';
 import { useAuth } from '../../context/AuthContext';
 import useLibraryProgress from '../../hooks/useLibraryProgress';
+import { getUILabel } from '../../lib/locales';
 
 export default function LibraryPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, l1 } = useAuth();
   const [texts, setTexts] = useState([]);
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -87,12 +88,12 @@ export default function LibraryPage() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Library</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">{getUILabel('library', l1)}</h1>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by title or author..."
+            placeholder={getUILabel('searchPlaceholder', l1)}
             className="w-full sm:w-72 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
           />
         </div>
@@ -129,7 +130,7 @@ export default function LibraryPage() {
           <div className="text-center text-gray-400 py-16">Loading...</div>
         ) : filteredItems.length === 0 ? (
           <div className="text-center text-gray-400 py-16">
-            {texts.length === 0 && books.length === 0 ? 'No texts in the library yet.' : 'No texts match your filters.'}
+            {texts.length === 0 && books.length === 0 ? getUILabel('noTextsYet', l1) : getUILabel('noTextsMatch', l1)}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -141,12 +142,14 @@ export default function LibraryPage() {
                   chapterCount={item.chapterCount}
                   bookProgress={getBookProgress((chaptersByBook[item.book.id] || []).map(c => c.id))}
                   onClick={() => navigate(`/book/${item.book.id}`)}
+                  l1={l1}
                 />
               ) : (
                 <TextCard
                   key={`text-${item.text.id}`}
                   text={item.text}
                   onClick={() => navigate(`/read?text=${item.text.id}`)}
+                  l1={l1}
                 />
               )
             )}
@@ -163,8 +166,8 @@ export default function LibraryPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
           <p className="text-sm text-amber-800 flex-1">
-            <span className="font-medium">¿Prefieres leer en papel?</span>{' '}
-            Nuestras lecturas graduadas también están disponibles en formato impreso en Amazon.
+            <span className="font-medium">{getUILabel('amazonBannerTitle', l1)}</span>{' '}
+            {getUILabel('amazonBannerText', l1)}
           </p>
           <svg className="w-4 h-4 text-amber-400 group-hover:text-amber-600 shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -175,7 +178,7 @@ export default function LibraryPage() {
   );
 }
 
-function BookCard({ book, chapterCount, bookProgress, onClick }) {
+function BookCard({ book, chapterCount, bookProgress, onClick, l1 }) {
   const color = CEFR_COLORS[book.cefr_estimate] || CEFR_COLORS.unclassified;
   const initial = (book.title || '?')[0].toUpperCase();
   const hasProgress = bookProgress && bookProgress.chaptersWithActivity > 0;
@@ -224,8 +227,8 @@ function BookCard({ book, chapterCount, bookProgress, onClick }) {
         )}
         <p className="text-xs text-gray-400 mt-1">
           {hasProgress
-            ? `${bookProgress.chaptersWithActivity}/${bookProgress.totalChapters} chapters`
-            : `${chapterCount} ${chapterCount === 1 ? 'chapter' : 'chapters'}`
+            ? `${bookProgress.chaptersWithActivity}/${bookProgress.totalChapters} ${getUILabel('chapters', l1)}`
+            : `${chapterCount} ${getUILabel('chapters', l1)}`
           }
         </p>
       </div>
@@ -233,7 +236,7 @@ function BookCard({ book, chapterCount, bookProgress, onClick }) {
   );
 }
 
-function TextCard({ text, onClick }) {
+function TextCard({ text, onClick, l1 }) {
   const color = CEFR_COLORS[text.cefr_estimate] || CEFR_COLORS.unclassified;
   const initial = (text.title || '?')[0].toUpperCase();
 
@@ -272,7 +275,7 @@ function TextCard({ text, onClick }) {
           <p className="text-xs text-gray-500 mt-1 truncate">{text.author}</p>
         )}
         {text.word_count > 0 && (
-          <p className="text-xs text-gray-400 mt-1">{text.word_count} words</p>
+          <p className="text-xs text-gray-400 mt-1">{text.word_count} {getUILabel('wordsCount', l1)}</p>
         )}
       </div>
     </button>

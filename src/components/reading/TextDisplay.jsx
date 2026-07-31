@@ -5,8 +5,6 @@ import { findStructures } from '../../lib/structureUtils';
 import { egpLookup } from '../../data/egpLookup';
 import { getGlossTranslation } from '../../lib/translations';
 
-const SHOW_CEFR_UNDERLINES = false;
-
 function extractSentence(tokens, targetIdx) {
   let start = targetIdx;
   while (start > 0) {
@@ -260,9 +258,7 @@ export default function TextDisplay({
               const color = cefrColor(token.cefr);
               const isA1 = token.cefr === 'A1';
 
-              let wordStyle = !inParticle && SHOW_CEFR_UNDERLINES
-                ? { borderBottom: isA1 ? 'none' : `2px solid ${color}`, paddingBottom: isA1 ? 0 : '1px' }
-                : {};
+              let wordStyle = {};
 
               if (wordAssessmentMap) {
                 const assessment = wordAssessmentMap.get(token.wordIdx);
