@@ -257,10 +257,12 @@ export default function TeacherDashboard() {
                     students={classStudents}
                     progress={progress}
                     studentRecordings={studentRecordings}
+                    pronunciationAssessments={pronunciationAssessments}
                     fluencySessions={fluencySessions}
                     srsCards={srsCards}
                     reviewLogs={reviewLogs}
                     exerciseResults={exerciseResults}
+                    phonemeSessions={phonemeSessions}
                     classId={selectedClassId}
                     showCreate={showCreateAssignment}
                     onShowCreate={setShowCreateAssignment}
@@ -346,7 +348,7 @@ function ClassInfoPanel({ cls, students, onRemoveStudent, onDeleteClass }) {
   );
 }
 
-function AssignmentsPanel({ assignments, allTexts, books, students, progress, studentRecordings, fluencySessions, srsCards, reviewLogs, exerciseResults, classId, showCreate, onShowCreate, onCreated, onDeleted }) {
+function AssignmentsPanel({ assignments, allTexts, books, students, progress, studentRecordings, pronunciationAssessments = [], fluencySessions, srsCards, reviewLogs, exerciseResults, phonemeSessions = [], classId, showCreate, onShowCreate, onCreated, onDeleted }) {
   const [showArchived, setShowArchived] = useState(false);
 
   const activeAssignments = assignments.filter(a => !a.archivedAt);

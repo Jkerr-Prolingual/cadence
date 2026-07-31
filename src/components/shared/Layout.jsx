@@ -11,7 +11,6 @@ export default function Layout() {
   const navItems = useMemo(() => {
     const items = [
       { to: '/', label: getUILabel('navLibrary', l1) },
-      { to: '/read', label: getUILabel('navRead', l1) },
       { to: '/flashcards', label: getUILabel('navFlashcards', l1) },
     ];
     if (l1 === 'es' || l1 === 'en') {
