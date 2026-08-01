@@ -213,7 +213,6 @@ export default function ReadingView() {
 
       if (assessment && rec?.assessment_status === 'complete' && sentences.length > 0) {
         setAssessmentData(assessment);
-        setWordAssessmentMap(buildWordAssessmentMap(assessment, sentences));
       }
     })();
 
@@ -271,6 +270,12 @@ export default function ReadingView() {
       setTimedElapsed(0);
     }
   }, [toolSet]);
+
+  useEffect(() => {
+    if (toolSet === 'record' && assessmentData && assessmentStatus === 'complete' && sentences.length > 0) {
+      setWordAssessmentMap(buildWordAssessmentMap(assessmentData, sentences));
+    }
+  }, [assessmentData, assessmentStatus, toolSet, sentences.length]);
 
   useEffect(() => {
     const requestedId = searchParams.get('text');
