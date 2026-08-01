@@ -85,11 +85,11 @@ export default function ApproachPage() {
         </div>
       </section>
 
-      {/* Reading to Acquire */}
+      {/* Reading to Acquire Language */}
       <section className="py-12 sm:py-16 px-4 sm:px-6 bg-gray-50">
         <div className="max-w-3xl mx-auto">
           <h3 className="text-2xl font-bold tracking-tight text-gray-900 mb-6">
-            Reading to Acquire
+            Reading to Acquire Language
           </h3>
           <div className="space-y-4 text-gray-500 leading-relaxed">
             <p>
@@ -113,14 +113,20 @@ export default function ApproachPage() {
             </p>
             <p>
               There is a critical distinction between <em>learning to read</em> and{' '}
-              <em>reading to acquire</em>. Learning to read is a foundational skill
-              that requires explicit instruction in decoding and phonics. Reading to
-              acquire is what happens after a learner already has literacy in their
+              <em>reading to acquire language</em>. Learning to read is a foundational
+              skill that requires explicit instruction in decoding and phonics.
+              Reading to acquire language is what happens after a learner already
+              has literacy in their
               first language. For these learners, reading is the most effective
               vehicle for vocabulary acquisition, grammar internalization, and
               overall language development. Relato is built for the second group:
               students who can already read in their L1 and need comprehensible
-              English text to read extensively.
+              English text to read extensively. This includes the vast majority
+              of adolescent and adult English learners, who arrive with at least
+              foundational reading ability in their home language. Students
+              whose L1 reading is below grade level still benefit from extensive
+              English reading, though they may need concurrent support in L1
+              literacy — a different intervention that Relato does not replace.
             </p>
 
             <div className="bg-white rounded-xl p-6 border border-gray-200 my-8">

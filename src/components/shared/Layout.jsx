@@ -8,6 +8,17 @@ import { resetAllProgress } from '../../lib/resetProgress';
 export default function Layout() {
   const { user, profile, signOut, refreshProfile, isTeacher, isAdmin, isStudent, l1, textSize } = useAuth();
 
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase
+      .from('contact_messages')
+      .select('id', { count: 'exact', head: true })
+      .is('read_at', null)
+      .then(({ count }) => setUnreadMessages(count || 0));
+  }, [isAdmin]);
+
   const navItems = useMemo(() => {
     const items = [
       { to: '/', label: getUILabel('navLibrary', l1) },
@@ -81,9 +92,12 @@ export default function Layout() {
           {isAdmin && (
             <NavLink
               to="/admin"
-              className="text-sm text-gray-500 hover:text-gray-900"
+              className="relative text-sm text-gray-500 hover:text-gray-900"
             >
               Admin
+              {unreadMessages > 0 && (
+                <span className="absolute -top-1 -right-2.5 w-2 h-2 bg-red-500 rounded-full" />
+              )}
             </NavLink>
           )}
           <div className="relative" ref={settingsRef}>

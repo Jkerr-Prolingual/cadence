@@ -4,6 +4,7 @@ import { findParticles } from '../../lib/particleUtils';
 import { findStructures } from '../../lib/structureUtils';
 import { egpLookup } from '../../data/egpLookup';
 import { getGlossTranslation } from '../../lib/translations';
+import { displayScore } from '../../lib/pronunciation';
 
 function extractSentence(tokens, targetIdx) {
   let start = targetIdx;
@@ -263,7 +264,7 @@ export default function TextDisplay({
               if (wordAssessmentMap) {
                 const assessment = wordAssessmentMap.get(token.wordIdx);
                 if (assessment && assessment.type !== 'omission') {
-                  const acc = assessment.accuracy;
+                  const acc = displayScore(assessment);
                   const assessColor = acc >= 85 ? '#9333ea'
                     : acc >= 70 ? '#22c55e'
                     : acc >= 50 ? '#eab308'

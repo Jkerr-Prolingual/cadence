@@ -6,6 +6,7 @@ import { egpL1Overlays } from '../../data/egpL1Overlays';
 import { getL1Dict, getManifestTranslation, getManifestConstituents, getGlossTranslation, getGlossConstituents } from '../../lib/translations';
 import { getL1Label, getUILabel } from '../../lib/locales';
 import { lookupPhoneme } from '../../data/ipaPhonemes';
+import { displayScore } from '../../lib/pronunciation';
 import { getPhonemeVideo } from '../../data/phonemeVideos';
 import { getMWAudioUrl, playMWAudio } from '../../lib/mwDictionary';
 
@@ -500,18 +501,23 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
               {assessmentInfo.accuracy != null && (
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${assessmentInfo.accuracy}%`,
-                        backgroundColor: assessmentInfo.accuracy >= 85 ? '#9333ea'
-                          : assessmentInfo.accuracy >= 70 ? '#22c55e'
-                          : assessmentInfo.accuracy >= 50 ? '#eab308'
-                          : assessmentInfo.accuracy >= 30 ? '#f97316' : '#ef4444',
-                      }}
-                    />
+                    {(() => {
+                      const score = displayScore(assessmentInfo);
+                      return (
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${score}%`,
+                            backgroundColor: score >= 85 ? '#9333ea'
+                              : score >= 70 ? '#22c55e'
+                              : score >= 50 ? '#eab308'
+                              : score >= 30 ? '#f97316' : '#ef4444',
+                          }}
+                        />
+                      );
+                    })()}
                   </div>
-                  <span className="text-xs text-gray-600 tabular-nums">{Math.round(assessmentInfo.accuracy)}%</span>
+                  <span className="text-xs text-gray-600 tabular-nums">{Math.round(displayScore(assessmentInfo))}%</span>
                 </div>
               )}
               {assessmentInfo.phonemes?.length > 0 && (

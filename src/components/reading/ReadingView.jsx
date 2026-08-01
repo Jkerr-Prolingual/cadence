@@ -16,7 +16,7 @@ import { cleanToken } from '../../lib/wordUtils';
 import { findCurrentWord, findCurrentSentence, detectSentences, findSentenceForWord } from '../../lib/audioUtils';
 import { completeTaskForText } from '../../lib/assignments';
 import { logFluencySession, getFluencySessionsForText } from '../../lib/fluency';
-import { runPronunciationAssessment, buildWordAssessmentMap, assessSentencePronunciation, getWordPositions, extractChunkText, runFluencyAssessment, getPhonemeSessionsForText, buildPhonemeWordExamples } from '../../lib/pronunciation';
+import { runPronunciationAssessment, buildWordAssessmentMap, assessSentencePronunciation, getWordPositions, extractChunkText, runFluencyAssessment, getPhonemeSessionsForText, buildPhonemeWordExamples, displayScore } from '../../lib/pronunciation';
 import { resetChapterRecording, resetChapterWpm } from '../../lib/resetProgress';
 import PhonemeSummaryReport from './PhonemeSummaryReport';
 import { getUILabel } from '../../lib/locales';
@@ -1158,8 +1158,9 @@ export default function ReadingView() {
             const accMap = new Map();
             for (const [sIdx, sentMap] of shadowFeedbackMap) {
               const scores = [...sentMap.values()]
-                .filter(a => a.accuracy != null && a.type !== 'omission')
-                .map(a => a.accuracy);
+                .filter(a => a.type !== 'omission')
+                .map(a => displayScore(a))
+                .filter(s => s != null);
               if (scores.length > 0) accMap.set(sIdx, Math.round(scores.reduce((a, b) => a + b, 0) / scores.length));
             }
             return accMap;

@@ -190,8 +190,93 @@ function detectGlossLocales(glosses) {
   return [...locales].sort();
 }
 
+function MessagesTab() {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from('contact_messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setMessages(data || []); setLoading(false); });
+  }, []);
+
+  async function markRead(id) {
+    const { error } = await supabase
+      .from('contact_messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('id', id);
+    if (!error) {
+      setMessages(prev => prev.map(m => m.id === id ? { ...m, read_at: m.read_at || new Date().toISOString() } : m));
+    }
+  }
+
+  async function markAllRead() {
+    const unread = messages.filter(m => !m.read_at);
+    if (!unread.length) return;
+    const { error } = await supabase
+      .from('contact_messages')
+      .update({ read_at: new Date().toISOString() })
+      .in('id', unread.map(m => m.id));
+    if (!error) {
+      setMessages(prev => prev.map(m => ({ ...m, read_at: m.read_at || new Date().toISOString() })));
+    }
+  }
+
+  if (loading) return <p className="text-sm text-gray-400 py-8 text-center">Loading messages...</p>;
+  if (!messages.length) return <p className="text-sm text-gray-400 py-8 text-center">No messages yet.</p>;
+
+  const unreadCount = messages.filter(m => !m.read_at).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">
+          {unreadCount > 0 ? `${unreadCount} unread` : 'All read'}
+        </p>
+        {unreadCount > 0 && (
+          <button onClick={markAllRead} className="text-xs text-blue-600 hover:text-blue-800">
+            Mark all as read
+          </button>
+        )}
+      </div>
+      <div className="space-y-3">
+        {messages.map(m => (
+          <div
+            key={m.id}
+            className={`border rounded-lg px-4 py-3 ${m.read_at ? 'border-gray-200 bg-white' : 'border-blue-200 bg-blue-50'}`}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-gray-900">{m.name}</span>
+                  <a href={`mailto:${m.email}`} className="text-xs text-blue-600 hover:underline">{m.email}</a>
+                </div>
+                <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{m.message}</p>
+                <p className="text-xs text-gray-400 mt-2">
+                  {new Date(m.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+              {!m.read_at && (
+                <button
+                  onClick={() => markRead(m.id)}
+                  className="shrink-0 text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Mark read
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPanel() {
   const { user } = useAuth();
+  const [adminTab, setAdminTab] = useState('corpus');
   const [step, setStep] = useState(1);
 
   // Step 1: Content
@@ -750,6 +835,25 @@ export default function AdminPanel() {
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Admin Panel</h1>
 
+      <div className="flex gap-1 mb-6">
+        {[{ key: 'corpus', label: 'Corpus' }, { key: 'messages', label: 'Messages' }].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setAdminTab(key)}
+            className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+              adminTab === key
+                ? 'bg-gray-900 text-white font-semibold'
+                : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {adminTab === 'messages' && <MessagesTab />}
+
+      {adminTab === 'corpus' && <>
       {/* Library */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
@@ -1631,6 +1735,7 @@ export default function AdminPanel() {
 
         </div>
       )}
+    </>}
     </div>
     </div>
   );

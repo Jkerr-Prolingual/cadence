@@ -8,6 +8,16 @@ const CHUNK_MIN_WORDS = 4;
 const AUDIO_BUFFER_SEC = 0.3;
 const MIN_PHONEME_INSTANCES = 5;
 
+export function displayScore(assessment) {
+  if (!assessment || assessment.type === 'omission') return 0;
+  const phonemes = assessment.phonemes;
+  if (phonemes?.length) {
+    const scores = phonemes.map(p => p.accuracyScore).filter(s => s != null);
+    if (scores.length) return Math.min(...scores);
+  }
+  return assessment.accuracy ?? 0;
+}
+
 export async function runPronunciationAssessment({ userId, textId, storagePath, referenceText, audioBlob, supabase }) {
   await supabase
     .from('student_recordings')
