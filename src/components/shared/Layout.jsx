@@ -252,6 +252,15 @@ export default function Layout() {
       <main className="flex-1 min-h-0">
         <Outlet />
       </main>
+
+      <footer className="border-t border-gray-100 px-4 py-2 flex items-center justify-center gap-4">
+        <a href="/landing" className="text-xs text-gray-400 hover:text-gray-600">
+          About Relato
+        </a>
+        <a href="/approach" className="text-xs text-gray-400 hover:text-gray-600">
+          Our Approach
+        </a>
+      </footer>
     </div>
   );
 }

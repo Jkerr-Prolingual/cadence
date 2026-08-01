@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import ContactForm from './ContactForm';
 
 const FEATURES = [
   {
     title: 'Read & Listen',
-    description: 'Students follow professionally narrated stories with synchronized word highlighting, adjustable speed, and sentence-by-sentence repetition.',
+    description: 'Students follow along with high-quality narration, synchronized word highlighting, adjustable speed, and sentence-by-sentence repetition.',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -23,7 +24,7 @@ const FEATURES = [
   },
   {
     title: 'Syntax Glosses',
-    description: 'Full-text phrase-level translations show how English syntax maps to the student\'s native language — from single words to full phrases.',
+    description: 'Full-text phrase-level translations show how English syntax maps to the student\'s native language — from single words to full sentences.',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
@@ -40,8 +41,8 @@ const FEATURES = [
     ),
   },
   {
-    title: 'Shadow Reading',
-    description: 'Students shadow the narrator sentence by sentence, building phonological fluency. Loop individual sentences until they feel natural, then record and compare.',
+    title: 'Shadow Reading & Pronunciation',
+    description: 'Students shadow the narrator sentence by sentence, then record and get per-phoneme IPA feedback with mouth diagrams showing exactly how to shape each sound.',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
@@ -49,11 +50,11 @@ const FEATURES = [
     ),
   },
   {
-    title: 'Multi-L1 Support',
-    description: 'Supports Spanish, Mandarin, Japanese, and Korean speakers. Translations, phrase-level glosses, and vocabulary lookups adapt to each student\'s native language.',
+    title: 'Teacher Dashboard',
+    description: 'Teachers create classes, track reading progress, and review student recordings with AI-generated pronunciation flags highlighting where to focus.',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
   },
@@ -94,77 +95,6 @@ const STEPS = [
   },
 ];
 
-function ContactForm() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [message, setMessage] = useState('');
-  const [status, setStatus] = useState(null);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setStatus('loading');
-    const { error } = await supabase
-      .from('contact_messages')
-      .insert({ name: name.trim(), email: email.trim().toLowerCase(), message: message.trim() });
-    if (error) {
-      setStatus('error');
-    } else {
-      setStatus('success');
-      setName('');
-      setEmail('');
-      setMessage('');
-    }
-  }
-
-  if (status === 'success') {
-    return (
-      <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 mt-6">
-        <p className="text-sm font-medium text-green-800">Message sent! I'll get back to you soon.</p>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="mt-6 space-y-3 text-left">
-      <div className="grid sm:grid-cols-2 gap-3">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Your name"
-          required
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-        />
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Your email"
-          required
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-        />
-      </div>
-      <textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        placeholder="Your message..."
-        required
-        rows={3}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-none"
-      />
-      <button
-        type="submit"
-        disabled={status === 'loading'}
-        className="px-5 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
-      >
-        {status === 'loading' ? '...' : 'Send message'}
-      </button>
-      {status === 'error' && (
-        <p className="text-xs text-red-500">Something went wrong. Please try again.</p>
-      )}
-    </form>
-  );
-}
 
 function NewsletterForm() {
   const [email, setEmail] = useState('');
@@ -241,6 +171,12 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-3">
             <Link
+              to="/approach"
+              className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5"
+            >
+              Our Approach
+            </Link>
+            <Link
               to="/login"
               className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5"
             >
@@ -290,6 +226,9 @@ export default function LandingPage() {
             <p className="mt-4 text-xs text-gray-400">
               For ESL/EFL programs. Independent learners welcome too.
             </p>
+            <p className="mt-2 text-xs text-gray-400">
+              Supports Spanish, Mandarin, Japanese, and Korean speakers.
+            </p>
           </div>
 
           <div>
@@ -302,6 +241,21 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Nation quote */}
+      <section className="py-12 sm:py-16 px-4 sm:px-6 border-t border-gray-100">
+        <div className="max-w-3xl mx-auto text-center">
+          <blockquote className="text-xl sm:text-2xl font-medium text-gray-800 italic leading-relaxed">
+            "Adding an extensive reading program to a language course is the most important improvement a teacher can make."
+          </blockquote>
+          <p className="mt-3 text-sm text-gray-500">
+            — Paul Nation, <em>What Every EFL Teacher Should Know</em>
+          </p>
+          <p className="mt-4 text-gray-500 leading-relaxed max-w-2xl mx-auto">
+            Nation's research shows that reading-centered activities — comprehension, vocabulary practice, fluency building — should occupy roughly half of a balanced language program. Relato makes that practical.
+          </p>
+        </div>
+      </section>
+
       {/* Reading experience showcase */}
       <section className="py-16 sm:py-24 bg-gray-50 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
@@ -311,16 +265,16 @@ export default function LandingPage() {
               Read with the support that makes input comprehensible
             </h3>
             <p className="mt-4 text-gray-500 leading-relaxed">
-              Students read graded stories while listening to professional narration.
+              Students read graded stories while listening to high-quality narration.
               Every word is clickable for instant L1 translation and CEFR level.
               Toggle phrase-level translations to see how English phrases map to structures
-              in their native language — from single words to full phrases.
+              in their native language — from single words to full sentences.
             </p>
             <ul className="mt-6 space-y-3">
               {[
                 'Tap any word for L1 translation, English definition, and CEFR level',
                 'Phrasal verbs and multi-word expressions translate as a whole phrase — then drill into each word',
-                'Phrase-level translations compare English structure to L1 — from single words to full phrases',
+                'Phrase-level translations compare English structure to L1 — from single words to full sentences',
                 'Drill into gloss constituents to see how each piece translates in context',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2.5">
@@ -487,8 +441,7 @@ export default function LandingPage() {
             </h3>
             <p className="mt-4 text-gray-500 leading-relaxed">
               Relato gives ESL/EFL teachers visibility into reading progress,
-              vocabulary growth, and pronunciation development — without adding
-              grading work. When students record themselves, AI flags words that
+              vocabulary growth, and pronunciation development. When students record themselves, AI flags words that
               need attention and scores pronunciation down to the phoneme.
             </p>
 
@@ -520,63 +473,13 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Teacher dashboard mock UI */}
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h4 className="text-sm font-semibold text-gray-900">Class Dashboard</h4>
-                <p className="text-xs text-gray-400 mt-0.5">Period 3 — ESL Intermediate</p>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {[
-                  { name: 'Maria G.', chapters: '4/6', accuracy: 73, flags: 2, level: 'A2', color: 'bg-green-400' },
-                  { name: 'Wei L.', chapters: '6/6', accuracy: 81, flags: 0, level: 'B1', color: 'bg-purple-400' },
-                  { name: 'Soo-Jin K.', chapters: '3/6', accuracy: 58, flags: 5, level: 'A2', color: 'bg-yellow-400' },
-                  { name: 'Carlos R.', chapters: '5/6', accuracy: 69, flags: 3, level: 'A2', color: 'bg-green-400' },
-                ].map((student) => (
-                  <div key={student.name} className="px-4 py-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-500">
-                      {student.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-700">{student.name}</span>
-                        <span className="text-xs text-gray-400">{student.chapters} chapters</span>
-                      </div>
-                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full ${student.color} rounded-full`} style={{ width: `${student.accuracy}%` }} />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {student.flags > 0 && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-orange-50 text-orange-600">
-                          {student.flags} flags
-                        </span>
-                      )}
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-gray-100 text-gray-600">{student.level}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Pronunciation detail preview within dashboard */}
-              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-                <p className="text-[10px] font-medium text-gray-400 mb-2">Soo-Jin K. — flagged words</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { word: 'library', score: 42, color: 'bg-orange-50 text-orange-600 border-orange-200' },
-                    { word: 'without', score: 38, color: 'bg-orange-50 text-orange-600 border-orange-200' },
-                    { word: 'walked', score: 55, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-                    { word: 'already', score: 61, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-                    { word: 'brought', score: 28, color: 'bg-red-50 text-red-600 border-red-200' },
-                  ].map((w, i) => (
-                    <span key={i} className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${w.color}`}>
-                      {w.word} {w.score}%
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
+          {/* Teacher dashboard screenshot */}
+          <div>
+            <img
+              src="/images/teacher-dashboard.png"
+              alt="Teacher dashboard showing student pronunciation assessment with accuracy, fluency, and prosody scores"
+              className="rounded-2xl shadow-2xl w-full"
+            />
           </div>
         </div>
       </section>
@@ -647,8 +550,8 @@ export default function LandingPage() {
           <p className="mt-6 text-gray-500 leading-relaxed">
             Research consistently shows that extensive reading is one of the most powerful
             methods for second language acquisition — especially for students who already
-            have literacy in their first language. But extensive reading only works once
-            students can actually read at their level. For English learners stuck at A1–A2,
+            have literacy in their first language. But extensive reading only works when the text is actually
+            comprehensible. For English learners stuck at A1–A2,
             the gap between "I can read in my language" and "I can read enough English to
             start acquiring through reading" is where most programs stall.
           </p>
@@ -788,38 +691,16 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* About */}
+      {/* Contact */}
       <section id="contact" className="py-16 sm:py-24 bg-gray-50 px-4 sm:px-6">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex flex-col sm:flex-row gap-8 items-start">
-            <div className="w-16 h-16 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold tracking-tight text-gray-900 mb-4">About the author</h3>
-              <div className="space-y-3 text-gray-500 leading-relaxed">
-                <p>
-                  John started writing graded readers from his own experience as a language
-                  learner. While learning Mandarin, he discovered extensive reading — and
-                  everything changed. Not drills, not grammar tables, but time spent with
-                  stories at the right level. The kind of reading where you stop noticing the
-                  effort and start noticing the meaning.
-                </p>
-                <p>
-                  He looked for the same thing for his own English learners. He didn't find
-                  enough. So he wrote it himself.
-                </p>
-                <p className="font-medium text-gray-700">
-                  The Relato series is built on rigorous vocabulary research and stories
-                  that are actually worth finishing — for students who are ready to move
-                  forward by reading.
-                </p>
-              </div>
-              <ContactForm />
-            </div>
-          </div>
+        <div className="max-w-xl mx-auto text-center">
+          <h3 className="text-2xl font-bold tracking-tight text-gray-900 mb-2">
+            Get in touch
+          </h3>
+          <p className="text-gray-500">
+            Questions about Relato, partnership inquiries, or feedback? I'd love to hear from you.
+          </p>
+          <ContactForm />
         </div>
       </section>
 
@@ -831,6 +712,7 @@ export default function LandingPage() {
             <span className="text-xs text-gray-400">read, listen, and learn English</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-gray-400">
+            <Link to="/approach" className="hover:text-gray-600">Our Approach</Link>
             <a href="#contact" className="hover:text-gray-600">Contact</a>
             <Link to="/login" className="hover:text-gray-600">Log in</Link>
             <Link to="/login?mode=signup" className="hover:text-gray-600">Sign up</Link>

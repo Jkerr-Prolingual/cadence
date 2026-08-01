@@ -13,6 +13,7 @@ import BookChaptersPage from './components/library/BookChaptersPage';
 import LoginPage from './components/shared/LoginPage';
 import ResetPasswordPage from './components/shared/ResetPasswordPage';
 import LandingPage from './components/landing/LandingPage';
+import ApproachPage from './components/landing/ApproachPage';
 
 function ProtectedRoute({ children, requireTeacher, requireAdmin }) {
   const { user, loading, isTeacher, isAdmin } = useAuth();
@@ -49,9 +50,14 @@ function AppRoutes() {
           <Route path="admin" element={<ProtectedRoute requireAdmin><AdminPanel /></ProtectedRoute>} />
         </Route>
       ) : (
-        <Route index element={<LandingPage />} />
+        <>
+          <Route index element={<LandingPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </>
       )}
 
+      <Route path="/landing" element={<LandingPage />} />
+      <Route path="/approach" element={<ApproachPage />} />
       <Route path="/shadow/:textId" element={
         <ProtectedRoute><ShadowingView /></ProtectedRoute>
       } />
