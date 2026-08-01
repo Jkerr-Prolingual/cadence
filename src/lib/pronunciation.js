@@ -241,6 +241,43 @@ function getChunkTimeRange(chunk, alignment, whisperTimestamps) {
   };
 }
 
+function normalizeAzureWord(w) {
+  return (w || '').toLowerCase().replace(/[^a-zA-ZÀ-ÿ'-]/g, '');
+}
+
+function mapAzureChunk(azureWords, alignmentEntries, azureByIdx) {
+  const refWords = azureWords.filter(w => w.errorType !== 'Insertion');
+  if (!refWords.length) return;
+
+  const used = new Set();
+
+  for (const entry of alignmentEntries) {
+    const refNorm = normalizeAzureWord(entry.refWord);
+    let bestIdx = -1;
+    for (let i = 0; i < refWords.length; i++) {
+      if (used.has(i)) continue;
+      if (normalizeAzureWord(refWords[i].word) === refNorm) {
+        bestIdx = i;
+        break;
+      }
+    }
+    if (bestIdx >= 0) {
+      azureByIdx.set(entry.refIdx, refWords[bestIdx]);
+      used.add(bestIdx);
+    }
+  }
+
+  for (let i = 0; i < refWords.length; i++) {
+    if (used.has(i)) continue;
+    for (const entry of alignmentEntries) {
+      if (azureByIdx.has(entry.refIdx)) continue;
+      azureByIdx.set(entry.refIdx, refWords[i]);
+      used.add(i);
+      break;
+    }
+  }
+}
+
 function mapAzureToAlignment(azureWords, alignment) {
   const azureByIdx = new Map();
   if (!azureWords?.length) return azureByIdx;
@@ -259,29 +296,16 @@ function mapAzureToAlignment(azureWords, alignment) {
     }
 
     for (const group of chunkGroups) {
-      const refWords = group.words.filter(w => w.errorType !== 'Insertion');
       const chunkAlignment = alignment.filter(e =>
         e.refIdx != null &&
         e.refIdx >= group.first &&
         e.refIdx <= group.last
       );
-
-      let azIdx = 0;
-      for (const entry of chunkAlignment) {
-        if (azIdx >= refWords.length) break;
-        azureByIdx.set(entry.refIdx, refWords[azIdx]);
-        azIdx++;
-      }
+      mapAzureChunk(group.words, chunkAlignment, azureByIdx);
     }
   } else {
-    const azureRefWords = azureWords.filter(w => w.errorType !== 'Insertion');
-    let azIdx = 0;
-    for (const entry of alignment) {
-      if (entry.refIdx == null) continue;
-      if (azIdx >= azureRefWords.length) break;
-      azureByIdx.set(entry.refIdx, azureRefWords[azIdx]);
-      azIdx++;
-    }
+    const allAlignment = alignment.filter(e => e.refIdx != null);
+    mapAzureChunk(azureWords, allAlignment, azureByIdx);
   }
 
   return azureByIdx;

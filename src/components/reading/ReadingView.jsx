@@ -238,6 +238,12 @@ export default function ReadingView() {
   // Reset tool-specific state when switching tool sets
   useEffect(() => {
     shadowedSentencesRef.current = new Set();
+    setShadowFeedbackMap(new Map());
+    if (toolSet === 'record' && assessmentData && assessmentStatus === 'complete' && sentences.length > 0) {
+      setWordAssessmentMap(buildWordAssessmentMap(assessmentData, sentences));
+    } else {
+      setWordAssessmentMap(null);
+    }
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
       setIsPlaying(false);
