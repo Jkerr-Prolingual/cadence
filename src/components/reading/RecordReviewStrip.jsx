@@ -30,6 +30,7 @@ export default function RecordReviewStrip({
   onSaveFluencyOnly,
   onListenBackFluency,
   hasFluencyBlob = false,
+  playbackPlaying = false,
   onShowPhonemeReport,
   phonemeSession = null,
 }) {
@@ -107,9 +108,14 @@ export default function RecordReviewStrip({
           <div className="flex items-center justify-center gap-2">
             <button
               onClick={onListenBackFluency}
-              className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              className={`inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium rounded-lg transition-colors ${playbackPlaying ? 'bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-700' : 'bg-white border border-gray-200 hover:bg-gray-50 active:bg-gray-100'}`}
             >
-              {t('listenBack')}
+              {playbackPlaying ? (
+                <>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="1" y="1" width="10" height="10" rx="1.5" /></svg>
+                  {t('stop')}
+                </>
+              ) : t('listenBack')}
             </button>
             {!hasRecording && (
               <button
@@ -254,9 +260,14 @@ export default function RecordReviewStrip({
           <div className="flex items-center justify-center gap-2">
             <button
               onClick={onListenBack}
-              className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              className={`inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium rounded-lg transition-colors ${playbackPlaying ? 'bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-700' : 'bg-white border border-gray-200 hover:bg-gray-50 active:bg-gray-100'}`}
             >
-              {t('listenBack')}
+              {playbackPlaying ? (
+                <>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="1" y="1" width="10" height="10" rx="1.5" /></svg>
+                  {t('stop')}
+                </>
+              ) : t('listenBack')}
             </button>
             <button
               onClick={onSaveRecording}

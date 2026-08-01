@@ -261,9 +261,13 @@ export default function ApproachPage() {
           </h3>
           <div className="space-y-4 text-gray-500 leading-relaxed">
             <p>
-              I designed Relato's features around Nation's four strands, not as a
-              grab bag of tools but as a coherent system that supports each
-              dimension of a balanced language program.
+              I designed Relato's features around Nation's four strands. Relato
+              directly supports three of the four: meaning-focused input,
+              language-focused learning, and fluency development. Meaning-focused
+              output — communicative speaking and writing — is best served by the
+              classroom and conversation, not an app. A balanced program needs all
+              four, and Relato is designed to complement what teachers already do
+              well.
             </p>
           </div>
 
@@ -284,20 +288,6 @@ export default function ApproachPage() {
                   {
                     name: 'Syntax glosses',
                     desc: 'Phrase-level L1 translations help students parse English syntax by comparing it to structures in their native language, from single words to full sentences.',
-                  },
-                ],
-              },
-              {
-                strand: 'Meaning-focused output',
-                color: 'bg-green-100 text-green-700',
-                features: [
-                  {
-                    name: 'Shadow reading',
-                    desc: 'Students shadow the narrator sentence by sentence, producing spoken English in the context of stories they have already understood. Output is grounded in comprehended input.',
-                  },
-                  {
-                    name: 'Student recordings',
-                    desc: 'Full-text oral read-alouds that students save for teacher review. Speaking practice tied directly to the reading experience.',
                   },
                 ],
               },
@@ -323,6 +313,10 @@ export default function ApproachPage() {
                 strand: 'Fluency development',
                 color: 'bg-blue-100 text-blue-700',
                 features: [
+                  {
+                    name: 'Shadow reading',
+                    desc: 'Students shadow the narrator sentence by sentence, building phonological fluency by repeating language they have already understood at natural speed.',
+                  },
                   {
                     name: 'Re-reading and timed reading',
                     desc: 'Students re-read texts they have already understood, building automatic recognition of vocabulary and structures. Timed reading tracks words per minute over time.',

@@ -93,6 +93,7 @@ export default function ReadingView() {
   const [saveError, setSaveError] = useState(null);
   const elapsedTimerRef = useRef(null);
   const playbackRef = useRef(null);
+  const [playbackPlaying, setPlaybackPlaying] = useState(false);
 
   // Sentence-loop ephemeral recording (Shadow Read tool set)
   const loopRecorder = useAudioRecorder();
@@ -622,11 +623,18 @@ export default function ReadingView() {
   }
 
   function handleListenBack() {
-    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; }
+    if (playbackRef.current) {
+      playbackRef.current.pause();
+      playbackRef.current = null;
+      setPlaybackPlaying(false);
+      return;
+    }
     if (recorder.audioUrl) {
       const a = new Audio(recorder.audioUrl);
+      a.onended = () => { playbackRef.current = null; setPlaybackPlaying(false); };
       playbackRef.current = a;
-      a.play().catch(() => {});
+      setPlaybackPlaying(true);
+      a.play().catch(() => { setPlaybackPlaying(false); });
     }
   }
 
@@ -663,7 +671,7 @@ export default function ReadingView() {
     }
     await completeTaskForText(user.id, textId, 'recordAudio').catch(() => {});
     setChecklistKey(k => k + 1);
-    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; }
+    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; setPlaybackPlaying(false); }
     recorder.clearRecording();
     setRecordingMode('idle');
     setSaving(false);
@@ -722,7 +730,7 @@ export default function ReadingView() {
   }
 
   function handleDiscardRecording() {
-    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; }
+    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; setPlaybackPlaying(false); }
     recorder.clearRecording();
     setRecordingMode('idle');
     setSaveError(null);
@@ -781,6 +789,7 @@ export default function ReadingView() {
 
   async function handleSaveFluencyOnly() {
     if (!user?.id || !recorder.audioBlob) return;
+    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; setPlaybackPlaying(false); }
     const textId = selectedTextIdRef.current;
     const storagePath = `${user.id}/${textId}.webm`;
 
@@ -807,16 +816,24 @@ export default function ReadingView() {
 
   function handleListenBackFluency() {
     if (!recorder.audioBlob) return;
-    if (playbackRef.current) { playbackRef.current.pause(); }
+    if (playbackRef.current) {
+      playbackRef.current.pause();
+      const src = playbackRef.current.src;
+      playbackRef.current = null;
+      setPlaybackPlaying(false);
+      if (src) URL.revokeObjectURL(src);
+      return;
+    }
     const url = URL.createObjectURL(recorder.audioBlob);
     const audio = new Audio(url);
-    audio.onended = () => URL.revokeObjectURL(url);
+    audio.onended = () => { URL.revokeObjectURL(url); playbackRef.current = null; setPlaybackPlaying(false); };
     playbackRef.current = audio;
-    audio.play();
+    setPlaybackPlaying(true);
+    audio.play().catch(() => { setPlaybackPlaying(false); });
   }
 
   function handleDiscardFluency() {
-    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; }
+    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; setPlaybackPlaying(false); }
     recorder.clearRecording();
     setRecordingMode('idle');
     setFluencyDuration(null);
@@ -1183,6 +1200,7 @@ export default function ReadingView() {
           onDiscardFluency={handleDiscardFluency}
           onSaveFluencyOnly={handleSaveFluencyOnly}
           onListenBackFluency={handleListenBackFluency}
+          playbackPlaying={playbackPlaying}
           hasFluencyBlob={!!(fluencyDuration && recorder.audioBlob && recordingMode === 'idle')}
           onShowPhonemeReport={() => setShowPhonemeReport(true)}
           phonemeSession={phonemeSession}

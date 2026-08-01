@@ -75,9 +75,14 @@ export async function runPronunciationAssessment({ userId, textId, storagePath, 
       const prosodyScores = [];
       const completenessScores = [];
 
-      for (const result of chunkResults) {
+      for (let ci = 0; ci < chunkResults.length; ci++) {
+        const result = chunkResults[ci];
         if (!result) continue;
-        if (result.words?.length) mergedWords.push(...result.words);
+        if (result.words?.length) {
+          for (const w of result.words) {
+            mergedWords.push({ ...w, _chunkFirst: chunks[ci].firstWordIdx, _chunkLast: chunks[ci].lastWordIdx });
+          }
+        }
         if (result.fluencyScore != null) fluencyScores.push(result.fluencyScore);
         if (result.prosodyScore != null) prosodyScores.push(result.prosodyScore);
         if (result.completenessScore != null) completenessScores.push(result.completenessScore);
@@ -230,14 +235,45 @@ function mapAzureToAlignment(azureWords, alignment) {
   const azureByIdx = new Map();
   if (!azureWords?.length) return azureByIdx;
 
-  const azureRefWords = azureWords.filter(w => w.errorType !== 'Insertion');
-  let azIdx = 0;
-  for (const entry of alignment) {
-    if (entry.refIdx == null) continue;
-    if (azIdx >= azureRefWords.length) break;
-    azureByIdx.set(entry.refIdx, azureRefWords[azIdx]);
-    azIdx++;
+  const hasChunkTags = azureWords[0]._chunkFirst != null;
+
+  if (hasChunkTags) {
+    const chunkGroups = [];
+    let current = null;
+    for (const w of azureWords) {
+      if (!current || w._chunkFirst !== current.first || w._chunkLast !== current.last) {
+        current = { first: w._chunkFirst, last: w._chunkLast, words: [] };
+        chunkGroups.push(current);
+      }
+      current.words.push(w);
+    }
+
+    for (const group of chunkGroups) {
+      const refWords = group.words.filter(w => w.errorType !== 'Insertion');
+      const chunkAlignment = alignment.filter(e =>
+        e.refIdx != null &&
+        e.refIdx >= group.first &&
+        e.refIdx <= group.last
+      );
+
+      let azIdx = 0;
+      for (const entry of chunkAlignment) {
+        if (azIdx >= refWords.length) break;
+        azureByIdx.set(entry.refIdx, refWords[azIdx]);
+        azIdx++;
+      }
+    }
+  } else {
+    const azureRefWords = azureWords.filter(w => w.errorType !== 'Insertion');
+    let azIdx = 0;
+    for (const entry of alignment) {
+      if (entry.refIdx == null) continue;
+      if (azIdx >= azureRefWords.length) break;
+      azureByIdx.set(entry.refIdx, azureRefWords[azIdx]);
+      azIdx++;
+    }
   }
+
   return azureByIdx;
 }
 
@@ -596,9 +632,14 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
     const prosodyScores = [];
     const completenessScores = [];
 
-    for (const result of chunkResults) {
+    for (let ci = 0; ci < chunkResults.length; ci++) {
+      const result = chunkResults[ci];
       if (!result) continue;
-      if (result.words?.length) mergedWords.push(...result.words);
+      if (result.words?.length) {
+        for (const w of result.words) {
+          mergedWords.push({ ...w, _chunkFirst: chunks[ci].firstWordIdx, _chunkLast: chunks[ci].lastWordIdx });
+        }
+      }
       if (result.fluencyScore != null) fluencyScores.push(result.fluencyScore);
       if (result.prosodyScore != null) prosodyScores.push(result.prosodyScore);
       if (result.completenessScore != null) completenessScores.push(result.completenessScore);
