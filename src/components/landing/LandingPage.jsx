@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ContactForm from './ContactForm';
+import RelatoLogo from '../shared/RelatoLogo';
 
 const FEATURES = [
   {
@@ -166,7 +167,8 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-sm border-b border-gray-100 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <RelatoLogo size={26} />
             <h1 className="text-xl font-semibold tracking-tight text-gray-900">Relato</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -692,7 +694,8 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-gray-100 py-8 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <RelatoLogo size={22} />
             <span className="text-lg font-semibold tracking-tight text-gray-900">Relato</span>
             <span className="text-xs text-gray-400">read, listen, and learn English</span>
           </div>

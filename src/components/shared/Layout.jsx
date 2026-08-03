@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { L1_LOCALES, getUILabel } from '../../lib/locales';
 import { resetAllProgress } from '../../lib/resetProgress';
+import RelatoLogo from './RelatoLogo';
 
 export default function Layout() {
   const { user, profile, signOut, refreshProfile, isTeacher, isAdmin, isStudent, l1, textSize } = useAuth();
@@ -12,11 +13,16 @@ export default function Layout() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    supabase
-      .from('contact_messages')
-      .select('id', { count: 'exact', head: true })
-      .is('read_at', null)
-      .then(({ count }) => setUnreadMessages(count || 0));
+    function fetchUnread() {
+      supabase
+        .from('contact_messages')
+        .select('id', { count: 'exact', head: true })
+        .is('read_at', null)
+        .then(({ count }) => setUnreadMessages(count || 0));
+    }
+    fetchUnread();
+    window.addEventListener('messages-read', fetchUnread);
+    return () => window.removeEventListener('messages-read', fetchUnread);
   }, [isAdmin]);
 
   const navItems = useMemo(() => {
@@ -75,7 +81,10 @@ export default function Layout() {
     <div className="h-dvh flex flex-col bg-white overflow-hidden">
       <header className="border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <h1 className="text-xl font-semibold tracking-tight text-gray-900">Relato</h1>
+          <div className="flex items-center gap-2">
+            <RelatoLogo size={26} />
+            <h1 className="text-xl font-semibold tracking-tight text-gray-900">Relato</h1>
+          </div>
           <span className="text-xs text-gray-400 hidden sm:inline">
             {getUILabel('tagline', l1)}
           </span>

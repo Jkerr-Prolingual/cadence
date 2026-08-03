@@ -6,6 +6,7 @@ import PhonemeHistogram from './PhonemeHistogram';
 import PhonemeGrowthTable from './PhonemeGrowthTable';
 import LeitnerMiniBar from './LeitnerMiniBar';
 import Sparkline from './Sparkline';
+import { PRONUNCIATION_DISCLAIMER } from './PronunciationDisclaimer';
 
 const BOX_LABELS = ['Box 1', 'Box 2', 'Box 3', 'Box 4', 'Box 5'];
 
@@ -27,7 +28,10 @@ export default function ChapterReportDetail({ detail, studentRecordings }) {
       {/* Pronunciation assessment */}
       {detail.assessment && (
         <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-700">Pronunciation Assessment</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-semibold text-gray-700">Pronunciation Assessment</h3>
+            <PronunciationInfoIcon />
+          </div>
           <p className="text-[11px] text-gray-400 leading-snug">These scores measure connected speech across the full reading, not individual words.</p>
           <div className="space-y-2 max-w-md">
             <ScoreBar label="Accuracy" value={detail.assessment.accuracy} description="How closely each word matches expected pronunciation" />
@@ -362,6 +366,37 @@ function FlashcardSection({ flashcards }) {
         </div>
       )}
     </div>
+  );
+}
+
+function PronunciationInfoIcon() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <span className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="text-gray-400 hover:text-gray-600 transition-colors"
+        aria-label="About pronunciation scores"
+        title="About pronunciation scores"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4M12 8h.01" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-6 z-20 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+          <p className="text-xs text-gray-600 leading-relaxed">{PRONUNCIATION_DISCLAIMER}</p>
+          <button
+            onClick={() => setOpen(false)}
+            className="mt-2 text-[11px] text-gray-400 hover:text-gray-600"
+          >
+            Close
+          </button>
+        </div>
+      )}
+    </span>
   );
 }
 

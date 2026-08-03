@@ -4,6 +4,7 @@ import ReportFilters from './ReportFilters';
 import RosterTable from './RosterTable';
 import StudentReportCard from './StudentReportCard';
 import ChapterReportDetail from './ChapterReportDetail';
+import PronunciationDisclaimer from './PronunciationDisclaimer';
 
 export default function ReportsTab({
   students,
@@ -53,6 +54,8 @@ export default function ReportsTab({
 
   return (
     <div>
+      <PronunciationDisclaimer />
+
       {/* Breadcrumb */}
       {selectedStudentId && (
         <nav className="flex items-center gap-1.5 text-sm mb-4">

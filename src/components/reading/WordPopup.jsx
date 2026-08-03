@@ -576,8 +576,8 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                               {getUILabel('asIn', l1)}: <strong>{pd.example}</strong>{' '}
                               <span className="text-gray-400">({pd.exampleHighlight})</span>
                             </p>
-                            {l1 === 'es' && (() => {
-                              const vid = getPhonemeVideo('es', p.phoneme);
+                            {(() => {
+                              const vid = getPhonemeVideo(l1, p.phoneme);
                               if (!vid) return null;
                               return (
                                 <button

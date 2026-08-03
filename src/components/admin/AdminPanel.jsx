@@ -209,6 +209,7 @@ function MessagesTab() {
       .eq('id', id);
     if (!error) {
       setMessages(prev => prev.map(m => m.id === id ? { ...m, read_at: m.read_at || new Date().toISOString() } : m));
+      window.dispatchEvent(new Event('messages-read'));
     }
   }
 
@@ -221,6 +222,7 @@ function MessagesTab() {
       .in('id', unread.map(m => m.id));
     if (!error) {
       setMessages(prev => prev.map(m => ({ ...m, read_at: m.read_at || new Date().toISOString() })));
+      window.dispatchEvent(new Event('messages-read'));
     }
   }
 
