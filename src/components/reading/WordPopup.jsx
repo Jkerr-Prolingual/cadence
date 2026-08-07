@@ -35,7 +35,7 @@ function SpeakButton({ text }) {
   );
 }
 
-export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss, l1 = 'es', assessmentInfo = null, toolSet = null }) {
+export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss, l1 = 'es', assessmentInfo = null, toolSet = null, onNavigatePrev = null, onNavigateNext = null, fromNav = false }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
   const [view, setView] = useState(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
@@ -43,6 +43,9 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   const [activePhoneme, setActivePhoneme] = useState(null);
   const [mwAudioUrl, setMwAudioUrl] = useState(null);
   const [showVideo, setShowVideo] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef(null);
+  const userDraggedRef = useRef(false);
 
   useEffect(() => {
     setView(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
@@ -77,20 +80,72 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     };
   }, [onClose]);
 
+  useEffect(() => {
+    if (!fromNav) userDraggedRef.current = false;
+  }, [position, fromNav]);
+
+  function handleDragStart(e) {
+    if (e.target.closest('button')) return;
+    if (window.innerWidth < 640) return;
+    e.preventDefault();
+    const el = popupRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setIsDragging(true);
+    dragStartRef.current = {
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+    };
+  }
+
+  useEffect(() => {
+    if (!isDragging) return;
+    function handleMove(e) {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const el = popupRef.current;
+      const w = el?.offsetWidth || 320;
+      let x = e.clientX - dragStartRef.current.offsetX;
+      let y = e.clientY - dragStartRef.current.offsetY;
+      x = Math.max(-w + 40, Math.min(x, vw - 40));
+      y = Math.max(0, Math.min(y, vh - 40));
+      setAdjusted({ x, y });
+    }
+    function handleUp() {
+      setIsDragging(false);
+      userDraggedRef.current = true;
+    }
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+  }, [isDragging]);
+
+  function handleContentClick(e) {
+    if (e.target.closest('button, a, [data-no-close]')) return;
+    if (window.getSelection()?.toString()) return;
+    onClose();
+  }
+
   const isShadowSheet = toolSet === 'shadow' && assessmentInfo;
 
   useEffect(() => {
     if (!popupRef.current || !position) return;
+    if (userDraggedRef.current) return;
+
+    const el = popupRef.current;
+    const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.visualViewport?.height || window.innerHeight;
+    const pad = 8;
+    const isMobile = vw < 640;
+
     if (isShadowSheet) {
-      const vw = window.innerWidth;
-      const isMobile = vw < 640;
       if (isMobile) {
-        setAdjusted({ x: 8, y: 'auto', bottom: 8 });
+        setAdjusted({ x: 0, bottom: 0, isMobileSheet: true });
       } else {
-        const el = popupRef.current;
-        const rect = el.getBoundingClientRect();
-        const vh = window.visualViewport?.height || window.innerHeight;
-        const pad = 8;
         let x = Math.round((vw - rect.width) / 2);
         if (x < pad) x = pad;
         let y = vh - rect.height - pad;
@@ -99,11 +154,12 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
       }
       return;
     }
-    const el = popupRef.current;
-    const rect = el.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.visualViewport?.height || window.innerHeight;
-    const pad = 8;
+
+    if (isMobile) {
+      setAdjusted({ x: 0, bottom: 0, isMobileSheet: true });
+      return;
+    }
+
     let { x, y } = position;
     if (x + rect.width > vw - pad) {
       x = vw - rect.width - pad;
@@ -446,14 +502,53 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
   return (
     <div
       ref={popupRef}
-      className={`fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 overflow-y-auto ${
-        isShadowSheet ? 'w-[calc(100vw-16px)] sm:w-96' : 'w-[calc(100vw-16px)] sm:w-80'
+      className={`fixed z-50 bg-white border border-gray-200 shadow-lg overflow-y-auto ${
+        adjusted.isMobileSheet
+          ? 'rounded-t-2xl w-full'
+          : isShadowSheet ? 'rounded-lg w-[calc(100vw-16px)] sm:w-96' : 'rounded-lg w-[calc(100vw-16px)] sm:w-80'
       }`}
-      style={adjusted.bottom != null
-        ? { left: `${adjusted.x}px`, bottom: `${adjusted.bottom}px`, maxHeight: 'calc(100vh - 16px)' }
-        : { left: `${adjusted.x}px`, top: `${adjusted.y}px`, maxHeight: 'calc(100vh - 16px)' }
+      style={adjusted.isMobileSheet
+        ? { left: 0, right: 0, bottom: 0, maxHeight: '60vh', padding: '12px 16px 16px' }
+        : adjusted.bottom != null
+          ? { left: `${adjusted.x}px`, bottom: `${adjusted.bottom}px`, maxHeight: 'calc(100vh - 16px)', padding: '16px' }
+          : { left: `${adjusted.x}px`, top: `${adjusted.y}px`, maxHeight: 'calc(100vh - 16px)', padding: '16px' }
       }
+      onClick={handleContentClick}
     >
+      <div
+        className={`flex items-center justify-between mb-2 pb-2 border-b border-gray-100 select-none ${
+          !adjusted.isMobileSheet ? 'cursor-grab active:cursor-grabbing' : ''
+        }`}
+        onMouseDown={handleDragStart}
+        data-no-close
+      >
+        <button
+          onClick={() => onNavigatePrev?.()}
+          disabled={!onNavigatePrev}
+          className="p-1.5 text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-default rounded-md hover:bg-gray-50 active:bg-gray-100 min-h-[32px] min-w-[32px] flex items-center justify-center"
+          aria-label="Previous"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 12L6 8L10 4" />
+          </svg>
+        </button>
+        <div className="flex-1 flex justify-center items-center gap-0.5">
+          <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+          <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+          <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+        </div>
+        <button
+          onClick={() => onNavigateNext?.()}
+          disabled={!onNavigateNext}
+          className="p-1.5 text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-default rounded-md hover:bg-gray-50 active:bg-gray-100 min-h-[32px] min-w-[32px] flex items-center justify-center"
+          aria-label="Next"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 4L10 8L6 12" />
+          </svg>
+        </button>
+      </div>
+
       {!(toolSet === 'shadow' && assessmentInfo) && (
         <>
           {view === 'gloss' && renderGlossView()}

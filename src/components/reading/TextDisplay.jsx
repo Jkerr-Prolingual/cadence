@@ -39,6 +39,7 @@ export default function TextDisplay({
   wordAssessmentMap = null,
   textSize = 'medium',
   endpointWordIdx = null,
+  popupWordIdx = null,
 }) {
   const paragraphs = useMemo(() => {
     if (!text) return [];
@@ -104,6 +105,18 @@ export default function TextDisplay({
     }
     return map;
   }, [paragraphs, syntaxGlosses, translationMode]);
+
+  const glossSequence = useMemo(() => {
+    if (!translationMode) return new Map();
+    const seq = new Map();
+    let counter = 0;
+    for (const [, entry] of glossMap) {
+      if (!seq.has(entry.firstWordIdx)) {
+        seq.set(entry.firstWordIdx, counter++);
+      }
+    }
+    return seq;
+  }, [glossMap, translationMode]);
 
   const particleMap = useMemo(() => {
     const all = new Map();
@@ -261,6 +274,11 @@ export default function TextDisplay({
 
               let wordStyle = {};
 
+              if (popupWordIdx != null && token.wordIdx === popupWordIdx && !translationMode) {
+                wordStyle.backgroundColor = '#bfdbfe';
+                wordStyle.borderRadius = '2px';
+              }
+
               if (wordAssessmentMap) {
                 const assessment = wordAssessmentMap.get(token.wordIdx);
                 if (assessment && assessment.type !== 'omission') {
@@ -324,13 +342,17 @@ export default function TextDisplay({
               if (glossBuffer.length === 0) return;
               const g = activeGlossEntry;
               const isComplex = g.gloss.complexity === 'complex';
+              const isActive = popupWordIdx != null && g.firstWordIdx <= popupWordIdx && popupWordIdx <= g.lastWordIdx;
+              const gSeq = glossSequence.get(g.firstWordIdx);
               inner.push(
                 <span
                   key={`g-${g.firstWordIdx}`}
                   className="rounded-sm"
+                  data-gloss-seq={gSeq}
                   style={{
                     borderBottom: `2px solid ${isComplex ? '#3b82f6' : '#93c5fd'}`,
                     paddingBottom: '1px',
+                    ...(isActive ? { backgroundColor: '#dbeafe', borderRadius: '3px' } : {}),
                   }}
                   title={getGlossTranslation(g.gloss, l1)}
                 >

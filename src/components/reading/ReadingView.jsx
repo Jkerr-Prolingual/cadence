@@ -63,6 +63,7 @@ export default function ReadingView() {
     };
   }, [allTexts, selectorTexts, selectedTextId]);
   const [popup, setPopup] = useState(null);
+  const navigatingRef = useRef(false);
   const [cardCreator, setCardCreator] = useState(null);
   const [encounters, setEncounters] = useState({});
   const [bookManifest, setBookManifest] = useState(null);
@@ -1092,9 +1093,49 @@ export default function ReadingView() {
       audioRef.current.pause();
       setIsPlaying(false);
     }
-    setPopup({ token, position });
+    const fromNav = navigatingRef.current;
+    navigatingRef.current = false;
+    setPopup({ token, position, fromNav });
     recordEncounter(token);
   }, [hasAudio, sentences, toolSet, timedMode]);
+
+  const handleNavigate = useCallback((direction) => {
+    if (!popup) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const isTranslate = toolSet === 'translate' && popup.token.syntaxGloss;
+    let targetEl;
+
+    if (isTranslate) {
+      const glossSpans = Array.from(container.querySelectorAll('[data-gloss-seq]'));
+      glossSpans.sort((a, b) => Number(a.dataset.glossSeq) - Number(b.dataset.glossSeq));
+      const currentWordEl = container.querySelector(`[data-widx="${popup.token.wordIdx}"]`);
+      const currentGloss = currentWordEl?.closest('[data-gloss-seq]');
+      if (!currentGloss) return;
+      const currentSeq = Number(currentGloss.dataset.glossSeq);
+      const nextSeq = currentSeq + direction;
+      const nextGloss = glossSpans.find(el => Number(el.dataset.glossSeq) === nextSeq);
+      if (!nextGloss) return;
+      targetEl = nextGloss.querySelector('[data-widx]');
+    } else {
+      const wordEls = Array.from(container.querySelectorAll('[data-widx]'));
+      wordEls.sort((a, b) => Number(a.dataset.widx) - Number(b.dataset.widx));
+      const currentPos = wordEls.findIndex(el => Number(el.dataset.widx) === popup.token.wordIdx);
+      const nextPos = currentPos + direction;
+      if (nextPos < 0 || nextPos >= wordEls.length) return;
+      targetEl = wordEls[nextPos];
+    }
+
+    if (!targetEl) return;
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+    if (targetRect.top < containerRect.top || targetRect.bottom > containerRect.bottom) {
+      targetEl.scrollIntoView({ block: 'center', behavior: 'instant' });
+    }
+    navigatingRef.current = true;
+    targetEl.click();
+  }, [popup, toolSet]);
 
   function handleResumeAudio() {
     setPopup(null);
@@ -1315,6 +1356,7 @@ export default function ReadingView() {
                 wordAssessmentMap={(toolSet === 'record' || toolSet === 'shadow') ? wordAssessmentMap : null}
                 textSize={textSize}
                 endpointWordIdx={null}
+                popupWordIdx={popup?.token?.wordIdx ?? null}
               />
 
               {chapterNav && (
@@ -1401,6 +1443,9 @@ export default function ReadingView() {
           l1={l1}
           assessmentInfo={(toolSet === 'record' || toolSet === 'shadow') ? (wordAssessmentMap?.get(popup.token.wordIdx) || null) : null}
           toolSet={toolSet}
+          onNavigatePrev={() => handleNavigate(-1)}
+          onNavigateNext={() => handleNavigate(1)}
+          fromNav={popup.fromNav}
         />
       )}
 
