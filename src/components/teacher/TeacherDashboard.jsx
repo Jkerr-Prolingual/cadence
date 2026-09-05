@@ -81,8 +81,8 @@ export default function TeacherDashboard() {
           supabase.from('fluency_sessions').select('*').in('user_id', studentIds).order('session_date', { ascending: true }),
           supabase.from('srs_cards').select('user_id, word, text_id, leitner_box, card_type, cefr, added_date, last_review_date, next_review_date').in('user_id', studentIds),
           supabase.from('review_log').select('user_id, word, correct, reviewed_at').in('user_id', studentIds),
-          supabase.from('exercise_results').select('user_id, text_id, score, total, completed_at, answers').in('user_id', studentIds).catch(() => ({ data: [] })),
-          supabase.from('phoneme_sessions').select('user_id, text_id, session_date, overall_accuracy, phoneme_medians, weak_phonemes, words_assessed').in('user_id', studentIds).order('session_date', { ascending: true }).catch(() => ({ data: [] })),
+          supabase.from('exercise_results').select('user_id, text_id, score, total, completed_at, answers').in('user_id', studentIds).then(r => r, () => ({ data: [] })),
+          supabase.from('phoneme_sessions').select('user_id, text_id, session_date, overall_accuracy, phoneme_medians, weak_phonemes, words_assessed').in('user_id', studentIds).order('session_date', { ascending: true }).then(r => r, () => ({ data: [] })),
         ]);
         if (profilesRes.error) console.error('Profiles fetch error:', profilesRes.error);
         const map = {};

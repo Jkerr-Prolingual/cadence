@@ -153,10 +153,10 @@ create policy "Teachers read flags for enrolled students"
     or public.is_teacher_of_student(student_id)
   );
 
--- fluency_sessions
+-- fluency_sessions (column is user_id per migration 004)
 create policy "Teachers read enrolled student fluency"
   on fluency_sessions for select using (
-    public.is_teacher_of_student(student_id)
+    public.is_teacher_of_student(user_id)
   );
 
 -- student_recordings
