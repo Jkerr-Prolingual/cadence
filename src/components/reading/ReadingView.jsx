@@ -11,6 +11,7 @@ import RecordReviewStrip from './RecordReviewStrip';
 import TimedReadStrip from './TimedReadStrip';
 import AssignmentChecklist from './AssignmentChecklist';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
+import useAudioPreFlight from '../../hooks/useAudioPreFlight';
 import { supabase } from '../../lib/supabase';
 import { cleanToken } from '../../lib/wordUtils';
 import { findCurrentWord, findCurrentSentence, detectSentences, findSentenceForWord } from '../../lib/audioUtils';
@@ -88,6 +89,9 @@ export default function ReadingView() {
 
   // Full-text recording (Record & Review tool set)
   const recorder = useAudioRecorder();
+  const preFlight = useAudioPreFlight();
+  const preFlightCalibrated = useRef(false);
+  const [preFlightDismissed, setPreFlightDismissed] = useState(false);
   const [recordingMode, setRecordingMode] = useState('idle');
   const [recordingElapsed, setRecordingElapsed] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -277,6 +281,27 @@ export default function ReadingView() {
       setWordAssessmentMap(buildWordAssessmentMap(assessmentData, sentences));
     }
   }, [assessmentData, assessmentStatus, toolSet, sentences.length]);
+
+  // Auto-calibrate mic when entering the Record tool set (once per session)
+  useEffect(() => {
+    if (toolSet === 'record' && !preFlightCalibrated.current && preFlight.status === 'idle') {
+      preFlightCalibrated.current = true;
+      setPreFlightDismissed(false);
+      preFlight.calibrate();
+    }
+  }, [toolSet, preFlight.status]);
+
+  // Attach pre-flight live monitoring when recording stream becomes active
+  useEffect(() => {
+    if (recorder.activeStream && recordingMode === 'recording') {
+      preFlight.attachStream(recorder.activeStream);
+      preFlight.startMonitoring();
+      return () => {
+        preFlight.stopMonitoring();
+        preFlight.detach();
+      };
+    }
+  }, [recorder.activeStream, recordingMode]);
 
   useEffect(() => {
     const requestedId = searchParams.get('text');
@@ -1257,6 +1282,11 @@ export default function ReadingView() {
           hasFluencyBlob={!!(fluencyDuration && recorder.audioBlob && recordingMode === 'idle')}
           onShowPhonemeReport={() => setShowPhonemeReport(true)}
           phonemeSession={phonemeSession}
+          preFlightStatus={preFlight.status}
+          preFlightCondition={recordingMode === 'recording' ? preFlight.condition : (preFlightDismissed ? null : preFlight.condition)}
+          preFlightLevel={preFlight.level}
+          onCalibrate={() => { preFlightCalibrated.current = false; setPreFlightDismissed(false); preFlight.calibrate(); }}
+          onDismissPreFlight={() => setPreFlightDismissed(true)}
         />
       );
     }

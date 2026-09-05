@@ -8,6 +8,7 @@ export default function useAudioRecorder() {
   const [audioBlob, setAudioBlob]     = useState(null);
   const [audioUrl, setAudioUrl]       = useState(null);
   const [error, setError]             = useState(null);
+  const [activeStream, setActiveStream] = useState(null);
 
   const recorderRef  = useRef(null);
   const streamRef    = useRef(null);
@@ -21,6 +22,7 @@ export default function useAudioRecorder() {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
+    setActiveStream(null);
     recorderRef.current = null;
     chunksRef.current = [];
     startTimeRef.current = null;
@@ -44,8 +46,11 @@ export default function useAudioRecorder() {
     setError(null);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
       streamRef.current = stream;
+      setActiveStream(stream);
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
@@ -112,5 +117,6 @@ export default function useAudioRecorder() {
     error,
     clearRecording,
     getElapsedSeconds,
+    activeStream,
   };
 }

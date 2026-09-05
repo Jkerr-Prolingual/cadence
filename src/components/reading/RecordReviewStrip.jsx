@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getUILabel } from '../../lib/locales';
 import { formatTime } from '../../lib/audioUtils';
+import { PRE_FLIGHT_MESSAGES } from '../../hooks/useAudioPreFlight';
 
 export default function RecordReviewStrip({
   recordingMode,
@@ -33,15 +34,51 @@ export default function RecordReviewStrip({
   playbackPlaying = false,
   onShowPhonemeReport,
   phonemeSession = null,
+  // Audio pre-flight props
+  preFlightStatus = 'idle',
+  preFlightCondition = null,
+  preFlightLevel = 0,
+  onCalibrate,
+  onDismissPreFlight,
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const t = (key) => getUILabel(key, l1);
+
+  // --- Audio pre-flight: Calibrating ---
+  if (preFlightStatus === 'calibrating') {
+    const meterWidth = Math.max(4, Math.round(preFlightLevel * 100));
+    return (
+      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
+        <div className="max-w-2xl mx-auto text-center space-y-3">
+          <div className="flex items-center justify-center gap-2">
+            <svg className="w-4 h-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+              <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+            <span className="text-sm text-gray-500">{t('checkingMic')}</span>
+          </div>
+          <div className="w-48 mx-auto h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-400 rounded-full transition-all duration-100"
+              style={{ width: `${meterWidth}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Audio pre-flight: Warning (dismissable) ---
+  const showPreFlightWarning = preFlightStatus === 'ready' && preFlightCondition && onDismissPreFlight;
 
   // --- Fluency: Duration picker ---
   if (recordingMode === 'idle' && !hasRecording && onSelectDuration && !fluencyDuration && !assessmentStatus && !phonemeSession) {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
+          {showPreFlightWarning && (
+            <PreFlightWarning condition={preFlightCondition} t={t} onDismiss={onDismissPreFlight} onRecheck={onCalibrate} />
+          )}
           <p className="text-xs text-gray-500">{t('readInstructions')}</p>
           <p className="text-xs font-medium text-gray-600">{t('selectDuration')}</p>
           <div className="flex items-center justify-center gap-2">
@@ -69,8 +106,11 @@ export default function RecordReviewStrip({
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
+          {preFlightCondition && (
+            <p className="text-xs text-amber-600">{PRE_FLIGHT_MESSAGES[preFlightCondition]}</p>
+          )}
           <div className="flex items-center justify-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${preFlightCondition ? 'bg-amber-500' : 'bg-red-500'}`} />
             <span className="text-sm font-semibold text-red-900 tabular-nums">
               {formatTime(fluencyCountdown)}
             </span>
@@ -229,8 +269,11 @@ export default function RecordReviewStrip({
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
+          {preFlightCondition && (
+            <p className="text-xs text-amber-600">{PRE_FLIGHT_MESSAGES[preFlightCondition]}</p>
+          )}
           <div className="flex items-center justify-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${preFlightCondition ? 'bg-amber-500' : 'bg-red-500'}`} />
             <span className="text-sm font-semibold text-red-900 tabular-nums">
               {elapsed}
             </span>
@@ -406,6 +449,9 @@ export default function RecordReviewStrip({
   return (
     <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
       <div className="max-w-2xl mx-auto text-center space-y-3">
+        {showPreFlightWarning && (
+          <PreFlightWarning condition={preFlightCondition} t={t} onDismiss={onDismissPreFlight} onRecheck={onCalibrate} />
+        )}
         <p className="text-xs text-gray-500">
           {t('recordPrompt')}
         </p>
@@ -421,6 +467,31 @@ export default function RecordReviewStrip({
           </svg>
           {t('startRecording')}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function PreFlightWarning({ condition, t, onDismiss, onRecheck }) {
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-left">
+      <p className="text-xs font-medium text-amber-800">{t('micWarning')}</p>
+      <p className="text-xs text-amber-700 mt-0.5">{PRE_FLIGHT_MESSAGES[condition]}</p>
+      <div className="flex items-center gap-2 mt-1.5">
+        <button
+          onClick={onDismiss}
+          className="text-xs font-medium text-amber-700 hover:text-amber-900 transition-colors"
+        >
+          {t('tryAnyway')}
+        </button>
+        {onRecheck && (
+          <button
+            onClick={onRecheck}
+            className="text-xs font-medium text-amber-700 hover:text-amber-900 transition-colors"
+          >
+            {t('recheckMic')}
+          </button>
+        )}
       </div>
     </div>
   );

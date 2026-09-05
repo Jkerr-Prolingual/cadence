@@ -1116,7 +1116,7 @@ relato/
       admin/            — AdminPanel, corpus ingestion
       onboarding/       — Onboarding flow
       shared/           — Layout, LoginPage, shared UI
-    hooks/              — useAudioRecorder, useProgressSync
+    hooks/              — useAudioRecorder, useAudioPreFlight, useProgressSync
     lib/
       supabase.js       — Supabase client
       db.js             — IndexedDB stores
@@ -1444,6 +1444,67 @@ there's real word-level usage data to calibrate thresholds against.
   Future: change-over-time analysis (compare accuracy across recordings
   for the same word).
 
+### Audio Pre-Flight Check
+
+Client-side audio quality gate that runs before pronunciation assessment
+recordings. Uses Web Audio API (`AnalyserNode` on the mic stream) — no
+server round-trip, no AI, no Azure credits spent on bad audio.
+
+**Why it exists:** Recording quality can masquerade as pronunciation
+difficulty. Sonorants (/m/, /l/, /n/) and sibilants (/s/, /z/) degrade
+first under noise/compression because they depend on low-energy spectral
+detail. A Spanish-L1 student scoring poorly on /m/ (phonetically
+near-identical across Spanish and English) is a red flag for audio
+problems, not a real production gap. The pre-flight check catches these
+conditions before they contaminate assessment data.
+
+**Architecture:**
+
+```
+User opens Record tab
+  → Auto-calibrate: getUserMedia → AnalyserNode → measure noise floor
+    for 3 seconds → release stream
+  → If clean: show duration picker / start button
+  → If noisy/quiet/no-signal: show dismissable warning
+  → Student can proceed regardless (gate, not block)
+
+Recording starts
+  → Attach AnalyserNode to recorder's live stream
+  → Monitor in real time: clipping, silence, elevated noise
+  → Subtle inline warning if conditions degrade mid-recording
+  → Stop monitoring when recording stops
+```
+
+**Conditions detected:**
+
+| Condition | Detection | Student prompt |
+|---|---|---|
+| Clipping | Peak amplitude ≥ 0.98 | Move back or lower mic volume |
+| Too quiet | RMS < -50 dBFS | Move closer or check mic |
+| High noise floor | Calibration RMS > -30 dBFS | Try a quieter spot |
+| No signal | RMS < -60 dBFS | Check mic is connected |
+
+**Thresholds** are named constants in `useAudioPreFlight.js`, not
+hardcoded — adjust once real device/browser distributions are available.
+
+**No data persistence.** The pre-flight check is a quality gate only.
+Audio metrics are not stored in Supabase. Teachers can listen to the
+recording themselves if they have concerns about audio quality.
+
+**getUserMedia constraints:** `useAudioRecorder` requests
+`echoCancellation`, `noiseSuppression`, and `autoGainControl` (browser
+defaults were previously used, which varied by platform).
+
+**Files:**
+- `src/hooks/useAudioPreFlight.js` — AnalyserNode-based calibration +
+  live monitoring hook
+- `src/hooks/useAudioRecorder.js` — audio constraints, exposes
+  `activeStream` for pre-flight attachment
+- `src/components/reading/RecordReviewStrip.jsx` — calibration gate UI,
+  dismissable warning, live recording indicators
+- `src/components/reading/ReadingView.jsx` — wires up pre-flight hook,
+  auto-calibrates on Record tab entry
+
 ### Future: Azure-Only Pipeline (Drop Whisper)
 
 Whisper currently serves two purposes: (1) providing word-level timestamps
@@ -1563,3 +1624,58 @@ alongside the word and sentence where the student struggled). These would
 be produced incrementally and integrated as they're completed — the
 current SVG diagrams serve as fallback for any phoneme without a custom
 animation.
+
+### Future: Minimal-Pairs Bank & L1-Transfer Heuristics
+
+**Status: Deferred** — revisit once pronunciation assessment data exists
+for more than a handful of students.
+
+**What it is:** A curated bank of minimal-pair word contrasts (e.g.,
+"ship/sheep", "bat/bet", "light/right") organized by phoneme confusion
+pattern and CEFR level. Teachers would use these as targeted drills when
+a student's phoneme report shows consistent difficulty with a specific
+contrast. Students might encounter them as optional practice after a
+pronunciation assessment flags weak phonemes.
+
+**Why deferred:** The theory is sound — L1-transfer patterns predict
+which phoneme contrasts will be hard for a given language background
+(e.g., Spanish-L1 speakers struggle with /ʃ/–/tʃ/, /b/–/v/,
+/s/-clusters; Japanese-L1 with /l/–/r/; Korean-L1 with /p/–/f/). But
+the observation that motivated this feature came from only two students.
+Encoding L1-specific confusion heuristics into product logic before
+validating them across a meaningful sample risks building scaffolding
+around noise.
+
+**What needs to be true before building:**
+- Pronunciation assessment data from ≥15–20 students per L1 background
+- Confirmed rank-order stability of weak phonemes across recording
+  conditions (the audio pre-flight check is a prerequisite — can't build
+  confusion heuristics on unreliable data)
+- At least one L1 background where the pattern is clear enough to
+  generate useful drill recommendations
+
+**What it would look like when built:**
+- Static data file: phoneme pairs × L1 backgrounds × CEFR-gated example
+  words (similar structure to `ipaPhonemes.js`)
+- L1-specific confusion matrices derived from real `phoneme_sessions`
+  data (not from linguistic theory alone)
+- Teacher-facing: "Students with this L1 background commonly struggle
+  with these contrasts" — surfaced alongside the phoneme report
+- Student-facing: optional targeted practice after a pronunciation
+  assessment, using minimal-pair words from texts they've already read
+
+**Relationship to existing code:**
+- `phoneme_sessions.weak_phonemes` — the data source for identifying
+  which phonemes a student struggles with
+- `ipaPhonemes.js` — the articulation data for each phoneme (would be
+  extended with confusion-pair metadata)
+- `PhonemeSummaryReport.jsx` — the teacher/student-facing phoneme report
+  (would link to minimal-pair drills)
+
+**L1-transfer sanity-check heuristic (also deferred):** Flag phoneme
+scores that are implausible given the student's L1 background as likely
+audio quality artifacts rather than real production gaps. Example: a
+Spanish-L1 speaker scoring < 50 on /m/ (phonetically identical across
+Spanish and English) is almost certainly a bad recording, not a
+pronunciation deficit. This heuristic depends on the same n≥15 data
+threshold as the minimal-pairs bank.

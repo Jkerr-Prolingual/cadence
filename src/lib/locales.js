@@ -74,6 +74,13 @@ export const UI_LABELS = {
     confirmDelete: 'Confirm delete',
     analysisFailed: 'Analysis failed',
 
+    // Audio pre-flight
+    checkingMic: 'Checking your mic...',
+    micReady: 'Mic check passed',
+    micWarning: 'Audio quality issue detected',
+    tryAnyway: 'Continue anyway',
+    recheckMic: 'Check again',
+
     // WordPopup pronunciation
     pronunciation: 'Pronunciation',
     skipped: 'Skipped',
@@ -318,6 +325,12 @@ export const UI_LABELS = {
     confirmDelete: 'Confirmar eliminación',
     analysisFailed: 'Error en el análisis',
 
+    checkingMic: 'Verificando tu micrófono...',
+    micReady: 'Micrófono listo',
+    micWarning: 'Problema de calidad de audio detectado',
+    tryAnyway: 'Continuar de todos modos',
+    recheckMic: 'Verificar de nuevo',
+
     pronunciation: 'Pronunciación',
     skipped: 'Omitida',
     youSaid: 'Dijiste',
@@ -536,6 +549,12 @@ export const UI_LABELS = {
     confirmDelete: '确认删除',
     analysisFailed: '分析失败',
 
+    checkingMic: '正在检查麦克风...',
+    micReady: '麦克风检查通过',
+    micWarning: '检测到音频质量问题',
+    tryAnyway: '仍然继续',
+    recheckMic: '重新检查',
+
     pronunciation: '发音',
     skipped: '跳过',
     youSaid: '你说的是',
@@ -753,6 +772,12 @@ export const UI_LABELS = {
     confirmDelete: '削除を確認',
     analysisFailed: '分析に失敗しました',
 
+    checkingMic: 'マイクを確認中...',
+    micReady: 'マイクチェック完了',
+    micWarning: '音声品質の問題が検出されました',
+    tryAnyway: 'そのまま続ける',
+    recheckMic: '再確認',
+
     pronunciation: '発音',
     skipped: 'スキップ',
     youSaid: 'あなたの発音',
@@ -969,6 +994,12 @@ export const UI_LABELS = {
     reRecord: '다시 녹음',
     confirmDelete: '삭제 확인',
     analysisFailed: '분석 실패',
+
+    checkingMic: '마이크 확인 중...',
+    micReady: '마이크 확인 완료',
+    micWarning: '오디오 품질 문제가 감지되었습니다',
+    tryAnyway: '그래도 계속',
+    recheckMic: '다시 확인',
 
     pronunciation: '발음',
     skipped: '건너뜀',
