@@ -1134,6 +1134,8 @@ relato/
       en_dictionary.js  — English definitions (~3.4k)
       egpLookup.js      — EGP grammar pattern lookup
       egpL1Overlays.js  — locale-keyed grammar overlays (es populated)
+      confusionPairs.js — minimal pair display data for phoneme confusions
+      ipaPhonemes.js    — ~44 phoneme articulation entries
     context/
       AuthContext.jsx    — auth + profile (exposes l1)
   supabase/
@@ -1608,6 +1610,81 @@ lookup and syntax glosses.
 - `netlify/functions/assess-pronunciation.js` — Azure PA proxy
 - `src/components/reading/WordPopup.jsx` — phoneme display + detail panel
 - `src/components/reading/TextDisplay.jsx` — colored underline rendering
+
+### Phoneme Confusion Tracking
+
+Azure Pronunciation Assessment returns NBest phoneme hypotheses —
+alternate phonemes Azure considered alongside the expected phoneme,
+each with a confidence score. This data reveals *what* a student is
+producing instead of the target phoneme, not just that accuracy is low.
+
+**Data capture:** The `assess-pronunciation.js` Netlify function requests
+`NBestPhonemeCount: 3` in the PA config. Each phoneme in the response
+includes an `nBestPhonemes` array of `{phoneme, score}` entries.
+
+**Aggregation:** `aggregateConfusions()` in `pronunciation.js` processes
+NBest data across all words in a session. For each expected phoneme, it
+identifies the highest-confidence alternate and computes the confusion
+gap: `alternate confidence - expected confidence`. Positive gap = the
+student is producing the wrong phoneme more confidently than the right
+one. Negative gap = confusion resolved.
+
+**Storage:** `phoneme_confusions` JSONB column on `phoneme_sessions`
+(migration `021_phoneme_confusions.sql`). Schema:
+```json
+{
+  "θ:s": {
+    "expected": "θ",
+    "alternate": "s",
+    "expectedConfidence": 28,
+    "alternateConfidence": 62,
+    "gap": 34,
+    "instances": 8
+  }
+}
+```
+
+**Minimal pair display:** `src/data/confusionPairs.js` maps ~30 common
+L1 confusion pairs to human-readable minimal pair words (e.g.,
+`"θ:s" → { word1: "think", word2: "sink" }`). Covers es/zh/ja/ko
+transfer patterns. Used instead of raw IPA for students and teachers
+who aren't familiar with the phonemic alphabet.
+
+**Teacher reports (PhonemeGrowthTable):** Adds a "Confusion" column
+showing the top alternate as a minimal pair label (e.g., "think / sink").
+Green when the confusion gap goes negative (resolved). This annotates
+the existing table — no new panel.
+
+**Teacher reports (ChapterReportDetail):** When ≥2 phoneme sessions
+exist for the same chapter (re-recordings), shows a compact
+"Pronunciation Progress" section with confusion gap deltas and
+resolved indicators.
+
+**Student-facing (PhonemeSummaryReport):** Each weak phoneme card shows
+a confusion hint when NBest data identifies a top alternate: "This might
+sound like **s** in **sink** — practice hearing the difference:
+**think** vs **sink**." Uses minimal pair display data.
+
+**Report computation (useReportData.js):** `computeConfusionTrends()`
+aggregates confusion gaps across sessions per phoneme pair. Outputs
+trend arrays with current/first/change/resolved status, consumed by
+both PhonemeGrowthTable and ChapterReportDetail.
+
+**Growth signals:**
+- **Chapter-level:** Re-recording the same text shows whether targeted
+  practice moved specific confusion pairs (gap closed between attempts)
+- **Book/series-level:** Confusion trends across chapters show whether
+  phoneme discrimination is generalizing into fluent reading
+
+**Files:**
+- `netlify/functions/assess-pronunciation.js` — NBestPhonemeCount config
+- `src/lib/pronunciation.js` — `aggregateConfusions()`, session insert
+- `src/data/confusionPairs.js` — minimal pair display data (~30 pairs)
+- `src/hooks/useReportData.js` — `computeConfusionTrends()`
+- `src/components/teacher/PhonemeGrowthTable.jsx` — confusion column
+- `src/components/teacher/ChapterReportDetail.jsx` — re-recording delta
+- `src/components/reading/PhonemeSummaryReport.jsx` — confusion hints
+- `supabase/migrations/021_phoneme_confusions.sql`
 
 ### Future: Custom Phoneme Articulation Animations
 

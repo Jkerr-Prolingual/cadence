@@ -53,6 +53,7 @@ export default async (req) => {
       PhonemeAlphabet: 'IPA',
       Dimension: 'Comprehensive',
       EnableMiscue: true,
+      NBestPhonemeCount: 3,
     };
     const paJson = JSON.stringify(paConfig);
     const paHeaderValue = Buffer.from(paJson, 'utf-8').toString('base64');
@@ -104,6 +105,10 @@ export default async (req) => {
       phonemes: (w.Phonemes || []).map((p) => ({
         phoneme: p.Phoneme,
         accuracyScore: p.PronunciationAssessment?.AccuracyScore ?? p.AccuracyScore ?? null,
+        nBestPhonemes: (p.NBestPhonemes || []).map(nb => ({
+          phoneme: nb.Phoneme,
+          score: nb.Score,
+        })),
       })),
     }));
 

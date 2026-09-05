@@ -60,7 +60,7 @@ export default function BookReportCard({ book, onSelectChapter }) {
 
           {/* Phoneme growth table — full width */}
           {book.phonemes.growthTable.length > 0 && (
-            <PhonemeGrowthTable rows={book.phonemes.growthTable} />
+            <PhonemeGrowthTable rows={book.phonemes.growthTable} confusionTrends={book.phonemes.confusionTrends} />
           )}
 
           {/* Exercises — full width */}

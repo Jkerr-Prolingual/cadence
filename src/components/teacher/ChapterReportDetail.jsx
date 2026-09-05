@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ScoreBar } from '../reading/PhonemeSummaryReport';
 import { accuracyColor, accuracyBg, formatRelativeDate } from '../../lib/reportUtils';
+import { ipaPhonemes } from '../../data/ipaPhonemes';
+import { getConfusionDisplay } from '../../data/confusionPairs';
 import PhonemeHistogram from './PhonemeHistogram';
 import PhonemeGrowthTable from './PhonemeGrowthTable';
 import LeitnerMiniBar from './LeitnerMiniBar';
@@ -49,8 +51,13 @@ export default function ChapterReportDetail({ detail, studentRecordings }) {
       {detail.phonemes.histogram.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <PhonemeHistogram phonemes={detail.phonemes.histogram} />
-          <PhonemeGrowthTable rows={detail.phonemes.growthTable} />
+          <PhonemeGrowthTable rows={detail.phonemes.growthTable} confusionTrends={detail.phonemes.confusionTrends} />
         </div>
+      )}
+
+      {/* Re-recording confusion delta */}
+      {detail.phonemes.confusionTrends?.length > 0 && (
+        <ReRecordingDelta confusionTrends={detail.phonemes.confusionTrends} />
       )}
 
       {/* Exercise results */}
@@ -398,6 +405,52 @@ function PronunciationInfoIcon() {
       )}
     </span>
   );
+}
+
+function ReRecordingDelta({ confusionTrends }) {
+  const active = confusionTrends.filter(ct => !ct.resolved);
+  const resolved = confusionTrends.filter(ct => ct.resolved);
+
+  function pairLabel(ct) {
+    const display = getConfusionDisplay(ct.expected, ct.alternate);
+    if (display) return `${display.word1} / ${display.word2}`;
+    const pd1 = ipaPhonemes[ct.expected];
+    const pd2 = ipaPhonemes[ct.alternate];
+    if (pd1 && pd2) return `${pd1.exampleHighlight} (${pd1.example}) → ${pd2.exampleHighlight} (${pd2.example})`;
+    return `/${ct.expected}/ → /${ct.alternate}/`;
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 space-y-2">
+      <h3 className="text-sm font-semibold text-gray-700">Pronunciation Progress</h3>
+      <p className="text-[11px] text-gray-400">Confusion changes across re-recordings of this chapter</p>
+      <div className="space-y-1">
+        {active.map(ct => (
+          <div key={ct.key} className="flex items-center gap-2 text-xs">
+            <span className="text-orange-500 font-medium w-4">●</span>
+            <span className="text-gray-700">{pairLabel(ct)}</span>
+            <span className="text-gray-400 tabular-nums">
+              gap {ct.first > 0 ? '+' : ''}{ct.first} → {ct.current > 0 ? '+' : ''}{ct.current}
+            </span>
+            <ChangeCell value={ct.change} />
+          </div>
+        ))}
+        {resolved.map(ct => (
+          <div key={ct.key} className="flex items-center gap-2 text-xs">
+            <span className="text-green-500 font-medium w-4">✓</span>
+            <span className="text-gray-500">{pairLabel(ct)}</span>
+            <span className="text-green-600 text-[11px]">resolved</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ChangeCell({ value }) {
+  if (value === 0) return <span className="text-gray-400 text-[11px]">no change</span>;
+  const color = value < 0 ? 'text-green-600' : 'text-red-600';
+  return <span className={`text-[11px] font-medium ${color}`}>({value < 0 ? '' : '+'}{value})</span>;
 }
 
 function Metric({ label, value }) {

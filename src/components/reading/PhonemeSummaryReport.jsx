@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ipaPhonemes } from '../../data/ipaPhonemes';
+import { getConfusionDisplay } from '../../data/confusionPairs';
 import MouthDiagram from './MouthDiagram';
 import { getUILabel } from '../../lib/locales';
 import { accuracyColor, accuracyBg } from '../../lib/reportUtils';
@@ -20,7 +21,7 @@ function WordInstanceList({ instances }) {
   );
 }
 
-function PhonemeCard({ phoneme, median, count, l1, wordExamples = [], defaultExpanded = false }) {
+function PhonemeCard({ phoneme, median, count, l1, wordExamples = [], defaultExpanded = false, confusionHint = null }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [expandedWord, setExpandedWord] = useState(null);
   const pd = ipaPhonemes[phoneme];
@@ -88,6 +89,17 @@ function PhonemeCard({ phoneme, median, count, l1, wordExamples = [], defaultExp
               </div>
               <p className="text-sm text-gray-700 leading-snug flex-1">
                 {pd.instructions?.[l1] || pd.instruction}
+              </p>
+            </div>
+          )}
+          {confusionHint && (
+            <div className="mt-3 px-2 py-2 bg-amber-50 rounded-lg">
+              <p className="text-xs text-amber-800">
+                {confusionHint.display ? (
+                  <>This might sound like <strong>{confusionHint.display.highlight2}</strong> in <strong>{confusionHint.display.word2}</strong> — practice hearing the difference: <strong>{confusionHint.display.word1}</strong> vs <strong>{confusionHint.display.word2}</strong></>
+                ) : (
+                  <>This sound is being confused with /{confusionHint.alternate}/</>
+                )}
               </p>
             </div>
           )}
@@ -159,7 +171,20 @@ export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, p
 
   if (!phonemeSession) return null;
 
-  const { phoneme_medians, phoneme_counts, weak_phonemes, overall_accuracy, fluency_score, prosody_score, words_assessed } = phonemeSession;
+  const { phoneme_medians, phoneme_counts, weak_phonemes, overall_accuracy, fluency_score, prosody_score, words_assessed, phoneme_confusions } = phonemeSession;
+
+  const confusionByPhoneme = {};
+  if (phoneme_confusions) {
+    for (const [, data] of Object.entries(phoneme_confusions)) {
+      if (!confusionByPhoneme[data.expected] || data.gap > confusionByPhoneme[data.expected].gap) {
+        confusionByPhoneme[data.expected] = {
+          alternate: data.alternate,
+          gap: data.gap,
+          display: getConfusionDisplay(data.expected, data.alternate),
+        };
+      }
+    }
+  }
 
   const allPhonemes = Object.entries(phoneme_medians)
     .sort((a, b) => a[1] - b[1])
@@ -218,6 +243,7 @@ export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, p
                     l1={l1}
                     wordExamples={phonemeWordExamples?.[p.phoneme] || []}
                     defaultExpanded={weakEntries.length <= 3}
+                    confusionHint={confusionByPhoneme[p.phoneme] || null}
                   />
                 ))}
               </div>

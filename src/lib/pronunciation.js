@@ -581,6 +581,41 @@ export function buildPhonemeWordExamples(words) {
   return examples;
 }
 
+function aggregateConfusions(words) {
+  const pairData = {};
+  for (const w of words) {
+    if (w.errorType === 'Insertion' || w.errorType === 'Omission') continue;
+    for (const p of (w.phonemes || [])) {
+      const nBest = p.nBestPhonemes;
+      if (!nBest || nBest.length < 2) continue;
+      const expected = p.phoneme;
+      const expectedEntry = nBest.find(nb => nb.phoneme === expected);
+      const expectedScore = expectedEntry?.score ?? 0;
+      const topAlt = nBest.filter(nb => nb.phoneme !== expected).sort((a, b) => b.score - a.score)[0];
+      if (!topAlt) continue;
+      const key = `${expected}:${topAlt.phoneme}`;
+      if (!pairData[key]) pairData[key] = { expected, alternate: topAlt.phoneme, expectedScores: [], alternateScores: [] };
+      pairData[key].expectedScores.push(expectedScore);
+      pairData[key].alternateScores.push(topAlt.score);
+    }
+  }
+  const confusions = {};
+  for (const [key, data] of Object.entries(pairData)) {
+    if (data.expectedScores.length < MIN_PHONEME_INSTANCES) continue;
+    const avgExpected = Math.round(data.expectedScores.reduce((a, b) => a + b, 0) / data.expectedScores.length);
+    const avgAlternate = Math.round(data.alternateScores.reduce((a, b) => a + b, 0) / data.alternateScores.length);
+    confusions[key] = {
+      expected: data.expected,
+      alternate: data.alternate,
+      expectedConfidence: avgExpected,
+      alternateConfidence: avgAlternate,
+      gap: avgAlternate - avgExpected,
+      instances: data.expectedScores.length,
+    };
+  }
+  return confusions;
+}
+
 function identifyWeakPhonemes(medians) {
   const entries = Object.entries(medians).sort((a, b) => a[1] - b[1]);
   if (entries.length === 0) return [];
@@ -713,6 +748,7 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
     const phonemeGroups = aggregatePhonemes(mergedWords);
     const { medians, counts } = computePhonemeMedians(phonemeGroups);
     const weakPhonemes = identifyWeakPhonemes(medians);
+    const phonemeConfusions = aggregateConfusions(mergedWords);
 
     let phonemeSession = null;
     if (Object.keys(medians).length > 0) {
@@ -727,6 +763,7 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
         phoneme_medians: medians,
         phoneme_counts: counts,
         weak_phonemes: weakPhonemes,
+        phoneme_confusions: Object.keys(phonemeConfusions).length > 0 ? phonemeConfusions : null,
       };
       await supabase.from('phoneme_sessions').insert(sessionRow);
       phonemeSession = sessionRow;

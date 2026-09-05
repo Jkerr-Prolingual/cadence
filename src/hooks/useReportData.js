@@ -242,6 +242,7 @@ export default function useReportData({
         const chapterPhonemes = allStudentPhonemes.filter(ps => chapterTextIds.has(ps.text_id));
         const phonemeHistogram = computePhonemeHistogram(chapterPhonemes);
         const phonemeGrowth = computePhonemeGrowth(chapterPhonemes);
+        const confusionTrends = computeConfusionTrends(chapterPhonemes);
 
         const chapterExercises = (exerciseResults || []).filter(
           er => er.user_id === sid && chapterTextIds.has(er.text_id) && assignedTextIds.has(er.text_id)
@@ -284,6 +285,7 @@ export default function useReportData({
           phonemes: {
             histogram: phonemeHistogram,
             growthTable: phonemeGrowth,
+            confusionTrends,
           },
           exercises: {
             values: exValues,
@@ -346,6 +348,7 @@ export default function useReportData({
     );
     const phonemeHistogram = computePhonemeHistogram(chapterPhonemes);
     const phonemeGrowth = computePhonemeGrowth(chapterPhonemes);
+    const confusionTrends = computeConfusionTrends(chapterPhonemes);
 
     const chapterExercises = (exerciseResults || []).filter(
       er => er.user_id === sid && er.text_id === textId
@@ -392,6 +395,7 @@ export default function useReportData({
       phonemes: {
         histogram: phonemeHistogram,
         growthTable: phonemeGrowth,
+        confusionTrends,
       },
       exercise: latestExercise ? {
         score: latestExercise.score,
@@ -486,6 +490,38 @@ function computePhonemeGrowth(phonemeSessions) {
       values: sorted.map(e => Math.round(e.median)),
     };
   });
+}
+
+function computeConfusionTrends(phonemeSessions) {
+  const pairHistory = {};
+  for (const ps of phonemeSessions) {
+    const confusions = ps.phoneme_confusions;
+    if (!confusions) continue;
+    const date = ps.session_date;
+    for (const [key, data] of Object.entries(confusions)) {
+      if (!pairHistory[key]) pairHistory[key] = { expected: data.expected, alternate: data.alternate, entries: [] };
+      pairHistory[key].entries.push({ gap: data.gap, date });
+    }
+  }
+  return Object.entries(pairHistory)
+    .filter(([, data]) => data.entries.length >= 2)
+    .map(([key, data]) => {
+      const sorted = data.entries.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      const first = sorted[0].gap;
+      const current = sorted[sorted.length - 1].gap;
+      return {
+        key,
+        expected: data.expected,
+        alternate: data.alternate,
+        current,
+        first,
+        change: current - first,
+        sessions: sorted.length,
+        values: sorted.map(e => e.gap),
+        resolved: current < 0,
+      };
+    })
+    .sort((a, b) => b.current - a.current);
 }
 
 function computeWeakPhonemes(phonemeSessions) {
