@@ -90,6 +90,30 @@ export function detectSentences(text, timestamps) {
     sentences.push(s);
   }
 
+  if (timestamps?.length && sentences.length > 1) {
+    let monotonic = true;
+    for (let i = 1; i < sentences.length; i++) {
+      if (sentences[i].startTime < sentences[i - 1].startTime) {
+        monotonic = false;
+        break;
+      }
+    }
+    if (!monotonic) {
+      const sorted = timestamps
+        .filter(t => t.charIndex >= 0)
+        .sort((a, b) => a.start - b.start);
+      if (sorted.length) {
+        const ratio = sorted.length / Math.max(wordCharIndices.length, 1);
+        for (const s of sentences) {
+          const si = Math.min(Math.round(s.firstWordIdx * ratio), sorted.length - 1);
+          const ei = Math.min(Math.round(s.lastWordIdx * ratio), sorted.length - 1);
+          s.startTime = sorted[si]?.start ?? 0;
+          s.endTime = sorted[ei]?.end ?? 0;
+        }
+      }
+    }
+  }
+
   return sentences;
 }
 

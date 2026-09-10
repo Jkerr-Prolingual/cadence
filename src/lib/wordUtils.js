@@ -1,9 +1,11 @@
 import { cefrLookup, cefrMultiWord } from '../data/cefrLookup.js';
 import { lemmaMap } from '../data/lemmaMap.js';
+import { cefrLookupEs, cefrMultiWordEs } from '../data/cefrLookupEs.js';
+import { lemmaMapEs } from '../data/lemmaMapEs.js';
 
 const cefrData = {
   en: { lookup: cefrLookup, lemmas: lemmaMap },
-  // es: { lookup: cefrLookupEs, lemmas: lemmaMapEs }, — added when Spanish CEFR data exists
+  es: { lookup: cefrLookupEs, lemmas: lemmaMapEs },
 };
 
 export const CONTRACTIONS = {

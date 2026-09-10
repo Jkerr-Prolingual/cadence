@@ -91,7 +91,8 @@ function matchWordsToText(sourceWords, textWords, getTimestamp) {
     }
 
     if (!matched) {
-      for (let j = textIdx; j < textWords.length; j++) {
+      const scanLimit = Math.min(textIdx + 20, textWords.length);
+      for (let j = textIdx; j < scanLimit; j++) {
         if (normalize(textWords[j].word) === normW) {
           matched = textWords[j];
           textIdx = j + 1;
@@ -102,7 +103,7 @@ function matchWordsToText(sourceWords, textWords, getTimestamp) {
 
     result.push({
       word: matched?.word ?? w.word,
-      charIndex: matched?.charIndex ?? 0,
+      charIndex: matched?.charIndex ?? -1,
       ...getTimestamp(w),
     });
   }
