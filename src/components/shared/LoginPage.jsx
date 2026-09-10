@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { L1_LOCALES, DEFAULT_L1 } from '../../lib/locales';
+import { L1_LOCALES, L2_LOCALES, DEFAULT_L1, DEFAULT_L2, getTagline } from '../../lib/locales';
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState('student');
   const [l1, setL1] = useState(DEFAULT_L1);
+  const [l2, setL2] = useState(DEFAULT_L2);
   const [mode, setMode] = useState(searchParams.get('mode') === 'signup' ? 'signup' : 'login');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -39,6 +40,7 @@ export default function LoginPage() {
             display_name: displayName.trim() || email.split('@')[0],
             role,
             l1,
+            l2,
           },
         },
       });
@@ -101,7 +103,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Relato</h1>
-          <p className="text-sm text-gray-500 mt-1">read, listen, and learn English</p>
+          <p className="text-sm text-gray-500 mt-1">{getTagline(l2)}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
@@ -164,6 +166,30 @@ export default function LoginPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">I'm learning / Estoy aprendiendo</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.values(L2_LOCALES).map((loc) => (
+                    <button
+                      key={loc.code}
+                      type="button"
+                      onClick={() => {
+                        setL2(loc.code);
+                        if (loc.code === 'es') setL1('en');
+                      }}
+                      className={`py-2 rounded-md text-sm font-medium border transition-colors ${
+                        l2 === loc.code
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {loc.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {l2 === 'en' && (
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Mi idioma / My language</label>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.values(L1_LOCALES).map((loc) => (
@@ -182,6 +208,7 @@ export default function LoginPage() {
                   ))}
                 </div>
               </div>
+              )}
             </>
           )}
 

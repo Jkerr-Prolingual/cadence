@@ -1,6 +1,11 @@
 import { cefrLookup, cefrMultiWord } from '../data/cefrLookup.js';
 import { lemmaMap } from '../data/lemmaMap.js';
 
+const cefrData = {
+  en: { lookup: cefrLookup, lemmas: lemmaMap },
+  // es: { lookup: cefrLookupEs, lemmas: lemmaMapEs }, — added when Spanish CEFR data exists
+};
+
 export const CONTRACTIONS = {
   "i'm": 'i am', "i've": 'i have', "i'll": 'i will', "i'd": 'i would',
   "you're": 'you are', "you've": 'you have', "you'll": 'you will', "you'd": 'you would',
@@ -36,13 +41,16 @@ export function cleanToken(raw) {
  * Look up CEFR level for a word. Tries direct match first, then lemma.
  * Returns { cefr, lemma, via } where cefr is 'A1'–'C1' or null.
  */
-export function lookupCefr(word) {
+export function lookupCefr(word, l2 = 'en') {
   const w = cleanToken(word);
   if (!w) return { cefr: null, lemma: w, via: 'empty' };
 
-  const direct = cefrLookup[w];
-  const lemma = lemmaMap[w];
-  const lemmaLevel = lemma ? cefrLookup[lemma] : null;
+  const data = cefrData[l2];
+  if (!data) return { cefr: null, lemma: w, via: 'unclassified' };
+
+  const direct = data.lookup[w];
+  const lemma = data.lemmas[w];
+  const lemmaLevel = lemma ? data.lookup[lemma] : null;
 
   if (direct && lemmaLevel) {
     if (CEFR_LEVELS.indexOf(lemmaLevel) < CEFR_LEVELS.indexOf(direct)) {

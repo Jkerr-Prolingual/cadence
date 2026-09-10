@@ -2,12 +2,12 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { L1_LOCALES, getUILabel } from '../../lib/locales';
+import { L1_LOCALES, L2_LOCALES, getUILabel, getTagline } from '../../lib/locales';
 import { resetAllProgress } from '../../lib/resetProgress';
 import RelatoLogo from './RelatoLogo';
 
 export default function Layout() {
-  const { user, profile, signOut, refreshProfile, isTeacher, isAdmin, isStudent, l1, textSize } = useAuth();
+  const { user, profile, signOut, refreshProfile, isTeacher, isAdmin, isStudent, l1, l2, textSize } = useAuth();
 
   const [unreadMessages, setUnreadMessages] = useState(0);
 
@@ -86,7 +86,7 @@ export default function Layout() {
             <h1 className="text-xl font-semibold tracking-tight text-gray-900">Relato</h1>
           </div>
           <span className="text-xs text-gray-400 hidden sm:inline">
-            {getUILabel('tagline', l1)}
+            {getTagline(l2)}
           </span>
         </div>
         <div className="flex items-center gap-4">
@@ -137,6 +137,30 @@ export default function Layout() {
                   <p className="text-xs text-gray-400 capitalize">{profile?.role || 'student'}</p>
                 </div>
                 <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-1.5">{getUILabel('iAmLearning', l1)}</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {Object.values(L2_LOCALES).map((loc) => (
+                      <button
+                        key={loc.code}
+                        onClick={async () => {
+                          const updates = { l2: loc.code };
+                          if (loc.code === 'es') updates.l1 = 'en';
+                          await supabase.from('profiles').update(updates).eq('id', user.id);
+                          await refreshProfile();
+                        }}
+                        className={`py-1 rounded text-xs font-medium border transition-colors ${
+                          l2 === loc.code
+                            ? 'bg-gray-900 text-white border-gray-900'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                        }`}
+                      >
+                        {loc.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {l2 === 'en' && (
+                <div className="px-4 py-3 border-b border-gray-100">
                   <p className="text-xs font-medium text-gray-500 mb-1.5">{getUILabel('myLanguage', l1)}</p>
                   <div className="grid grid-cols-2 gap-1">
                     {Object.values(L1_LOCALES).map((loc) => (
@@ -157,6 +181,7 @@ export default function Layout() {
                     ))}
                   </div>
                 </div>
+                )}
                 <div className="px-4 py-3 border-b border-gray-100">
                   <p className="text-xs font-medium text-gray-500 mb-1.5">{getUILabel('textSize', l1)}</p>
                   <div className="grid grid-cols-4 gap-1">

@@ -10,7 +10,16 @@ const dictionaries = {
   ko: koreanDict,
 };
 
-export function getL1Dict(l1) {
+// When L2=es (learning Spanish), we need a Spanish→English dictionary.
+// Placeholder: no data yet — will be populated by a build script.
+const l2Dictionaries = {
+  es: {},
+};
+
+export function getL1Dict(l1, l2 = 'en') {
+  if (l2 !== 'en') {
+    return l2Dictionaries[l2] || {};
+  }
   if (l1 === 'en') return dictionaries.es || {};
   return dictionaries[l1] || {};
 }

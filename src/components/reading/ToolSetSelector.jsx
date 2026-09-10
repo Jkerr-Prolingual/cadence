@@ -61,7 +61,7 @@ function Icon({ name, color, active }) {
 export default function ToolSetSelector({ active, onSelect, hasAudio, hasSyntaxGlosses, l1 }) {
   const available = TOOL_SETS.filter(t => {
     if (t.id === 'translate') return hasSyntaxGlosses;
-    if (!hasAudio) return t.id === 'timed';
+    if (!hasAudio) return t.id === 'timed' || t.id === 'record';
     return true;
   });
 

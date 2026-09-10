@@ -7,6 +7,12 @@ export const L1_LOCALES = {
 };
 
 export const DEFAULT_L1 = 'es';
+export const DEFAULT_L2 = 'en';
+
+export const L2_LOCALES = {
+  en: { code: 'en', label: 'English', englishLabel: 'English' },
+  es: { code: 'es', label: 'Español', englishLabel: 'Spanish' },
+};
 
 export function getL1Label(code) {
   return L1_LOCALES[code]?.label || code.toUpperCase();
@@ -14,6 +20,14 @@ export function getL1Label(code) {
 
 export function getL1EnglishLabel(code) {
   return L1_LOCALES[code]?.englishLabel || code.toUpperCase();
+}
+
+export function getL2Label(code) {
+  return L2_LOCALES[code]?.label || code.toUpperCase();
+}
+
+export function getL2EnglishLabel(code) {
+  return L2_LOCALES[code]?.englishLabel || code.toUpperCase();
 }
 
 export const UI_LABELS = {
@@ -32,6 +46,7 @@ export const UI_LABELS = {
     navExercises: 'Exercises',
     tagline: 'Extensive reading for English learners',
     myLanguage: 'My language',
+    iAmLearning: 'I\'m learning',
     joinClass: 'Join a class',
     yourNameForTeacher: 'Your name (for your teacher)',
     classCode: 'Class code',
@@ -285,6 +300,7 @@ export const UI_LABELS = {
     navExercises: 'Ejercicios',
     tagline: 'Extensive reading for English learners',
     myLanguage: 'Mi idioma',
+    iAmLearning: 'Estoy aprendiendo',
     joinClass: 'Unirse a una clase',
     yourNameForTeacher: 'Tu nombre (para tu maestro/a)',
     classCode: 'Código de clase',
@@ -509,6 +525,7 @@ export const UI_LABELS = {
     navExercises: '练习',
     tagline: 'Extensive reading for English learners',
     myLanguage: '我的语言',
+    iAmLearning: '我在学习',
     joinClass: '加入班级',
     yourNameForTeacher: '你的名字（给老师看）',
     classCode: '班级代码',
@@ -732,6 +749,7 @@ export const UI_LABELS = {
     navExercises: '練習問題',
     tagline: 'Extensive reading for English learners',
     myLanguage: '言語設定',
+    iAmLearning: '学習中の言語',
     joinClass: 'クラスに参加',
     yourNameForTeacher: 'あなたの名前（先生に表示されます）',
     classCode: 'クラスコード',
@@ -955,6 +973,7 @@ export const UI_LABELS = {
     navExercises: '연습 문제',
     tagline: 'Extensive reading for English learners',
     myLanguage: '언어 설정',
+    iAmLearning: '학습 중인 언어',
     joinClass: '수업 참가',
     yourNameForTeacher: '이름 (선생님에게 표시됩니다)',
     classCode: '수업 코드',
@@ -1169,4 +1188,13 @@ export const UI_LABELS = {
 
 export function getUILabel(key, l1) {
   return UI_LABELS[l1]?.[key] || UI_LABELS.en[key] || key;
+}
+
+const TAGLINES = {
+  en: 'Extensive reading for English learners',
+  es: 'Extensive reading for Spanish learners',
+};
+
+export function getTagline(l2) {
+  return TAGLINES[l2] || TAGLINES.en;
 }

@@ -7,7 +7,7 @@ const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(DEV_MODE ? { id: 'dev-user', email: 'dev@relato.local' } : null);
-  const [profile, setProfile] = useState(DEV_MODE ? { role: 'admin', display_name: 'Dev User', l1: 'es' } : null);
+  const [profile, setProfile] = useState(DEV_MODE ? { role: 'admin', display_name: 'Dev User', l1: 'es', l2: 'en' } : null);
   const [loading, setLoading] = useState(!DEV_MODE);
 
   useEffect(() => {
@@ -64,6 +64,7 @@ export function AuthProvider({ children }) {
     isAdmin: profile?.role === 'admin',
     isStudent: profile?.role === 'student',
     l1: profile?.l1 || 'es',
+    l2: profile?.l2 || 'en',
     textSize: profile?.text_size || localStorage.getItem('relato_text_size') || 'medium',
     devMode: DEV_MODE,
   };
