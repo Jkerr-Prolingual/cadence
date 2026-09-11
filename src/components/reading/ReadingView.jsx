@@ -24,7 +24,7 @@ import { getUILabel } from '../../lib/locales';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ReadingView() {
-  const { user, isTeacher, l1, textSize } = useAuth();
+  const { user, isTeacher, l1, l2, textSize } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [curatedTexts, setCuratedTexts] = useState([]);
@@ -1471,6 +1471,7 @@ export default function ReadingView() {
           manifest={bookManifest}
           syntaxGloss={popup.token.syntaxGloss || null}
           l1={l1}
+          l2={l2 || 'en'}
           assessmentInfo={(toolSet === 'record' || toolSet === 'shadow') ? (wordAssessmentMap?.get(popup.token.wordIdx) || null) : null}
           toolSet={toolSet}
           onNavigatePrev={() => handleNavigate(-1)}

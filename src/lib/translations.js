@@ -2,6 +2,7 @@ import { spanishDict } from '../data/es_dictionary';
 import { mandarinDict } from '../data/zh_dictionary';
 import { japaneseDict } from '../data/ja_dictionary';
 import { koreanDict } from '../data/ko_dictionary';
+import { dbGet, dbPut } from './db';
 
 const dictionaries = {
   es: spanishDict,
@@ -10,8 +11,6 @@ const dictionaries = {
   ko: koreanDict,
 };
 
-// When L2=es (learning Spanish), we need a Spanish→English dictionary.
-// Placeholder: no data yet — will be populated by a build script.
 const l2Dictionaries = {
   es: {},
 };
@@ -68,4 +67,38 @@ export function getGlossConstituents(gloss, l1) {
     return gloss.constituents.es || Object.values(gloss.constituents)[0] || null;
   }
   return null;
+}
+
+const inflight = new Map();
+
+export async function fetchTranslation(word, fromLang, toLang, context) {
+  const cacheKey = `${fromLang}>${toLang}:${word.toLowerCase()}`;
+
+  const cached = await dbGet('translationCache', cacheKey).catch(() => null);
+  if (cached) return cached.translation;
+
+  if (inflight.has(cacheKey)) return inflight.get(cacheKey);
+
+  const promise = (async () => {
+    try {
+      const res = await fetch('/.netlify/functions/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: word.toLowerCase(), fromLang, toLang, context }),
+      });
+      if (!res.ok) return null;
+      const { translation } = await res.json();
+      if (translation) {
+        await dbPut('translationCache', { word: cacheKey, translation }).catch(() => {});
+      }
+      return translation || null;
+    } catch {
+      return null;
+    } finally {
+      inflight.delete(cacheKey);
+    }
+  })();
+
+  inflight.set(cacheKey, promise);
+  return promise;
 }

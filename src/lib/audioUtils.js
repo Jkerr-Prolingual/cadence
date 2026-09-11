@@ -65,7 +65,7 @@ export function detectSentences(text, timestamps) {
     if (match[1]) {
       lastWordIdx = wordIdx;
       wordIdx++;
-    } else if (/[.!?]/.test(match[2]) && lastWordIdx >= sentenceStart) {
+    } else if ((/[.!?]/.test(match[2]) || /\n/.test(match[2])) && lastWordIdx >= sentenceStart) {
       const s = { sentenceIdx, firstWordIdx: sentenceStart, lastWordIdx };
       if (timestamps) {
         const startTs = getTimestampForWordIdx(sentenceStart);

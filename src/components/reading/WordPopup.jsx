@@ -3,27 +3,29 @@ import { cefrColor, lookupCefr } from '../../lib/wordUtils';
 import { lemmaMap } from '../../data/lemmaMap';
 import { egpLookup } from '../../data/egpLookup';
 import { egpL1Overlays } from '../../data/egpL1Overlays';
-import { getL1Dict, getManifestTranslation, getManifestConstituents, getGlossTranslation, getGlossConstituents } from '../../lib/translations';
+import { getL1Dict, getManifestTranslation, getManifestConstituents, getGlossTranslation, getGlossConstituents, fetchTranslation } from '../../lib/translations';
 import { getL1Label, getUILabel } from '../../lib/locales';
 import { lookupPhoneme } from '../../data/ipaPhonemes';
 import { displayScore } from '../../lib/pronunciation';
 import { getPhonemeVideo } from '../../data/phonemeVideos';
 import { getMWAudioUrl, playMWAudio } from '../../lib/mwDictionary';
 
-function speakWord(text) {
+const SPEECH_LANGS = { en: 'en-US', es: 'es-ES', zh: 'zh-CN', ja: 'ja-JP', ko: 'ko-KR' };
+
+function speakWord(text, lang = 'en') {
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
+    utterance.lang = SPEECH_LANGS[lang] || 'en-US';
     utterance.rate = 0.85;
     window.speechSynthesis.speak(utterance);
   }
 }
 
-function SpeakButton({ text }) {
+function SpeakButton({ text, lang }) {
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); speakWord(text); }}
+      onClick={(e) => { e.stopPropagation(); speakWord(text, lang); }}
       className="p-1 text-gray-400 hover:text-blue-500 active:text-blue-700 shrink-0"
       aria-label="Listen to pronunciation"
     >
@@ -35,7 +37,7 @@ function SpeakButton({ text }) {
   );
 }
 
-export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss, l1 = 'es', assessmentInfo = null, toolSet = null, onNavigatePrev = null, onNavigateNext = null, fromNav = false }) {
+export default function WordPopup({ word, cefr, lemma, via, position, onClose, onResumeAudio, onAddFlashcard, particle, manifest, structure, syntaxGloss, l1 = 'es', l2 = 'en', assessmentInfo = null, toolSet = null, onNavigatePrev = null, onNavigateNext = null, fromNav = false }) {
   const popupRef = useRef(null);
   const [adjusted, setAdjusted] = useState(position);
   const [view, setView] = useState(syntaxGloss ? 'gloss' : particle ? 'particle' : structure ? 'structure' : 'word');
@@ -172,12 +174,29 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
     setAdjusted({ x, y });
   }, [position, view, structureDrillDown, syntaxGloss, activePhoneme, isShadowSheet]);
 
-  const l1Dict = getL1Dict(l1);
+  const l1Dict = getL1Dict(l1, l2);
   const l1Label = l1 === 'en' ? getL1Label('es') : getL1Label(l1);
   const lookupKey = lemma || word.toLowerCase();
   const morphLemma = lemmaMap[word.toLowerCase()];
   const manifestEntry = manifest?.entries?.[lookupKey] || manifest?.entries?.[word.toLowerCase()] || (morphLemma && manifest?.entries?.[morphLemma]);
-  const wordTranslation = getManifestTranslation(manifestEntry, l1) || l1Dict[lookupKey] || l1Dict[word.toLowerCase()] || (morphLemma && l1Dict[morphLemma]);
+  const staticTranslation = getManifestTranslation(manifestEntry, l1) || l1Dict[lookupKey] || l1Dict[word.toLowerCase()] || (morphLemma && l1Dict[morphLemma]);
+  const [apiTranslation, setApiTranslation] = useState(null);
+  const [apiLoading, setApiLoading] = useState(false);
+
+  useEffect(() => {
+    if (staticTranslation || apiTranslation) return;
+    let cancelled = false;
+    setApiLoading(true);
+    fetchTranslation(lookupKey, l2, l1).then((result) => {
+      if (!cancelled) {
+        setApiTranslation(result);
+        setApiLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [lookupKey, l2, l1, staticTranslation, apiTranslation]);
+
+  const wordTranslation = staticTranslation || apiTranslation;
   const wordLevel = cefr || 'unclassified';
   const wordColor = cefrColor(wordLevel);
 
@@ -203,7 +222,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1">
             <span className="text-lg font-semibold text-gray-900">{particle.phrase}</span>
-            <SpeakButton text={particle.phrase} />
+            <SpeakButton text={particle.phrase} lang={l2} />
           </div>
           <span
             className="text-xs font-bold px-2 py-0.5 rounded"
@@ -307,7 +326,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1">
             <span className="text-lg font-semibold text-gray-900">{word}</span>
-            <SpeakButton text={word} />
+            <SpeakButton text={word} lang={l2} />
           </div>
           <span
             className="text-xs font-bold px-2 py-0.5 rounded"
@@ -328,6 +347,8 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{l1Label}</span>
             <p className="text-base text-gray-800 mt-0.5">{wordTranslation}</p>
           </div>
+        ) : apiLoading ? (
+          <p className="text-base text-gray-400 italic">…</p>
         ) : (
           <p className="text-base text-gray-400 italic">{getUILabel('noTranslation', l1)}</p>
         )}
@@ -579,7 +600,7 @@ export default function WordPopup({ word, cefr, lemma, via, position, onClose, o
                     </svg>
                   </button>
                 ) : (
-                  <SpeakButton text={word} />
+                  <SpeakButton text={word} lang={l2} />
                 )}
               </div>
             )}
