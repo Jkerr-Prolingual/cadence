@@ -12,14 +12,15 @@ export function findCurrentWord(timestamps, time) {
 
 export function findCurrentSentence(sentences, time) {
   if (!sentences?.length) return -1;
+  let best = -1;
   for (const s of sentences) {
     if (s.startTime != null && s.endTime != null) {
       if (time >= s.startTime - 0.05 && time <= s.endTime + 0.05) {
-        return s.sentenceIdx;
+        best = s.sentenceIdx;
       }
     }
   }
-  return -1;
+  return best;
 }
 
 export function detectSentences(text, timestamps) {
@@ -51,12 +52,20 @@ export function detectSentences(text, timestamps) {
   function getTimestampForWordIdx(wIdx) {
     const charIdx = wordCharIndices[wIdx];
     if (charIdx == null) return null;
-    // Exact match first
     if (charToTimestamp[charIdx]) return charToTimestamp[charIdx];
-    // Nearest timestamp within 3 characters (handles minor offset from punctuation)
     for (let d = 1; d <= 3; d++) {
       if (charToTimestamp[charIdx - d]) return charToTimestamp[charIdx - d];
       if (charToTimestamp[charIdx + d]) return charToTimestamp[charIdx + d];
+    }
+    return null;
+  }
+
+  function getSentenceBoundaryTs(wIdx, direction) {
+    let ts = getTimestampForWordIdx(wIdx);
+    if (ts) return ts;
+    for (let d = 1; d <= 3; d++) {
+      ts = getTimestampForWordIdx(wIdx + (direction > 0 ? d : -d));
+      if (ts) return ts;
     }
     return null;
   }
@@ -68,10 +77,10 @@ export function detectSentences(text, timestamps) {
     } else if ((/[.!?]/.test(match[2]) || /\n/.test(match[2])) && lastWordIdx >= sentenceStart) {
       const s = { sentenceIdx, firstWordIdx: sentenceStart, lastWordIdx };
       if (timestamps) {
-        const startTs = getTimestampForWordIdx(sentenceStart);
-        const endTs = getTimestampForWordIdx(lastWordIdx);
-        s.startTime = startTs?.start ?? 0;
-        s.endTime = endTs?.end ?? 0;
+        const startTs = getSentenceBoundaryTs(sentenceStart, 1);
+        const endTs = getSentenceBoundaryTs(lastWordIdx, -1);
+        if (startTs) s.startTime = startTs.start;
+        if (endTs) s.endTime = endTs.end;
       }
       sentences.push(s);
       sentenceIdx++;
@@ -82,10 +91,10 @@ export function detectSentences(text, timestamps) {
   if (lastWordIdx >= sentenceStart) {
     const s = { sentenceIdx, firstWordIdx: sentenceStart, lastWordIdx };
     if (timestamps) {
-      const startTs = getTimestampForWordIdx(sentenceStart);
-      const endTs = getTimestampForWordIdx(lastWordIdx);
-      s.startTime = startTs?.start ?? 0;
-      s.endTime = endTs?.end ?? 0;
+      const startTs = getSentenceBoundaryTs(sentenceStart, 1);
+      const endTs = getSentenceBoundaryTs(lastWordIdx, -1);
+      if (startTs) s.startTime = startTs.start;
+      if (endTs) s.endTime = endTs.end;
     }
     sentences.push(s);
   }
