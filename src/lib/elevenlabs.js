@@ -77,9 +77,11 @@ function extractTextWords(text) {
 function matchWordsToText(sourceWords, textWords, getTimestamp) {
   const result = [];
   let textIdx = 0;
-  for (const w of sourceWords) {
+  let i = 0;
+  while (i < sourceWords.length) {
+    const w = sourceWords[i];
     const normW = normalize(w.word);
-    if (!normW) continue;
+    if (!normW) { i++; continue; }
 
     let matched = null;
     for (let j = textIdx; j < textWords.length && j < textIdx + 3; j++) {
@@ -101,11 +103,39 @@ function matchWordsToText(sourceWords, textWords, getTimestamp) {
       }
     }
 
+    // Check if consecutive source words combine to match the current text word
+    // (handles Whisper splitting hyphenated words like "Forty-four" → "forty" + "four")
+    if (!matched && textIdx < textWords.length) {
+      const normText = normalize(textWords[textIdx].word);
+      let combined = normW;
+      let ahead = 1;
+      while (ahead <= 3 && combined.length < normText.length && i + ahead < sourceWords.length) {
+        combined += normalize(sourceWords[i + ahead].word);
+        if (combined === normText) {
+          matched = textWords[textIdx];
+          textIdx++;
+          // Emit entries for all combined source words, all pointing to the same text word
+          for (let k = 0; k <= ahead; k++) {
+            result.push({
+              word: matched.word,
+              charIndex: matched.charIndex,
+              ...getTimestamp(sourceWords[i + k]),
+            });
+          }
+          i += ahead + 1;
+          break;
+        }
+        ahead++;
+      }
+      if (matched) continue;
+    }
+
     result.push({
       word: matched?.word ?? w.word,
       charIndex: matched?.charIndex ?? -1,
       ...getTimestamp(w),
     });
+    i++;
   }
   return result;
 }

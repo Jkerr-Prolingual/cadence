@@ -23,6 +23,13 @@ export function findCurrentSentence(sentences, time) {
   return best;
 }
 
+const ABBREVIATIONS = new Set([
+  'mr', 'mrs', 'ms', 'dr', 'jr', 'sr', 'st', 'mt',
+  'ave', 'blvd', 'apt', 'dept',
+  'prof', 'gen', 'gov', 'sgt', 'lt', 'capt',
+  'corp', 'inc', 'ltd', 'vol', 'vs', 'etc',
+]);
+
 export function detectSentences(text, timestamps) {
   const sentences = [];
   const regex = /([a-zA-ZÀ-ÿ'''-]+)|([^a-zA-ZÀ-ÿ'''-]+)/g;
@@ -30,6 +37,7 @@ export function detectSentences(text, timestamps) {
   let wordIdx = 0;
   let sentenceStart = 0;
   let lastWordIdx = -1;
+  let lastWord = '';
   let sentenceIdx = 0;
 
   // Build charIndex → timestamp lookup so sentence timing
@@ -72,9 +80,12 @@ export function detectSentences(text, timestamps) {
 
   while ((match = regex.exec(text)) !== null) {
     if (match[1]) {
+      lastWord = match[1];
       lastWordIdx = wordIdx;
       wordIdx++;
     } else if ((/[.!?]/.test(match[2]) || /\n/.test(match[2])) && lastWordIdx >= sentenceStart) {
+      const dotOnly = /\./.test(match[2]) && !/[!?\n]/.test(match[2]);
+      if (dotOnly && (ABBREVIATIONS.has(lastWord.toLowerCase()) || lastWord.length === 1)) continue;
       const s = { sentenceIdx, firstWordIdx: sentenceStart, lastWordIdx };
       if (timestamps) {
         const startTs = getSentenceBoundaryTs(sentenceStart, 1);
