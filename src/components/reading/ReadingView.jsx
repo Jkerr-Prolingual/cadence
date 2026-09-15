@@ -282,26 +282,26 @@ export default function ReadingView() {
     }
   }, [assessmentData, assessmentStatus, toolSet, sentences.length]);
 
-  // Auto-calibrate mic when entering the Record tool set (once per session)
-  useEffect(() => {
-    if (toolSet === 'record' && !preFlightCalibrated.current && preFlight.status === 'idle') {
-      preFlightCalibrated.current = true;
-      setPreFlightDismissed(false);
-      preFlight.calibrate();
-    }
-  }, [toolSet, preFlight.status]);
-
-  // Attach pre-flight live monitoring when recording stream becomes active
-  useEffect(() => {
-    if (recorder.activeStream && recordingMode === 'recording') {
-      preFlight.attachStream(recorder.activeStream);
-      preFlight.startMonitoring();
-      return () => {
-        preFlight.stopMonitoring();
-        preFlight.detach();
-      };
-    }
-  }, [recorder.activeStream, recordingMode]);
+  // DISABLED: Audio pre-flight check — interfering with recording in student testing.
+  // Re-enable when root cause is identified and thresholds are tuned.
+  // useEffect(() => {
+  //   if (toolSet === 'record' && !preFlightCalibrated.current && preFlight.status === 'idle') {
+  //     preFlightCalibrated.current = true;
+  //     setPreFlightDismissed(false);
+  //     preFlight.calibrate();
+  //   }
+  // }, [toolSet, preFlight.status]);
+  //
+  // useEffect(() => {
+  //   if (recorder.activeStream && recordingMode === 'recording') {
+  //     preFlight.attachStream(recorder.activeStream);
+  //     preFlight.startMonitoring();
+  //     return () => {
+  //       preFlight.stopMonitoring();
+  //       preFlight.detach();
+  //     };
+  //   }
+  // }, [recorder.activeStream, recordingMode]);
 
   useEffect(() => {
     const requestedId = searchParams.get('text');
@@ -1295,11 +1295,11 @@ export default function ReadingView() {
           hasFluencyBlob={!!(fluencyDuration && recorder.audioBlob && recordingMode === 'idle')}
           onShowPhonemeReport={() => setShowPhonemeReport(true)}
           phonemeSession={phonemeSession}
-          preFlightStatus={preFlight.status}
-          preFlightCondition={recordingMode === 'recording' ? preFlight.condition : (preFlightDismissed ? null : preFlight.condition)}
-          preFlightLevel={preFlight.level}
-          onCalibrate={() => { preFlightCalibrated.current = false; setPreFlightDismissed(false); preFlight.calibrate(); }}
-          onDismissPreFlight={() => setPreFlightDismissed(true)}
+          preFlightStatus="idle"
+          preFlightCondition={null}
+          preFlightLevel={0}
+          onCalibrate={() => {}}
+          onDismissPreFlight={() => {}}
         />
       );
     }
