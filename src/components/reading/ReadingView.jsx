@@ -453,11 +453,21 @@ export default function ReadingView() {
         text_id: selectedTextIdRef.current,
         type: 'lookup',
       });
+      trackActivity('lookup');
       setEncounters((prev) => ({
         ...prev,
         [headword]: (prev[headword] || 0) + 1,
       }));
     } catch {}
+  }
+
+  function trackActivity(eventType) {
+    if (!user?.id || !selectedTextIdRef.current) return;
+    supabase.from('activity_events').insert({
+      user_id: user.id,
+      text_id: selectedTextIdRef.current,
+      event_type: eventType,
+    }).then(null, () => {});
   }
 
   // ── Audio playback ────────────────────────────────────────────────────────────
@@ -504,6 +514,7 @@ export default function ReadingView() {
       }
       audio.play();
       setIsPlaying(true);
+      trackActivity('audio_play');
     } else {
       audio.pause();
       setIsPlaying(false);
@@ -549,6 +560,7 @@ export default function ReadingView() {
     } else {
       trackShadowedSentence(sentence.sentenceIdx);
       setLoopSentenceIdx(sentence.sentenceIdx);
+      trackActivity('sentence_loop');
       const audio = audioRef.current;
       if (audio) {
         audio.currentTime = getLoopStart(sentence.sentenceIdx);
@@ -567,6 +579,7 @@ export default function ReadingView() {
     } else {
       trackShadowedSentence(sentenceIdx);
       setLoopSentenceIdx(sentenceIdx);
+      trackActivity('sentence_loop');
       const audio = audioRef.current;
       if (audio) {
         audio.currentTime = getLoopStart(sentenceIdx);

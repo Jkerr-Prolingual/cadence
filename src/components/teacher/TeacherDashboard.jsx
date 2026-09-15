@@ -27,6 +27,8 @@ export default function TeacherDashboard() {
   const [reviewLogs, setReviewLogs] = useState([]);
   const [exerciseResults, setExerciseResults] = useState([]);
   const [phonemeSessions, setPhonemeSessions] = useState([]);
+  const [activityEvents, setActivityEvents] = useState([]);
+  const [engagementWindow, setEngagementWindow] = useState(1);
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [activeTab, setActiveTab] = useState('assignments');
   const [showCreateClass, setShowCreateClass] = useState(false);
@@ -95,6 +97,14 @@ export default function TeacherDashboard() {
         setReviewLogs(reviewsRes.data || []);
         setExerciseResults(exerciseRes.data || []);
         setPhonemeSessions(phonemeRes.data || []);
+
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: actData } = await supabase
+          .from('activity_events')
+          .select('user_id, event_type, created_at')
+          .in('user_id', studentIds)
+          .gte('created_at', since);
+        setActivityEvents(actData || []);
       }
     }
   }
@@ -108,6 +118,20 @@ export default function TeacherDashboard() {
       name: studentProfiles[e.student_id]?.display_name || studentProfiles[e.student_id]?.email || 'Unknown',
       joinedAt: e.enrolled_at,
     }));
+
+  const studentEngagement = useMemo(() => {
+    const cutoff = Date.now() - engagementWindow * 60 * 60 * 1000;
+    const map = {};
+    for (const s of classStudents) {
+      map[s.id] = { lookup: 0, audio_play: 0, sentence_loop: 0 };
+    }
+    for (const ev of activityEvents) {
+      if (!map[ev.user_id]) continue;
+      if (new Date(ev.created_at).getTime() < cutoff) continue;
+      map[ev.user_id][ev.event_type] = (map[ev.user_id][ev.event_type] || 0) + 1;
+    }
+    return map;
+  }, [activityEvents, classStudents, engagementWindow]);
 
   async function handleCreateClass() {
     if (!newClassName.trim()) return;
@@ -243,6 +267,9 @@ export default function TeacherDashboard() {
                   <ClassInfoPanel
                     cls={selectedClass}
                     students={classStudents}
+                    studentEngagement={studentEngagement}
+                    engagementWindow={engagementWindow}
+                    onEngagementWindowChange={setEngagementWindow}
                     onRemoveStudent={handleRemoveStudent}
                     onDeleteClass={() => handleDeleteClass(selectedClass.id)}
                   />
@@ -302,7 +329,13 @@ export default function TeacherDashboard() {
   );
 }
 
-function ClassInfoPanel({ cls, students, onRemoveStudent, onDeleteClass }) {
+const ENGAGEMENT_WINDOWS = [
+  { value: 1, label: 'Last hour' },
+  { value: 12, label: 'Last 12 hours' },
+  { value: 24, label: 'Last 24 hours' },
+];
+
+function ClassInfoPanel({ cls, students, studentEngagement, engagementWindow, onEngagementWindowChange, onRemoveStudent, onDeleteClass }) {
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
@@ -313,26 +346,57 @@ function ClassInfoPanel({ cls, students, onRemoveStudent, onDeleteClass }) {
       </div>
 
       <div className="px-4 py-3">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-          Students ({students.length})
-        </h4>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Students ({students.length})
+          </h4>
+          <select
+            value={engagementWindow}
+            onChange={e => onEngagementWindowChange(Number(e.target.value))}
+            className="text-xs border border-gray-200 rounded px-1.5 py-0.5 text-gray-600 bg-white"
+          >
+            {ENGAGEMENT_WINDOWS.map(w => (
+              <option key={w.value} value={w.value}>{w.label}</option>
+            ))}
+          </select>
+        </div>
 
         {students.length === 0 && (
           <p className="text-xs text-gray-400 mb-3">No students enrolled yet. Share the join code with students.</p>
         )}
 
         <ul className="space-y-1 mb-3">
-          {students.map(s => (
-            <li key={s.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50 group">
-              <span className="text-sm text-gray-700">{s.name}</span>
-              <button
-                onClick={() => onRemoveStudent(s.id)}
-                className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                remove
-              </button>
-            </li>
-          ))}
+          {students.map(s => {
+            const eng = studentEngagement[s.id] || { lookup: 0, audio_play: 0, sentence_loop: 0 };
+            const total = eng.lookup + eng.audio_play + eng.sentence_loop;
+            return (
+              <li key={s.id} className="py-1.5 px-2 rounded hover:bg-gray-50 group">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">{s.name}</span>
+                  <button
+                    onClick={() => onRemoveStudent(s.id)}
+                    className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    remove
+                  </button>
+                </div>
+                <div className="flex items-center gap-2.5 mt-0.5">
+                  <span className={`text-xs tabular-nums ${eng.lookup > 0 ? 'text-blue-600' : 'text-gray-300'}`} title="Word lookups">
+                    Aa {eng.lookup}
+                  </span>
+                  <span className={`text-xs tabular-nums ${eng.audio_play > 0 ? 'text-green-600' : 'text-gray-300'}`} title="Audio plays">
+                    &#9654; {eng.audio_play}
+                  </span>
+                  <span className={`text-xs tabular-nums ${eng.sentence_loop > 0 ? 'text-purple-600' : 'text-gray-300'}`} title="Sentence loops">
+                    &#8635; {eng.sentence_loop}
+                  </span>
+                  {total === 0 && (
+                    <span className="text-[10px] text-gray-300 italic">no activity</span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </div>
 
