@@ -129,7 +129,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
       setBack(translation);
     } else {
       setFront('');
-      setBack(word);
+      setBack('');
     }
     setStep('build');
   }
@@ -141,24 +141,11 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
     if (!selected) return;
 
     const wordCount = selected.split(/\s+/).filter(Boolean).length;
-    if (wordCount < 3) { setSelectionError(getUILabel('selectAtLeast3', l1)); return; }
     if (wordCount > 15) { setSelectionError(getUILabel('keepUnder15', l1)); return; }
-    if (!isStructure && !selected.toLowerCase().includes(word.toLowerCase())) {
-      setSelectionError(`${getUILabel('mustInclude', l1)} "${word}".`);
-      return;
-    }
 
     setSelectionError('');
-    if (isStructure) {
-      setFront(sentence.replace(selected, '_____'));
-      setBack(selected);
-      setPhraseSelection(selected);
-      sel.removeAllRanges();
-      return;
-    } else {
-      const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-      setFront(selected.replace(regex, '_____'));
-    }
+    setFront(sentence.replace(selected, '_____'));
+    setBack(selected);
     setPhraseSelection(selected);
     sel.removeAllRanges();
   }
@@ -293,10 +280,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
             <div className="space-y-4">
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1">
-                  {isStructure
-                    ? getUILabel('highlightPart', l1)
-                    : <>{getUILabel('highlightPhrase', l1)} <strong className="text-gray-800">"{word}"</strong></>
-                  }
+                  {getUILabel('highlightPart', l1)}
                 </p>
                 <div
                   ref={phraseRef}
