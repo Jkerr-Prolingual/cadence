@@ -1506,7 +1506,6 @@ export default function ReadingView() {
           l1={l1}
           onClose={() => setCardCreator(null)}
           onCreated={() => {
-            setCardCreator(null);
             if (user?.id && selectedTextId) {
               completeTaskForText(user.id, selectedTextId, 'flashcards')
                 .then(() => setChecklistKey(k => k + 1));
