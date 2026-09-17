@@ -129,7 +129,7 @@ export default function BookChaptersPage() {
             const chColor = CEFR_COLORS[ch.cefr_estimate] || '#6b7280';
             const cp = progress[ch.id];
             const hasActivity = cp && (
-              cp.fluency.sessionCount > 0 || cp.recording.exists ||
+              cp.recording.exists ||
               cp.srs.totalCards > 0 || (cp.assignments && cp.assignments.total > 0)
             );
             const isExpanded = expandedChapter === ch.id;
@@ -151,11 +151,6 @@ export default function BookChaptersPage() {
                     </p>
                     {hasActivity && (
                       <div className="flex items-center gap-2.5 mt-0.5">
-                        {cp.fluency.sessionCount > 0 && (
-                          <span className="text-[10px] text-amber-600 font-medium">
-                            {cp.fluency.latestWpm} WPM
-                          </span>
-                        )}
                         {cp.recording.exists && (
                           <span className="text-[10px] text-gray-400" title="Recording saved">🎤</span>
                         )}
