@@ -36,7 +36,6 @@ export const UI_LABELS = {
     listenRead: 'Listen & Read',
     translate: 'Translate',
     shadowRead: 'Shadow Read',
-    timedRead: 'Timed Read',
     record: 'Record',
 
     // Navigation
@@ -196,7 +195,6 @@ export const UI_LABELS = {
     mustInclude: 'Must include',
 
     // Timed reading
-    timedReadInstruction: 'Read at your natural pace. The clock starts when you tap the button. Tap any word to mark where you stopped.',
     startTheClock: 'Start the clock',
     tapWordToMark: 'Tap any word to mark where you stopped',
     doneReading: 'Done reading',
@@ -238,7 +236,6 @@ export const UI_LABELS = {
     amazonBannerText: 'Our graded readers are also available in print on Amazon.',
 
     // Chapter progress
-    timedReads: 'Timed reads',
     yourRecording: 'Your recording',
     loadingAudio: 'Loading audio...',
     audioUnavailable: 'Audio unavailable',
@@ -254,12 +251,14 @@ export const UI_LABELS = {
 
     // Assignments
     assignments: 'Assignments',
+    assignmentCol: 'Book / Chapter',
+    noAssignments: 'No assignments yet.',
+    noAssignmentsHint: 'Assignments from your teacher will appear here.',
     dueLabel: 'Due',
     taskReadingPass: 'Complete a reading pass',
     taskFlashcards: 'Create flashcards from new words',
     taskRecordAudio: 'Record a read-aloud',
     taskShadowReading: 'Shadow reading practice',
-    taskTimedReading: 'Complete a timed reading',
 
     // Book chapters page
     bookNotFound: 'Book not found.',
@@ -291,7 +290,6 @@ export const UI_LABELS = {
     listenRead: 'Escuchar y leer',
     translate: 'Traducir',
     shadowRead: 'Lectura en eco',
-    timedRead: 'Lectura cronometrada',
     record: 'Grabar',
 
     navLibrary: 'Biblioteca',
@@ -441,7 +439,6 @@ export const UI_LABELS = {
     keepUnder15: 'Máximo 15 palabras.',
     mustInclude: 'Debe incluir',
 
-    timedReadInstruction: 'Lee a tu ritmo natural. El reloj empieza al tocar el botón. Toca cualquier palabra para marcar dónde paraste.',
     startTheClock: 'Iniciar el reloj',
     tapWordToMark: 'Toca cualquier palabra para marcar dónde paraste',
     doneReading: 'Terminé de leer',
@@ -480,7 +477,6 @@ export const UI_LABELS = {
     amazonBannerTitle: '¿Prefieres leer en papel?',
     amazonBannerText: 'Nuestras lecturas graduadas también están disponibles en formato impreso en Amazon.',
 
-    timedReads: 'Lecturas cronometradas',
     yourRecording: 'Tu grabación',
     loadingAudio: 'Cargando audio...',
     audioUnavailable: 'Audio no disponible',
@@ -495,12 +491,14 @@ export const UI_LABELS = {
     due: 'pendiente',
 
     assignments: 'Tareas',
+    assignmentCol: 'Libro / Capítulo',
+    noAssignments: 'Aún no hay tareas.',
+    noAssignmentsHint: 'Las tareas de tu maestro/a aparecerán aquí.',
     dueLabel: 'Fecha límite',
     taskReadingPass: 'Completar una lectura',
     taskFlashcards: 'Crear tarjetas de vocabulario nuevo',
     taskRecordAudio: 'Grabar una lectura en voz alta',
     taskShadowReading: 'Practicar lectura en eco',
-    taskTimedReading: 'Completar una lectura cronometrada',
 
     bookNotFound: 'Libro no encontrado.',
     backToLibrary: 'Volver a la biblioteca',
@@ -516,7 +514,6 @@ export const UI_LABELS = {
     listenRead: '听读',
     translate: '翻译',
     shadowRead: '跟读',
-    timedRead: '计时阅读',
     record: '录音',
 
     navLibrary: '书库',
@@ -665,7 +662,6 @@ export const UI_LABELS = {
     keepUnder15: '最多15个词。',
     mustInclude: '必须包含',
 
-    timedReadInstruction: '以自然速度阅读。点击按钮后开始计时。点击任意单词标记你读到的位置。',
     startTheClock: '开始计时',
     tapWordToMark: '点击任意单词标记你读到的位置',
     doneReading: '读完了',
@@ -704,7 +700,6 @@ export const UI_LABELS = {
     amazonBannerTitle: '想读纸质书？',
     amazonBannerText: '我们的分级读物也有Amazon纸质版。',
 
-    timedReads: '计时阅读',
     yourRecording: '你的录音',
     loadingAudio: '加载音频...',
     audioUnavailable: '音频不可用',
@@ -719,12 +714,14 @@ export const UI_LABELS = {
     due: '待复习',
 
     assignments: '作业',
+    assignmentCol: '书 / 章节',
+    noAssignments: '暂无作业。',
+    noAssignmentsHint: '老师布置的作业将显示在这里。',
     dueLabel: '截止',
     taskReadingPass: '完成一次阅读',
     taskFlashcards: '为生词创建单词卡',
     taskRecordAudio: '录制一次朗读',
     taskShadowReading: '跟读练习',
-    taskTimedReading: '完成一次计时阅读',
 
     bookNotFound: '未找到该书。',
     backToLibrary: '返回书库',
@@ -740,7 +737,6 @@ export const UI_LABELS = {
     listenRead: '聞いて読む',
     translate: '翻訳',
     shadowRead: 'シャドーリーディング',
-    timedRead: '時間計測読書',
     record: '録音',
 
     navLibrary: 'ライブラリ',
@@ -889,7 +885,6 @@ export const UI_LABELS = {
     keepUnder15: '15語以内にしてください。',
     mustInclude: '次の語を含める必要があります',
 
-    timedReadInstruction: '自然なペースで読んでください。ボタンをタップすると計測が始まります。読み終わった位置の単語をタップしてください。',
     startTheClock: '計測開始',
     tapWordToMark: '読み終わった位置の単語をタップ',
     doneReading: '読み終わりました',
@@ -928,7 +923,6 @@ export const UI_LABELS = {
     amazonBannerTitle: '紙の本で読みたいですか？',
     amazonBannerText: 'グレーデッド・リーダーはAmazonで紙版も購入できます。',
 
-    timedReads: '時間計測読書',
     yourRecording: 'あなたの録音',
     loadingAudio: '音声を読み込み中...',
     audioUnavailable: '音声が利用できません',
@@ -943,12 +937,14 @@ export const UI_LABELS = {
     due: '復習予定',
 
     assignments: '課題',
+    assignmentCol: '本 / 章',
+    noAssignments: 'まだ課題がありません。',
+    noAssignmentsHint: '先生からの課題がここに表示されます。',
     dueLabel: '期限',
     taskReadingPass: '1回読み通す',
     taskFlashcards: '新出単語のカードを作る',
     taskRecordAudio: '音読を録音する',
     taskShadowReading: 'シャドーリーディングの練習',
-    taskTimedReading: '時間計測読書を行う',
 
     bookNotFound: '本が見つかりません。',
     backToLibrary: 'ライブラリに戻る',
@@ -964,7 +960,6 @@ export const UI_LABELS = {
     listenRead: '듣고 읽기',
     translate: '번역',
     shadowRead: '따라 읽기',
-    timedRead: '시간 측정 읽기',
     record: '녹음',
 
     navLibrary: '도서관',
@@ -1113,7 +1108,6 @@ export const UI_LABELS = {
     keepUnder15: '15단어 이하로 해주세요.',
     mustInclude: '포함해야 합니다',
 
-    timedReadInstruction: '자연스러운 속도로 읽으세요. 버튼을 탭하면 시간이 시작됩니다. 멈춘 곳의 단어를 탭하세요.',
     startTheClock: '시간 측정 시작',
     tapWordToMark: '멈춘 곳의 단어를 탭하세요',
     doneReading: '읽기 완료',
@@ -1152,7 +1146,6 @@ export const UI_LABELS = {
     amazonBannerTitle: '종이책으로 읽고 싶으세요?',
     amazonBannerText: '그레이디드 리더는 Amazon에서 인쇄본으로도 구매할 수 있습니다.',
 
-    timedReads: '시간 측정 읽기',
     yourRecording: '내 녹음',
     loadingAudio: '오디오 로딩 중...',
     audioUnavailable: '오디오를 사용할 수 없습니다',
@@ -1167,12 +1160,14 @@ export const UI_LABELS = {
     due: '복습 예정',
 
     assignments: '과제',
+    assignmentCol: '책 / 챕터',
+    noAssignments: '아직 과제가 없습니다.',
+    noAssignmentsHint: '선생님이 내준 과제가 여기에 표시됩니다.',
     dueLabel: '마감',
     taskReadingPass: '읽기 1회 완료',
     taskFlashcards: '새 단어 카드 만들기',
     taskRecordAudio: '소리 내어 읽기 녹음',
     taskShadowReading: '따라 읽기 연습',
-    taskTimedReading: '시간 측정 읽기 완료',
 
     bookNotFound: '책을 찾을 수 없습니다.',
     backToLibrary: '도서관으로 돌아가기',

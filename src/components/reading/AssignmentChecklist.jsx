@@ -9,7 +9,6 @@ const TASK_LABEL_KEYS = {
   flashcards: 'taskFlashcards',
   recordAudio: 'taskRecordAudio',
   shadowReading: 'taskShadowReading',
-  timedReading: 'taskTimedReading',
 };
 
 export default function AssignmentChecklist({ textId, refreshKey, onSelectText }) {

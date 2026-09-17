@@ -16,15 +16,15 @@ export default function useLibraryProgress(userId) {
     setLoading(true);
 
     Promise.all([
-      supabase.from('fluency_sessions').select('text_id').eq('user_id', userId),
       supabase.from('student_recordings').select('text_id').eq('user_id', userId),
       supabase.from('srs_cards').select('text_id').eq('user_id', userId),
-    ]).then(([fluencyRes, recordingRes, srsRes]) => {
+      supabase.from('pronunciation_assessments').select('text_id').eq('user_id', userId),
+    ]).then(([recordingRes, srsRes, assessRes]) => {
       if (cancelled) return;
       const ids = new Set();
-      for (const r of fluencyRes.data || []) if (r.text_id) ids.add(r.text_id);
       for (const r of recordingRes.data || []) if (r.text_id) ids.add(r.text_id);
       for (const r of srsRes.data || []) if (r.text_id) ids.add(r.text_id);
+      for (const r of assessRes.data || []) if (r.text_id) ids.add(r.text_id);
       setActiveTextIds(ids);
       setLoading(false);
     }).catch(() => {

@@ -63,13 +63,6 @@ export async function resetChapterRecording(userId, textId) {
   }
 }
 
-export async function resetChapterWpm(userId, textId) {
-  await Promise.all([
-    clearStore('fluencySessions', (item) => item.textId === textId),
-    supabase.from('fluency_sessions').delete().eq('user_id', userId).eq('text_id', textId),
-  ]);
-}
-
 export async function resetAllProgress(userId) {
   await Promise.all([
     clearEntireStore('encounters'),

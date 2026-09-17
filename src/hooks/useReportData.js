@@ -81,17 +81,18 @@ export default function useReportData({
     return map;
   }, [filteredAssignments]);
 
+  const assignedBookIds = useMemo(() => {
+    const ids = new Set();
+    for (const textId of assignedTextIds) {
+      const bookId = textBookMap[textId];
+      if (bookId) ids.add(bookId);
+    }
+    return ids;
+  }, [assignedTextIds, textBookMap]);
+
   const rosterRows = useMemo(() => {
     return students.map(student => {
       const sid = student.id;
-
-      const studentFluency = fluencySessions.filter(
-        f => f.user_id === sid && assignedTextIds.has(f.text_id)
-      );
-      const latestWpmByText = mostRecentByTextId(studentFluency, 'session_date');
-      const wpmValues = sortByChapterOrder(latestWpmByText, allTexts).map(f => f.wpm);
-      const wpmDelta = wpmValues.length >= 2 ? wpmValues[wpmValues.length - 1] - wpmValues[0] : 0;
-      const avgWpm = wpmValues.length > 0 ? Math.round(wpmValues.reduce((a, b) => a + b, 0) / wpmValues.length) : null;
 
       const studentAssessments = pronunciationAssessments.filter(
         a => a.user_id === sid && assignedTextIds.has(a.text_id)
@@ -99,6 +100,21 @@ export default function useReportData({
       const latestAccByText = mostRecentByTextId(studentAssessments, 'processed_at');
       const accuracyValues = sortByChapterOrder(latestAccByText, allTexts).map(a => Math.round(a.overall_accuracy));
       const avgAccuracy = accuracyValues.length > 0 ? Math.round(accuracyValues.reduce((a, b) => a + b, 0) / accuracyValues.length) : null;
+
+      const wpmByText = {};
+      for (const a of latestAccByText) {
+        if (a.wpm != null) wpmByText[a.text_id] = a.wpm;
+      }
+      const studentFluency = fluencySessions.filter(
+        f => f.user_id === sid && assignedTextIds.has(f.text_id)
+      );
+      for (const f of studentFluency) {
+        if (!(f.text_id in wpmByText) && f.wpm != null) wpmByText[f.text_id] = f.wpm;
+      }
+      const wpmEntries = Object.entries(wpmByText).map(([text_id, wpm]) => ({ text_id, wpm }));
+      const wpmValues = sortByChapterOrder(wpmEntries, allTexts).map(e => e.wpm);
+      const wpmDelta = wpmValues.length >= 2 ? wpmValues[wpmValues.length - 1] - wpmValues[0] : 0;
+      const avgWpm = wpmValues.length > 0 ? Math.round(wpmValues.reduce((a, b) => a + b, 0) / wpmValues.length) : null;
 
       const studentPhonemes = phonemeSessions.filter(
         ps => ps.user_id === sid && assignedTextIds.has(ps.text_id)
@@ -142,10 +158,11 @@ export default function useReportData({
         return taskKeys.every(k => p.completed[k]);
       }).length;
 
-      const totalBooks = Object.keys(bookChapters).length;
-      const completedBooks = Object.keys(bookChapters).filter(bookId => {
-        const chapters = bookChapters[bookId];
-        return chapters.every(ch => {
+      const assignedBookList = Object.keys(bookChapters).filter(id => assignedBookIds.has(id));
+      const totalBooks = assignedBookList.length;
+      const completedBooks = assignedBookList.filter(bookId => {
+        const chapters = bookChapters[bookId].filter(ch => assignedTextIds.has(ch.id));
+        return chapters.length > 0 && chapters.every(ch => {
           const hasSession = studentFluency.some(f => f.text_id === ch.id) ||
             studentAssessments.some(a => a.text_id === ch.id) ||
             studentExercises.some(er => er.text_id === ch.id);
@@ -174,7 +191,7 @@ export default function useReportData({
         exerciseValues,
       };
     });
-  }, [students, filteredAssignments, assignedTextIds, assignmentDateByText, fluencySessions, pronunciationAssessments, phonemeSessions, srsCards, exerciseResults, progress, allTexts, bookChapters]);
+  }, [students, filteredAssignments, assignedTextIds, assignedBookIds, assignmentDateByText, fluencySessions, pronunciationAssessments, phonemeSessions, srsCards, exerciseResults, progress, allTexts, bookChapters]);
 
   const getStudentReport = useCallback((studentId) => {
     const student = students.find(s => s.id === studentId);
@@ -202,31 +219,24 @@ export default function useReportData({
     );
     const globalWeak = computeWeakPhonemes(allStudentPhonemes);
 
-    const totalBooks = Object.keys(bookChapters).length;
-    const completedBookCount = Object.keys(bookChapters).filter(bookId => {
-      const chapters = bookChapters[bookId];
-      return chapters.every(ch => {
-        const fl = fluencySessions.some(f => f.user_id === sid && f.text_id === ch.id && assignedTextIds.has(ch.id));
-        const pa = pronunciationAssessments.some(a => a.user_id === sid && a.text_id === ch.id && assignedTextIds.has(ch.id));
-        const ex = (exerciseResults || []).some(er => er.user_id === sid && er.text_id === ch.id && assignedTextIds.has(ch.id));
+    const assignedBookList = Object.keys(bookChapters).filter(id => assignedBookIds.has(id));
+    const totalBooks = assignedBookList.length;
+    const completedBookCount = assignedBookList.filter(bookId => {
+      const chapters = bookChapters[bookId].filter(ch => assignedTextIds.has(ch.id));
+      return chapters.length > 0 && chapters.every(ch => {
+        const fl = fluencySessions.some(f => f.user_id === sid && f.text_id === ch.id);
+        const pa = pronunciationAssessments.some(a => a.user_id === sid && a.text_id === ch.id);
+        const ex = (exerciseResults || []).some(er => er.user_id === sid && er.text_id === ch.id);
         return fl || pa || ex;
       });
     }).length;
 
-    const bookReports = Object.keys(bookChapters)
+    const bookReports = assignedBookList
       .filter(bookId => bookMap[bookId])
       .map(bookId => {
         const chapters = bookChapters[bookId];
         const chapterTextIds = new Set(chapters.map(ch => ch.id));
         const assignedChapterIds = chapters.filter(ch => assignedTextIds.has(ch.id));
-
-        const chapterFluency = fluencySessions.filter(
-          f => f.user_id === sid && chapterTextIds.has(f.text_id) && assignedTextIds.has(f.text_id)
-        );
-        const latestWpm = mostRecentByTextId(chapterFluency, 'session_date');
-        const wpmSorted = sortByChapterOrder(latestWpm, allTexts);
-        const wpmValues = wpmSorted.map(f => f.wpm);
-        const wpmLabels = wpmSorted.map(f => chapterLabel(f.text_id, chapters));
 
         const chapterAssessments = pronunciationAssessments.filter(
           a => a.user_id === sid && chapterTextIds.has(a.text_id) && assignedTextIds.has(a.text_id)
@@ -235,6 +245,21 @@ export default function useReportData({
         const accSorted = sortByChapterOrder(latestAcc, allTexts);
         const accValues = accSorted.map(a => Math.round(a.overall_accuracy));
         const accLabels = accSorted.map(a => chapterLabel(a.text_id, chapters));
+
+        const bookWpmByText = {};
+        for (const a of latestAcc) {
+          if (a.wpm != null) bookWpmByText[a.text_id] = a.wpm;
+        }
+        const chapterFluency = fluencySessions.filter(
+          f => f.user_id === sid && chapterTextIds.has(f.text_id) && assignedTextIds.has(f.text_id)
+        );
+        for (const f of chapterFluency) {
+          if (!(f.text_id in bookWpmByText) && f.wpm != null) bookWpmByText[f.text_id] = f.wpm;
+        }
+        const wpmEntries = Object.entries(bookWpmByText).map(([text_id, wpm]) => ({ text_id, wpm }));
+        const wpmSorted = sortByChapterOrder(wpmEntries, allTexts);
+        const wpmValues = wpmSorted.map(e => e.wpm);
+        const wpmLabels = wpmSorted.map(e => chapterLabel(e.text_id, chapters));
 
         const fluencyValues = accSorted.map(a => a.azure_fluency_score != null ? Math.round(a.azure_fluency_score) : null).filter(v => v != null);
         const fluencyLabels = accSorted.filter(a => a.azure_fluency_score != null).map(a => chapterLabel(a.text_id, chapters));
@@ -322,7 +347,7 @@ export default function useReportData({
       },
       books: bookReports,
     };
-  }, [students, srsCards, phonemeSessions, fluencySessions, pronunciationAssessments, exerciseResults, assignedTextIds, bookChapters, bookMap, allTexts]);
+  }, [students, srsCards, phonemeSessions, fluencySessions, pronunciationAssessments, exerciseResults, assignedTextIds, assignedBookIds, bookChapters, bookMap, allTexts]);
 
   const getChapterDetail = useCallback((studentId, textId) => {
     const student = students.find(s => s.id === studentId);
@@ -333,15 +358,16 @@ export default function useReportData({
 
     const sid = studentId;
 
-    const chapterFluency = fluencySessions
-      .filter(f => f.user_id === sid && f.text_id === textId)
-      .sort((a, b) => (a.session_date || '').localeCompare(b.session_date || ''));
-    const latestFluency = chapterFluency.length > 0 ? chapterFluency[chapterFluency.length - 1] : null;
-
     const chapterAssessment = pronunciationAssessments
       .filter(a => a.user_id === sid && a.text_id === textId)
       .sort((a, b) => (a.processed_at || '').localeCompare(b.processed_at || ''));
     const latestAssessment = chapterAssessment.length > 0 ? chapterAssessment[chapterAssessment.length - 1] : null;
+
+    const chapterFluency = fluencySessions
+      .filter(f => f.user_id === sid && f.text_id === textId)
+      .sort((a, b) => (a.session_date || '').localeCompare(b.session_date || ''));
+    const latestFluency = chapterFluency.length > 0 ? chapterFluency[chapterFluency.length - 1] : null;
+    const latestWpm = latestAssessment?.wpm ?? latestFluency?.wpm ?? null;
 
     const chapterPhonemes = phonemeSessions.filter(
       ps => ps.user_id === sid && ps.text_id === textId
@@ -373,18 +399,11 @@ export default function useReportData({
       textId,
       chapterTitle: text.title || `Chapter ${(text.chapter_order ?? 0) + 1}`,
       bookId: text.book_id,
-      fluency: latestFluency ? {
-        wpm: latestFluency.wpm,
-        date: latestFluency.session_date,
-        duration: latestFluency.duration_seconds,
-        wordsRead: latestFluency.words_read,
-        mode: latestFluency.session_mode,
+      fluency: latestWpm != null ? {
+        wpm: latestWpm,
+        date: latestAssessment?.processed_at || latestFluency?.session_date,
+        wordsRead: latestAssessment?.words_read || latestFluency?.words_read,
       } : null,
-      fluencyHistory: chapterFluency.map(f => ({
-        wpm: f.wpm,
-        date: f.session_date,
-        duration: f.duration_seconds,
-      })),
       assessment: latestAssessment ? {
         accuracy: latestAssessment.overall_accuracy,
         fluency: latestAssessment.azure_fluency_score,
@@ -420,7 +439,7 @@ export default function useReportData({
     };
   }, [students, allTexts, fluencySessions, pronunciationAssessments, phonemeSessions, exerciseResults, srsCards]);
 
-  return { rosterRows, getStudentReport, getChapterDetail };
+  return { rosterRows, getStudentReport, getChapterDetail, assignedBookIds };
 }
 
 function mostRecentByTextId(sessions, dateField) {

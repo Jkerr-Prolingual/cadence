@@ -7,7 +7,6 @@ import { getConfusionDisplay } from '../../data/confusionPairs';
 import PhonemeHistogram from './PhonemeHistogram';
 import PhonemeGrowthTable from './PhonemeGrowthTable';
 import LeitnerMiniBar from './LeitnerMiniBar';
-import Sparkline from './Sparkline';
 import { PRONUNCIATION_DISCLAIMER } from './PronunciationDisclaimer';
 
 const BOX_LABELS = ['Box 1', 'Box 2', 'Box 3', 'Box 4', 'Box 5'];
@@ -70,11 +69,11 @@ export default function ChapterReportDetail({ detail, studentRecordings }) {
 }
 
 function FluencySection({ detail }) {
-  const { fluency, fluencyHistory } = detail;
+  const { fluency } = detail;
 
   return (
     <div className="border border-gray-200 rounded-lg p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Timed Read</h3>
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">Reading Speed</h3>
       {fluency ? (
         <div className="space-y-3">
           <div className="flex items-center gap-6">
@@ -85,31 +84,13 @@ function FluencySection({ detail }) {
             {fluency.wordsRead && (
               <Metric label="Words" value={fluency.wordsRead} />
             )}
-            {fluency.duration && (
-              <Metric label="Duration" value={`${Math.round(fluency.duration)}s`} />
-            )}
           </div>
           <p className="text-xs text-gray-400">
             Latest: {formatRelativeDate(fluency.date)}
-            {fluency.mode && <span> · {fluency.mode}</span>}
           </p>
-          {fluencyHistory.length > 1 && (
-            <div className="flex items-center gap-2">
-              <Sparkline
-                values={fluencyHistory.map(f => f.wpm)}
-                width={100}
-                height={24}
-                color="#475569"
-                showValue={false}
-              />
-              <span className="text-xs text-gray-400">
-                {fluencyHistory.length} session{fluencyHistory.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-          )}
         </div>
       ) : (
-        <span className="text-xs text-gray-300">No timed read data</span>
+        <span className="text-xs text-gray-300">No reading speed data</span>
       )}
     </div>
   );

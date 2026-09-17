@@ -8,17 +8,15 @@ import ToolSetSelector from './ToolSetSelector';
 import ListenReadStrip from './ListenReadStrip';
 import ShadowReadStrip from './ShadowReadStrip';
 import RecordReviewStrip from './RecordReviewStrip';
-import TimedReadStrip from './TimedReadStrip';
-import AssignmentChecklist from './AssignmentChecklist';
+import AssignmentsDashboard from './AssignmentsDashboard';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
 import useAudioPreFlight from '../../hooks/useAudioPreFlight';
 import { supabase } from '../../lib/supabase';
 import { cleanToken } from '../../lib/wordUtils';
 import { findCurrentWord, findCurrentSentence, detectSentences, findSentenceForWord } from '../../lib/audioUtils';
-import { completeTaskForText } from '../../lib/assignments';
-import { logFluencySession, getFluencySessionsForText } from '../../lib/fluency';
-import { runPronunciationAssessment, buildWordAssessmentMap, assessSentencePronunciation, getWordPositions, extractChunkText, runFluencyAssessment, getPhonemeSessionsForText, buildPhonemeWordExamples, displayScore } from '../../lib/pronunciation';
-import { resetChapterRecording, resetChapterWpm } from '../../lib/resetProgress';
+import { completeTaskForText, getAssignments, getProgress } from '../../lib/assignments';
+import { buildWordAssessmentMap, assessSentencePronunciation, getWordPositions, extractChunkText, runRecordingAssessment, getPhonemeSessionsForText, buildPhonemeWordExamples, displayScore } from '../../lib/pronunciation';
+import { resetChapterRecording } from '../../lib/resetProgress';
 import PhonemeSummaryReport from './PhonemeSummaryReport';
 import { getUILabel } from '../../lib/locales';
 import { useAuth } from '../../context/AuthContext';
@@ -29,7 +27,15 @@ export default function ReadingView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [curatedTexts, setCuratedTexts] = useState([]);
 
-  const [selectedTextId, setSelectedTextId] = useState(null);
+  const [selectedTextId, _setSelectedTextId] = useState(() => searchParams.get('text'));
+  const setSelectedTextId = useCallback((id) => {
+    _setSelectedTextId(id);
+    if (id) {
+      setSearchParams({ text: id }, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  }, [setSearchParams]);
 
   const allTexts = useMemo(() => {
     const curated = curatedTexts.map(t => ({
@@ -74,8 +80,37 @@ export default function ReadingView() {
   const selectedTextIdRef = useRef(selectedTextId);
   selectedTextIdRef.current = selectedTextId;
 
+  // Student enrollment + pending assignment count
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [pendingAssignmentCount, setPendingAssignmentCount] = useState(0);
+
   // Tool set state — resets on text change
   const [toolSet, setToolSet] = useState('listen');
+
+  useEffect(() => {
+    if (!user?.id || isTeacher) return;
+    (async () => {
+      const { data: enrollments } = await supabase
+        .from('class_enrollments')
+        .select('class_id')
+        .eq('student_id', user.id);
+      const classIds = (enrollments || []).map(e => e.class_id);
+      if (classIds.length === 0) { setIsEnrolled(false); setPendingAssignmentCount(0); return; }
+      setIsEnrolled(true);
+      const [assigns, prog] = await Promise.all([
+        getAssignments(classIds),
+        getProgress(user.id),
+      ]);
+      const pending = assigns.filter(a => {
+        if (a.archivedAt) return false;
+        const p = prog.find(pr => pr.assignmentId === a.id);
+        const tasks = Object.entries(a.tasks).filter(([, v]) => v);
+        if (tasks.length === 0) return true;
+        return !tasks.every(([key]) => p?.completed?.[key]);
+      });
+      setPendingAssignmentCount(pending.length);
+    })();
+  }, [user?.id, isTeacher, checklistKey]);
 
   const scrollContainerRef = useRef(null);
   const audioRef = useRef(null);
@@ -121,22 +156,11 @@ export default function ReadingView() {
   const [shadowFeedbackMap, setShadowFeedbackMap] = useState(new Map());
   const [shadowFeedbackLoading, setShadowFeedbackLoading] = useState(false);
 
-  // Fluency assessment (time-based recording + phoneme analysis)
-  const [fluencyDuration, setFluencyDuration] = useState(null);
-  const [fluencyCountdown, setFluencyCountdown] = useState(null);
-  const [fluencyProgress, setFluencyProgress] = useState(null);
+  // Recording analysis
+  const [analysisProgress, setAnalysisProgress] = useState(null);
   const [phonemeSession, setPhonemeSession] = useState(null);
   const [phonemeHistory, setPhonemeHistory] = useState([]);
   const [showPhonemeReport, setShowPhonemeReport] = useState(false);
-  const fluencyTimerRef = useRef(null);
-
-  // Timed reading
-  const [timedMode, setTimedMode] = useState('idle');
-  const [timedStart, setTimedStart] = useState(null);
-  const [timedElapsed, setTimedElapsed] = useState(0);
-  const [timedResult, setTimedResult] = useState(null);
-  const [wpmHistory, setWpmHistory] = useState([]);
-  const timedIntervalRef = useRef(null);
 
   const selectedText = allTexts.find((t) => t.id === selectedTextId);
   const hasAudio = !!(selectedText?.audioUrl && selectedText?.audioTimestamps);
@@ -167,11 +191,6 @@ export default function ReadingView() {
       setRecordingMode('idle');
       if (elapsedTimerRef.current) { clearInterval(elapsedTimerRef.current); elapsedTimerRef.current = null; }
     }
-    if (timedIntervalRef.current) { clearInterval(timedIntervalRef.current); timedIntervalRef.current = null; }
-    setTimedMode('idle');
-    setTimedStart(null);
-    setTimedElapsed(0);
-    setTimedResult(null);
     setAssessmentStatus(null);
     setAssessmentError(null);
     setAssessmentData(null);
@@ -179,12 +198,9 @@ export default function ReadingView() {
     setHasRecording(false);
     setShadowFeedbackMap(new Map());
     setShadowFeedbackLoading(false);
-    setFluencyDuration(null);
-    setFluencyCountdown(null);
-    setFluencyProgress(null);
+    setAnalysisProgress(null);
     setPhonemeSession(null);
     setShowPhonemeReport(false);
-    if (fluencyTimerRef.current) { clearInterval(fluencyTimerRef.current); fluencyTimerRef.current = null; }
   }, [selectedTextId]);
 
   // Load existing assessment + recording state when text changes
@@ -268,12 +284,6 @@ export default function ReadingView() {
       setRecordingMode('idle');
       if (elapsedTimerRef.current) { clearInterval(elapsedTimerRef.current); elapsedTimerRef.current = null; }
     }
-    if (timedMode !== 'idle' && timedMode !== 'result') {
-      if (timedIntervalRef.current) { clearInterval(timedIntervalRef.current); timedIntervalRef.current = null; }
-      setTimedMode('idle');
-      setTimedStart(null);
-      setTimedElapsed(0);
-    }
   }, [toolSet]);
 
   useEffect(() => {
@@ -304,13 +314,9 @@ export default function ReadingView() {
   // }, [recorder.activeStream, recordingMode]);
 
   useEffect(() => {
-    const requestedId = searchParams.get('text');
-    if (requestedId && allTexts.find(t => t.id === requestedId)) {
-      setSelectedTextId(requestedId);
-      setSearchParams({}, { replace: true });
-    } else if (!selectedTextId && allTexts.length > 0) {
-      setSelectedTextId(allTexts[0].id);
-    }
+    if (!allTexts.length) return;
+    if (selectedTextId && allTexts.find(t => t.id === selectedTextId)) return;
+    navigate('/', { replace: true });
   }, [allTexts]);
 
   useEffect(() => {
@@ -318,7 +324,6 @@ export default function ReadingView() {
     loadEncounters();
     return () => {
       if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
-      if (timedIntervalRef.current) clearInterval(timedIntervalRef.current);
     };
   }, []);
 
@@ -391,29 +396,6 @@ export default function ReadingView() {
     if (!bookManifest?.entries) return false;
     return Object.values(bookManifest.entries).some(e => e.type === 'structure');
   }, [bookManifest]);
-
-  // Timed reading: tick every second while active
-  useEffect(() => {
-    if (timedMode === 'active' && timedStart) {
-      timedIntervalRef.current = setInterval(() => {
-        setTimedElapsed(Math.floor((Date.now() - timedStart) / 1000));
-      }, 1000);
-    } else {
-      if (timedIntervalRef.current) { clearInterval(timedIntervalRef.current); timedIntervalRef.current = null; }
-    }
-    return () => { if (timedIntervalRef.current) clearInterval(timedIntervalRef.current); };
-  }, [timedMode, timedStart]);
-
-  // Load WPM history when text changes
-  useEffect(() => {
-    if (selectedTextId) {
-      getFluencySessionsForText(selectedTextId).then(sessions => {
-        setWpmHistory(sessions.map(s => s.wpm));
-      });
-    } else {
-      setWpmHistory([]);
-    }
-  }, [selectedTextId]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = playbackRate;
@@ -662,10 +644,6 @@ export default function ReadingView() {
   }
 
   function handleStopRecording() {
-    if (fluencyDuration != null) {
-      handleStopFluencyRecording();
-      return;
-    }
     recorder.stopRecording();
     if (elapsedTimerRef.current) { clearInterval(elapsedTimerRef.current); elapsedTimerRef.current = null; }
     setRecordingMode('review');
@@ -732,209 +710,69 @@ export default function ReadingView() {
     setWordAssessmentMap(null);
   }
 
-  async function handleAnalyzePronunciation() {
-    if (!user?.id || !selectedText?.body) return;
-    const textId = selectedTextIdRef.current;
-    setAssessmentStatus('processing');
-    setAssessmentError(null);
-
-    const { data: rec } = await supabase
-      .from('student_recordings')
-      .select('storage_path')
-      .eq('user_id', user.id)
-      .eq('text_id', textId)
-      .single();
-    if (!rec) {
-      setAssessmentStatus('error');
-      setAssessmentError('No recording found');
-      return;
-    }
-
-    const { data: blob } = await supabase.storage
-      .from('student-recordings')
-      .download(rec.storage_path);
-    if (!blob) {
-      setAssessmentStatus('error');
-      setAssessmentError('Could not download recording');
-      return;
-    }
-
-    const result = await runPronunciationAssessment({
-      userId: user.id,
-      textId,
-      storagePath: rec.storage_path,
-      referenceText: selectedText.body,
-      audioBlob: blob,
-      supabase,
-    });
-
-    if (result.success) {
-      setAssessmentData(result.assessmentData);
-      setWordAssessmentMap(buildWordAssessmentMap(result.assessmentData, sentences));
-      setAssessmentStatus('complete');
-      setAssessmentError(null);
-    } else {
-      setAssessmentStatus('error');
-      setAssessmentError(result.error);
-    }
-  }
-
-  function handleDiscardRecording() {
-    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; setPlaybackPlaying(false); }
-    recorder.clearRecording();
-    setRecordingMode('idle');
-    setSaveError(null);
-  }
-
-  // ── Fluency assessment (time-based recording) ──────────────────────────────────
-
-  function handleSelectDuration(seconds) {
-    if (seconds === null) {
-      setFluencyDuration(null);
-      setFluencyCountdown(null);
-      setAssessmentStatus(null);
-      setAssessmentData(null);
-      setWordAssessmentMap(null);
-      setPhonemeSession(null);
-      setFluencyProgress(null);
-      return;
-    }
-    setFluencyDuration(seconds);
-    setFluencyCountdown(seconds);
-    handleStartFluencyRecording(seconds);
-  }
-
-  async function handleStartFluencyRecording(durationSec) {
-    if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false); }
-    setSaveError(null);
-    setAssessmentStatus(null);
-    setAssessmentError(null);
-    setAssessmentData(null);
-    setWordAssessmentMap(null);
-    setFluencyProgress(null);
-
-    await recorder.startRecording();
-    setRecordingMode('recording');
-
-    let remaining = durationSec;
-    setFluencyCountdown(remaining);
-
-    fluencyTimerRef.current = setInterval(() => {
-      remaining -= 1;
-      setFluencyCountdown(remaining);
-      if (remaining <= 0) {
-        clearInterval(fluencyTimerRef.current);
-        fluencyTimerRef.current = null;
-        recorder.stopRecording();
-        setRecordingMode('idle');
-      }
-    }, 1000);
-  }
-
-  function handleStopFluencyRecording() {
-    if (fluencyTimerRef.current) { clearInterval(fluencyTimerRef.current); fluencyTimerRef.current = null; }
-    recorder.stopRecording();
-    setRecordingMode('idle');
-  }
-
-  async function handleSaveFluencyOnly() {
-    if (!user?.id || !recorder.audioBlob) return;
-    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; setPlaybackPlaying(false); }
-    const textId = selectedTextIdRef.current;
-    const storagePath = `${user.id}/${textId}.webm`;
-
-    try {
-      await supabase.storage
-        .from('student-recordings')
-        .upload(storagePath, recorder.audioBlob, { contentType: 'audio/webm', upsert: true });
-
-      await supabase
-        .from('student_recordings')
-        .upsert({
-          user_id: user.id,
-          text_id: textId,
-          storage_path: storagePath,
-          duration_seconds: fluencyDuration,
-          playback_rate: 1.0,
-        }, { onConflict: 'user_id,text_id' });
-
-      setHasRecording(true);
-    } catch (err) {
-      setSaveError(err.message);
-    }
-  }
-
-  function handleListenBackFluency() {
-    if (!recorder.audioBlob) return;
-    if (playbackRef.current) {
-      playbackRef.current.pause();
-      const src = playbackRef.current.src;
-      playbackRef.current = null;
-      setPlaybackPlaying(false);
-      if (src) URL.revokeObjectURL(src);
-      return;
-    }
-    const url = URL.createObjectURL(recorder.audioBlob);
-    const audio = new Audio(url);
-    audio.onended = () => { URL.revokeObjectURL(url); playbackRef.current = null; setPlaybackPlaying(false); };
-    playbackRef.current = audio;
-    setPlaybackPlaying(true);
-    audio.play().catch(() => { setPlaybackPlaying(false); });
-  }
-
-  function handleDiscardFluency() {
-    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; setPlaybackPlaying(false); }
-    recorder.clearRecording();
-    setRecordingMode('idle');
-    setFluencyDuration(null);
-    setFluencyCountdown(null);
-  }
-
-  async function handleFluencyAnalysis() {
+  async function handleAnalyze(audioBlob) {
     if (!user?.id || !selectedText?.body) return;
     const textId = selectedTextIdRef.current;
 
     setRecordingMode('idle');
     setAssessmentStatus('processing');
-    setFluencyProgress(0);
+    setAssessmentError(null);
+    setAnalysisProgress(0);
 
     await new Promise(r => setTimeout(r, 100));
 
-    const audioBlob = recorder.audioBlob;
-    if (!audioBlob) {
-      setAssessmentStatus('error');
-      setAssessmentError('No recording captured');
-      return;
+    let blob = audioBlob || null;
+    let storagePath;
+
+    if (blob) {
+      storagePath = `${user.id}/${textId}.webm`;
+      try {
+        await supabase.storage
+          .from('student-recordings')
+          .upload(storagePath, blob, { contentType: 'audio/webm', upsert: true });
+
+        await supabase
+          .from('student_recordings')
+          .upsert({
+            user_id: user.id,
+            text_id: textId,
+            storage_path: storagePath,
+            duration_seconds: recordingElapsed,
+            playback_rate: 1.0,
+          }, { onConflict: 'user_id,text_id' });
+
+        setHasRecording(true);
+      } catch (err) {
+        setAssessmentStatus('error');
+        setAssessmentError(err.message);
+        return;
+      }
+    } else {
+      const { data: rec } = await supabase
+        .from('student_recordings')
+        .select('storage_path')
+        .eq('user_id', user.id)
+        .eq('text_id', textId)
+        .single();
+      if (!rec) { setAssessmentStatus('error'); setAssessmentError('No recording found'); return; }
+      storagePath = rec.storage_path;
+
+      const { data: downloaded } = await supabase.storage
+        .from('student-recordings')
+        .download(storagePath);
+      if (!downloaded) { setAssessmentStatus('error'); setAssessmentError('Could not download recording'); return; }
+      blob = downloaded;
     }
 
-    const storagePath = `${user.id}/${textId}.webm`;
-
     try {
-      await supabase.storage
-        .from('student-recordings')
-        .upload(storagePath, audioBlob, { contentType: 'audio/webm', upsert: true });
-
-      await supabase
-        .from('student_recordings')
-        .upsert({
-          user_id: user.id,
-          text_id: textId,
-          storage_path: storagePath,
-          duration_seconds: fluencyDuration,
-          playback_rate: 1.0,
-        }, { onConflict: 'user_id,text_id' });
-
-      setHasRecording(true);
-
-      const result = await runFluencyAssessment({
+      const result = await runRecordingAssessment({
         userId: user.id,
         textId,
         fullText: selectedText.body,
-        audioBlob,
+        audioBlob: blob,
         storagePath,
         supabase,
-        durationSeconds: fluencyDuration,
-        onProgress: (p) => setFluencyProgress(p),
+        onProgress: (p) => setAnalysisProgress(p),
       });
 
       if (result.success) {
@@ -947,12 +785,13 @@ export default function ReadingView() {
           const sessions = await getPhonemeSessionsForText(supabase, user.id, textId);
           setPhonemeHistory(sessions);
         }
-        setFluencyProgress(1);
+        setAnalysisProgress(1);
+        await completeTaskForText(user.id, textId, 'recordAudio').catch(() => {});
+        setChecklistKey(k => k + 1);
       } else {
         setAssessmentStatus('error');
         setAssessmentError(result.error);
       }
-
     } catch (err) {
       setAssessmentStatus('error');
       setAssessmentError(err.message);
@@ -960,6 +799,14 @@ export default function ReadingView() {
 
     recorder.clearRecording();
   }
+
+  function handleDiscardRecording() {
+    if (playbackRef.current) { playbackRef.current.pause(); playbackRef.current = null; setPlaybackPlaying(false); }
+    recorder.clearRecording();
+    setRecordingMode('idle');
+    setSaveError(null);
+  }
+
 
   // ── Sentence-loop ephemeral recording (Shadow Read) ───────────────────────────
 
@@ -1047,63 +894,6 @@ export default function ReadingView() {
     });
   }
 
-  // ── Timed reading controls ────────────────────────────────────────────────────
-
-  function countWords(text) {
-    return (text.match(/[a-zA-ZÀ-ÿ'''-]+/g) || []).length;
-  }
-
-  function handleTimedStart() {
-    if (audioRef.current && !audioRef.current.paused) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    }
-    setTimedStart(Date.now());
-    setTimedElapsed(0);
-    setTimedMode('active');
-  }
-
-  function handleTimedCancel() {
-    if (timedIntervalRef.current) { clearInterval(timedIntervalRef.current); timedIntervalRef.current = null; }
-    setTimedMode('idle');
-    setTimedStart(null);
-    setTimedElapsed(0);
-    setTimedResult(null);
-  }
-
-  function handleTimedDone(wordsReadOverride) {
-    const elapsed = Math.floor((Date.now() - timedStart) / 1000);
-    if (elapsed < 5) {
-      handleTimedCancel();
-      return;
-    }
-    const wordsRead = wordsReadOverride ?? countWords(selectedText?.body || '');
-    const wpm = elapsed > 0 ? Math.round((wordsRead / elapsed) * 60) : 0;
-    setTimedResult({ textId: selectedTextId, wordsRead, elapsed, wpm });
-    setTimedMode('result');
-  }
-
-  async function handleTimedSave() {
-    if (!timedResult) return;
-    await logFluencySession({
-      userId: user?.id,
-      textId: timedResult.textId,
-      wordCount: timedResult.wordsRead,
-      elapsedSeconds: timedResult.elapsed,
-    });
-    if (user?.id && timedResult.textId) {
-      await completeTaskForText(user.id, timedResult.textId, 'timedReading').catch(() => {});
-      setChecklistKey(k => k + 1);
-    }
-    const sessions = await getFluencySessionsForText(timedResult.textId);
-    setWpmHistory(sessions.map(s => s.wpm));
-    handleTimedCancel();
-  }
-
-  function handleTimedDiscard() {
-    handleTimedCancel();
-  }
-
   async function handleStartFresh() {
     if (!user?.id || !selectedTextId) return;
     await resetChapterRecording(user.id, selectedTextId);
@@ -1112,21 +902,13 @@ export default function ReadingView() {
     setAssessmentError(null);
     setAssessmentData(null);
     setWordAssessmentMap(null);
-  }
-
-  async function handleClearWpmHistory() {
-    if (!user?.id || !selectedTextId) return;
-    await resetChapterWpm(user.id, selectedTextId);
-    setWpmHistory([]);
+    setPhonemeSession(null);
+    setAnalysisProgress(null);
   }
 
   // ── Word click / popup ────────────────────────────────────────────────────────
 
   const handleWordClick = useCallback((token, position) => {
-    if (toolSet === 'timed' && timedMode === 'active') {
-      handleTimedDone(token.wordIdx + 1);
-      return;
-    }
     if (audioRef.current && !audioRef.current.paused && hasAudio) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -1135,7 +917,7 @@ export default function ReadingView() {
     navigatingRef.current = false;
     setPopup({ token, position, fromNav });
     recordEncounter(token);
-  }, [hasAudio, sentences, toolSet, timedMode]);
+  }, [hasAudio, sentences]);
 
   const handleNavigate = useCallback((direction) => {
     if (!popup) return;
@@ -1210,6 +992,8 @@ export default function ReadingView() {
   // ── Render control strip for active tool set ──────────────────────────────────
 
   function renderControlStrip() {
+    if (toolSet === 'assignments') return null;
+
     if (toolSet === 'listen' && hasAudio) {
       return (
         <ListenReadStrip
@@ -1281,18 +1065,10 @@ export default function ReadingView() {
           assessmentStatus={assessmentStatus}
           assessmentError={assessmentError}
           assessmentData={assessmentData}
-          onAnalyzePronunciation={handleAnalyzePronunciation}
+          onAnalyze={() => handleAnalyze(recorder.audioBlob)}
           onStartFresh={handleStartFresh}
-          fluencyDuration={fluencyDuration}
-          fluencyCountdown={fluencyCountdown}
-          fluencyProgress={fluencyProgress}
-          onSelectDuration={handleSelectDuration}
-          onSubmitFluency={handleFluencyAnalysis}
-          onDiscardFluency={handleDiscardFluency}
-          onSaveFluencyOnly={handleSaveFluencyOnly}
-          onListenBackFluency={handleListenBackFluency}
+          analysisProgress={analysisProgress}
           playbackPlaying={playbackPlaying}
-          hasFluencyBlob={!!(fluencyDuration && recorder.audioBlob && recordingMode === 'idle')}
           onShowPhonemeReport={() => setShowPhonemeReport(true)}
           phonemeSession={phonemeSession}
           preFlightStatus="idle"
@@ -1300,24 +1076,6 @@ export default function ReadingView() {
           preFlightLevel={0}
           onCalibrate={() => {}}
           onDismissPreFlight={() => {}}
-        />
-      );
-    }
-
-    if (toolSet === 'timed') {
-      return (
-        <TimedReadStrip
-          mode={timedMode}
-          elapsed={timedElapsed}
-          result={timedResult}
-          wpmHistory={wpmHistory}
-          onStart={handleTimedStart}
-          onCancel={handleTimedCancel}
-          onDone={() => handleTimedDone()}
-          onSave={handleTimedSave}
-          onDiscard={handleTimedDiscard}
-          onClearHistory={handleClearWpmHistory}
-          l1={l1}
         />
       );
     }
@@ -1342,14 +1100,28 @@ export default function ReadingView() {
         onSelect={(id) => { setSelectedTextId(id); setPopup(null); }}
       />
 
-      <AssignmentChecklist
-        textId={selectedTextId}
-        encounters={encounters}
-        refreshKey={checklistKey}
-        onSelectText={(id) => { setSelectedTextId(id); setPopup(null); }}
-      />
-
       <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
+        {toolSet === 'assignments' ? (
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+            <ToolSetSelector
+              active={toolSet}
+              onSelect={(id) => setToolSet(id)}
+              hasAudio={hasAudio}
+              hasSyntaxGlosses={hasSyntaxGlosses}
+              isEnrolled={isEnrolled}
+              assignmentCount={pendingAssignmentCount}
+              l1={l1}
+            />
+            <div className="mt-4">
+              <AssignmentsDashboard
+                userId={user?.id}
+                refreshKey={checklistKey}
+                onSelectText={(id) => { setSelectedTextId(id); setToolSet('listen'); setPopup(null); }}
+                l1={l1}
+              />
+            </div>
+          </div>
+        ) : (
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           {selectedText && (
             <>
@@ -1360,11 +1132,6 @@ export default function ReadingView() {
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
                     {selectedText.author} · {selectedText.cefr || selectedText.cefrEstimate}
-                    {wpmHistory.length > 0 && (
-                      <span className="ml-2 text-amber-600">
-                        · {wpmHistory[wpmHistory.length - 1]} WPM (pass {wpmHistory.length})
-                      </span>
-                    )}
                   </p>
                 </div>
                 <ToolSetSelector
@@ -1372,15 +1139,11 @@ export default function ReadingView() {
                   onSelect={(id) => setToolSet(id)}
                   hasAudio={hasAudio}
                   hasSyntaxGlosses={hasSyntaxGlosses}
+                  isEnrolled={isEnrolled}
+                  assignmentCount={pendingAssignmentCount}
                   l1={l1}
                 />
               </div>
-
-              {(recordingMode === 'recording' && fluencyDuration != null) && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 text-center">
-                  {getUILabel('readInstructions', l1)}
-                </div>
-              )}
 
               <TextDisplay
                 text={selectedText.body}
@@ -1446,6 +1209,7 @@ export default function ReadingView() {
             </>
           )}
         </div>
+        )}
       </div>
 
       {hasAudio && (

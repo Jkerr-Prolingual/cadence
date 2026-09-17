@@ -13,7 +13,7 @@ function formatDuration(seconds) {
 
 export default function ChapterProgressPanel({ chapterProgress, textId, userId, l1, onReset }) {
   const navigate = useNavigate();
-  const { fluency, recording, srs, assignments } = chapterProgress;
+  const { recording, srs, assignments } = chapterProgress;
   const [audioUrl, setAudioUrl] = useState(null);
   const [loadingAudio, setLoadingAudio] = useState(false);
   const audioRef = useRef(null);
@@ -34,28 +34,11 @@ export default function ChapterProgressPanel({ chapterProgress, textId, userId, 
     return () => { cancelled = true; };
   }, [hasRecording, storagePath]);
 
-  const hasAny = fluency.sessionCount > 0 || recording.exists || srs.totalCards > 0 || assignments;
+  const hasAny = recording.exists || srs.totalCards > 0 || assignments;
   if (!hasAny) return null;
 
   return (
     <div className="border border-t-0 border-gray-200 rounded-b-lg bg-gray-50 px-4 py-3 -mt-1 space-y-3">
-      {/* Timed reads */}
-      {fluency.sessionCount > 0 && (
-        <div>
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-            {getUILabel('timedReads', l1)}
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700">
-              {fluency.wpmHistory.join(' → ')} WPM
-            </span>
-            <span className="text-xs text-gray-400">
-              ({fluency.sessionCount} {getUILabel(fluency.sessionCount === 1 ? 'pass' : 'passes', l1)})
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Recording */}
       {recording.exists && (
         <div>

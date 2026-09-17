@@ -24,7 +24,7 @@ export default function ReportsTab({
   const [bookFilter, setBookFilter] = useState(null);
   const [dateRange, setDateRange] = useState({});
 
-  const { rosterRows, getStudentReport, getChapterDetail } = useReportData({
+  const { rosterRows, getStudentReport, getChapterDetail, assignedBookIds } = useReportData({
     students,
     assignments,
     allTexts,
@@ -117,7 +117,7 @@ export default function ReportsTab({
       {!selectedStudentId && (
         <>
           <ReportFilters
-            books={books}
+            books={books.filter(b => assignedBookIds.has(b.id))}
             bookFilter={bookFilter}
             onBookFilterChange={setBookFilter}
             dateRange={dateRange}

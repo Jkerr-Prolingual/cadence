@@ -8,13 +8,7 @@ export default function useChapterProgress({ chapterIds, userId }) {
   const loadProgress = async () => {
     setLoading(true);
     try {
-      const [fluencyRes, recordingRes, srsSourcesRes, enrollRes] = await Promise.all([
-        supabase
-          .from('fluency_sessions')
-          .select('text_id, wpm, pass_number, session_date')
-          .eq('user_id', userId)
-          .in('text_id', chapterIds)
-          .order('session_date', { ascending: true }),
+      const [recordingRes, srsSourcesRes, enrollRes] = await Promise.all([
         supabase
           .from('student_recordings')
           .select('text_id, storage_path, duration_seconds, assessment_status')
@@ -48,20 +42,10 @@ export default function useChapterProgress({ chapterIds, userId }) {
       const result = {};
       for (const id of chapterIds) {
         result[id] = {
-          fluency: { sessionCount: 0, latestWpm: null, wpmHistory: [] },
           recording: { exists: false, storagePath: null, durationSeconds: null, assessmentStatus: null },
           srs: { totalCards: 0, dueCards: 0 },
           assignments: null,
         };
-      }
-
-      // Fluency sessions
-      for (const s of fluencyRes.data || []) {
-        const entry = result[s.text_id];
-        if (!entry) continue;
-        entry.fluency.wpmHistory.push(s.wpm);
-        entry.fluency.sessionCount++;
-        entry.fluency.latestWpm = s.wpm;
       }
 
       // Recordings

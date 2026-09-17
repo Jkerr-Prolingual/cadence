@@ -19,22 +19,12 @@ export default function RecordReviewStrip({
   assessmentStatus = null,
   assessmentError = null,
   assessmentData = null,
-  onAnalyzePronunciation,
+  onAnalyze,
   onStartFresh,
-  // Fluency assessment props
-  fluencyDuration = null,
-  fluencyCountdown = null,
-  fluencyProgress = null,
-  onSelectDuration,
-  onSubmitFluency,
-  onDiscardFluency,
-  onSaveFluencyOnly,
-  onListenBackFluency,
-  hasFluencyBlob = false,
+  analysisProgress = null,
   playbackPlaying = false,
   onShowPhonemeReport,
   phonemeSession = null,
-  // Audio pre-flight props
   preFlightStatus = 'idle',
   preFlightCondition = null,
   preFlightLevel = 0,
@@ -68,41 +58,14 @@ export default function RecordReviewStrip({
     );
   }
 
-  // --- Audio pre-flight: Warning (dismissable) ---
   const showPreFlightWarning = preFlightStatus === 'ready' && preFlightCondition && onDismissPreFlight;
 
-  // --- Fluency: Duration picker ---
-  if (recordingMode === 'idle' && !hasRecording && onSelectDuration && !fluencyDuration && !assessmentStatus && !phonemeSession) {
-    return (
-      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
-        <div className="max-w-2xl mx-auto text-center space-y-3">
-          {showPreFlightWarning && (
-            <PreFlightWarning condition={preFlightCondition} t={t} onDismiss={onDismissPreFlight} onRecheck={onCalibrate} />
-          )}
-          <p className="text-xs text-gray-500">{t('readInstructions')}</p>
-          <p className="text-xs font-medium text-gray-600">{t('selectDuration')}</p>
-          <div className="flex items-center justify-center gap-2">
-            {[
-              { sec: 60, label: t('oneMinute') },
-              { sec: 120, label: t('twoMinutes') },
-              { sec: 180, label: t('threeMinutes') },
-            ].map(({ sec, label }) => (
-              <button
-                key={sec}
-                onClick={() => onSelectDuration(sec)}
-                className="px-5 py-3 sm:py-2.5 text-sm font-medium bg-red-500 text-white rounded-full hover:bg-red-600 active:bg-red-700 transition-colors"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // --- Recording active (elapsed timer, no countdown) ---
+  if (recordingMode === 'recording') {
+    const m = Math.floor(recordingElapsed / 60);
+    const s = Math.floor(recordingElapsed % 60);
+    const elapsed = `${m}:${s.toString().padStart(2, '0')}`;
 
-  // --- Fluency: Recording with countdown ---
-  if (recordingMode === 'recording' && fluencyCountdown != null) {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
@@ -112,17 +75,9 @@ export default function RecordReviewStrip({
           <div className="flex items-center justify-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${preFlightCondition ? 'bg-amber-500' : 'bg-red-500'}`} />
             <span className="text-sm font-semibold text-red-900 tabular-nums">
-              {formatTime(fluencyCountdown)}
+              {elapsed}
             </span>
           </div>
-          {fluencyDuration && (
-            <div className="w-48 mx-auto h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-red-500 rounded-full transition-all"
-                style={{ width: `${((fluencyDuration - fluencyCountdown) / fluencyDuration) * 100}%` }}
-              />
-            </div>
-          )}
           <button
             onClick={onStopRecording}
             className="inline-flex items-center gap-2 px-5 py-3 sm:py-2.5 text-sm font-medium bg-red-500 text-white rounded-full hover:bg-red-600 active:bg-red-700 transition-colors"
@@ -137,17 +92,15 @@ export default function RecordReviewStrip({
     );
   }
 
-  // --- Fluency: Review (recording done, choose save/analyze/discard) ---
-  if (hasFluencyBlob && !assessmentStatus) {
+  // --- Review (recording done, choose save/analyze/discard) ---
+  if (recordingMode === 'review') {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
-          <p className="text-xs text-gray-500">
-            {hasRecording ? t('recordingSaved') : t('reviewPrompt')}
-          </p>
+          <p className="text-xs text-gray-500">{t('reviewPrompt')}</p>
           <div className="flex items-center justify-center gap-2">
             <button
-              onClick={onListenBackFluency}
+              onClick={onListenBack}
               className={`inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium rounded-lg transition-colors ${playbackPlaying ? 'bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-700' : 'bg-white border border-gray-200 hover:bg-gray-50 active:bg-gray-100'}`}
             >
               {playbackPlaying ? (
@@ -157,35 +110,36 @@ export default function RecordReviewStrip({
                 </>
               ) : t('listenBack')}
             </button>
-            {!hasRecording && (
-              <button
-                onClick={onSaveFluencyOnly}
-                className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
-              >
-                {t('saveRecording')}
-              </button>
-            )}
             <button
-              onClick={onSubmitFluency}
+              onClick={onSaveRecording}
+              disabled={saving}
+              className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50"
+            >
+              {saving ? t('saving') : t('saveRecording')}
+            </button>
+            <button
+              onClick={onAnalyze}
               className="inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
             >
               {t('analyze')}
             </button>
             <button
-              onClick={onDiscardFluency}
+              onClick={onDiscardRecording}
               className="px-4 py-2.5 sm:py-2 text-xs font-medium text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors"
             >
               {t('discard')}
             </button>
           </div>
+          {saveError && <p className="text-xs text-red-500">{saveError}</p>}
+          {recorderError && <p className="text-xs text-red-500">{recorderError}</p>}
         </div>
       </div>
     );
   }
 
-  // --- Fluency: Processing with progress bar ---
-  if (assessmentStatus === 'processing' && fluencyProgress != null) {
-    const pct = Math.round((fluencyProgress || 0) * 100);
+  // --- Analyzing (progress bar) ---
+  if (assessmentStatus === 'processing') {
+    const pct = Math.round((analysisProgress || 0) * 100);
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
@@ -207,9 +161,10 @@ export default function RecordReviewStrip({
     );
   }
 
-  // --- Fluency: Results ---
-  if (assessmentStatus === 'complete' && phonemeSession) {
-    const accuracy = assessmentData?.overall_accuracy;
+  // --- Results (complete with WPM + accuracy + phonemes) ---
+  if (assessmentStatus === 'complete' && assessmentData) {
+    const accuracy = assessmentData.overall_accuracy;
+    const wpm = assessmentData.wpm;
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
@@ -217,17 +172,22 @@ export default function RecordReviewStrip({
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-green-500">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
             </svg>
+            {wpm != null && (
+              <span className="text-sm text-gray-700">
+                <strong className="tabular-nums">{wpm}</strong> WPM
+              </span>
+            )}
             {accuracy != null && (
               <span className="text-sm text-gray-700">
                 {t('accuracy')}: <strong className="tabular-nums">{Math.round(accuracy)}%</strong>
               </span>
             )}
-            {assessmentData?.azure_fluency_score != null && (
+            {assessmentData.azure_fluency_score != null && (
               <span className="text-xs text-gray-400">
                 {t('fluency')}: {Math.round(assessmentData.azure_fluency_score)}%
               </span>
             )}
-            {assessmentData?.azure_prosody_score != null && (
+            {assessmentData.azure_prosody_score != null && (
               <span className="text-xs text-gray-400">
                 {t('prosody')}: {Math.round(assessmentData.azure_prosody_score)}%
               </span>
@@ -235,21 +195,20 @@ export default function RecordReviewStrip({
           </div>
 
           <div className="flex items-center justify-center gap-2">
+            {phonemeSession && (
+              <button
+                onClick={onShowPhonemeReport}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                  <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+                  <path fillRule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                </svg>
+                {t('viewSounds')}
+              </button>
+            )}
             <button
-              onClick={onShowPhonemeReport}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
-                <path fillRule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-              </svg>
-              {t('viewSounds')}
-            </button>
-            <button
-              onClick={() => {
-                setConfirmDelete(false);
-                onSelectDuration && onSelectDuration(null);
-              }}
+              onClick={onStartRecording}
               className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
             >
               {t('recordAgain')}
@@ -260,171 +219,58 @@ export default function RecordReviewStrip({
     );
   }
 
-  // --- Legacy: recording (no countdown) ---
-  if (recordingMode === 'recording') {
-    const m = Math.floor(recordingElapsed / 60);
-    const s = Math.floor(recordingElapsed % 60);
-    const elapsed = `${m}:${s.toString().padStart(2, '0')}`;
-
+  // --- Error state ---
+  if (assessmentStatus === 'error') {
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
-          {preFlightCondition && (
-            <p className="text-xs text-amber-600">{PRE_FLIGHT_MESSAGES[preFlightCondition]}</p>
-          )}
+          <p className="text-xs text-red-500">{assessmentError || t('analysisFailed')}</p>
           <div className="flex items-center justify-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${preFlightCondition ? 'bg-amber-500' : 'bg-red-500'}`} />
-            <span className="text-sm font-semibold text-red-900 tabular-nums">
-              {elapsed}
-            </span>
-            <span className="text-xs text-red-400">/ 5:00</span>
-          </div>
-          <button
-            onClick={onStopRecording}
-            className="inline-flex items-center gap-2 px-5 py-3 sm:py-2.5 text-sm font-medium bg-red-500 text-white rounded-full hover:bg-red-600 active:bg-red-700 transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-              <rect x="2" y="2" width="10" height="10" rx="1.5" />
-            </svg>
-            {t('stopRecording')}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (recordingMode === 'review') {
-    return (
-      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
-        <div className="max-w-2xl mx-auto text-center space-y-3">
-          <p className="text-xs text-gray-500">
-            {t('reviewPrompt')}
-          </p>
-          <div className="flex items-center justify-center gap-2">
-            <button
-              onClick={onListenBack}
-              className={`inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium rounded-lg transition-colors ${playbackPlaying ? 'bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-700' : 'bg-white border border-gray-200 hover:bg-gray-50 active:bg-gray-100'}`}
-            >
-              {playbackPlaying ? (
-                <>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="1" y="1" width="10" height="10" rx="1.5" /></svg>
-                  {t('stop')}
-                </>
-              ) : t('listenBack')}
-            </button>
-            <button
-              onClick={onSaveRecording}
-              disabled={saving}
-              className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors disabled:opacity-50"
-            >
-              {saving ? t('saving') : t('save')}
-            </button>
-            <button
-              onClick={onDiscardRecording}
-              className="px-4 py-2.5 sm:py-2 text-xs font-medium text-gray-500 hover:text-gray-700 active:text-gray-900 transition-colors"
-            >
-              {t('discard')}
-            </button>
-          </div>
-          {saveError && <p className="text-xs text-red-500">{saveError}</p>}
-          {recorderError && <p className="text-xs text-red-500">{recorderError}</p>}
-        </div>
-      </div>
-    );
-  }
-
-  // idle mode — has a saved recording (legacy flow)
-  if (hasRecording) {
-    const isComplete = assessmentStatus === 'complete';
-    const isProcessing = assessmentStatus === 'processing';
-    const isError = assessmentStatus === 'error';
-    const accuracy = assessmentData?.overall_accuracy;
-
-    return (
-      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
-        <div className="max-w-2xl mx-auto text-center space-y-3">
-          {isProcessing && (
-            <div className="flex items-center justify-center gap-2">
-              <svg className="w-4 h-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-                <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-              <span className="text-sm text-gray-500">{t('analyzingPronunciation')}</span>
-            </div>
-          )}
-
-          {isComplete && accuracy != null && (
-            <div className="flex items-center justify-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-green-500">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
-              </svg>
-              <span className="text-sm text-gray-700">
-                {t('accuracy')}: <strong className="tabular-nums">{Math.round(accuracy)}%</strong>
-              </span>
-              {assessmentData?.azure_fluency_score != null && (
-                <span className="text-xs text-gray-400">
-                  {t('fluency')}: {Math.round(assessmentData.azure_fluency_score)}%
-                </span>
-              )}
-              {assessmentData?.azure_prosody_score != null && (
-                <span className="text-xs text-gray-400">
-                  {t('prosody')}: {Math.round(assessmentData.azure_prosody_score)}%
-                </span>
-              )}
-            </div>
-          )}
-
-          {isComplete && accuracy == null && (
-            <div className="flex items-center justify-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-green-500">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
-              </svg>
-              <span className="text-sm text-gray-500">{t('feedbackAvailable')}</span>
-            </div>
-          )}
-
-          {isError && (
-            <p className="text-xs text-red-500">{assessmentError || t('analysisFailed')}</p>
-          )}
-
-          <div className="flex items-center justify-center gap-2">
-            {!isComplete && !isProcessing && (
+            {hasRecording && onAnalyze && (
               <button
-                onClick={onAnalyzePronunciation}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
-                </svg>
-                {t('getFeedback')}
-              </button>
-            )}
-
-            {isError && (
-              <button
-                onClick={onAnalyzePronunciation}
+                onClick={onAnalyze}
                 className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
               >
                 {t('retry')}
               </button>
             )}
-
             <button
-              onClick={() => {
-                setConfirmDelete(false);
-                onStartRecording();
-              }}
-              disabled={isProcessing}
-              className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50"
+              onClick={onStartRecording}
+              className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
             >
               {t('reRecord')}
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
+  // --- Idle with existing recording (not yet analyzed) ---
+  if (hasRecording) {
+    return (
+      <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
+        <div className="max-w-2xl mx-auto text-center space-y-3">
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={onAnalyze}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+              </svg>
+              {t('getFeedback')}
+            </button>
+            <button
+              onClick={() => { setConfirmDelete(false); onStartRecording(); }}
+              className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+            >
+              {t('reRecord')}
+            </button>
             {!confirmDelete ? (
               <button
                 onClick={() => setConfirmDelete(true)}
-                disabled={isProcessing}
-                className="px-3 py-2.5 sm:py-2 text-xs text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                className="px-3 py-2.5 sm:py-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
                 title={t('resetRecording')}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
@@ -445,16 +291,14 @@ export default function RecordReviewStrip({
     );
   }
 
-  // No recording yet (legacy — no duration picker)
+  // --- Idle, no recording ---
   return (
     <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
       <div className="max-w-2xl mx-auto text-center space-y-3">
         {showPreFlightWarning && (
           <PreFlightWarning condition={preFlightCondition} t={t} onDismiss={onDismissPreFlight} onRecheck={onCalibrate} />
         )}
-        <p className="text-xs text-gray-500">
-          {t('recordPrompt')}
-        </p>
+        <p className="text-xs text-gray-500">{t('recordPrompt')}</p>
         <button
           onClick={onStartRecording}
           className="inline-flex items-center gap-2 px-5 py-3 sm:py-2.5 text-sm font-medium bg-red-500 text-white rounded-full hover:bg-red-600 active:bg-red-700 transition-colors"

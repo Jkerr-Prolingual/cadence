@@ -79,12 +79,12 @@ export default function TeacherDashboard() {
         const [profilesRes, recordingsRes, assessmentsRes, fluencyRes, cardsRes, reviewsRes, exerciseRes, phonemeRes] = await Promise.all([
           supabase.from('profiles').select('id, display_name, email').in('id', studentIds),
           supabase.from('student_recordings').select('*').in('user_id', studentIds),
-          supabase.from('pronunciation_assessments').select('user_id, text_id, overall_accuracy, azure_fluency_score, azure_prosody_score, azure_completeness_score').in('user_id', studentIds),
+          supabase.from('pronunciation_assessments').select('user_id, text_id, overall_accuracy, azure_fluency_score, azure_prosody_score, azure_completeness_score, wpm, words_read, processed_at').in('user_id', studentIds),
           supabase.from('fluency_sessions').select('*').in('user_id', studentIds).order('session_date', { ascending: true }),
           supabase.from('srs_cards').select('user_id, word, text_id, leitner_box, card_type, cefr, added_date, last_review_date, next_review_date').in('user_id', studentIds),
           supabase.from('review_log').select('user_id, word, correct, reviewed_at').in('user_id', studentIds),
           supabase.from('exercise_results').select('user_id, text_id, score, total, completed_at, answers').in('user_id', studentIds).then(r => r, () => ({ data: [] })),
-          supabase.from('phoneme_sessions').select('user_id, text_id, session_date, overall_accuracy, phoneme_medians, weak_phonemes, words_assessed').in('user_id', studentIds).order('session_date', { ascending: true }).then(r => r, () => ({ data: [] })),
+          supabase.from('phoneme_sessions').select('user_id, text_id, session_date, overall_accuracy, phoneme_medians, weak_phonemes, words_assessed, phoneme_confusions').in('user_id', studentIds).order('session_date', { ascending: true }).then(r => r, () => ({ data: [] })),
         ]);
         if (profilesRes.error) console.error('Profiles fetch error:', profilesRes.error);
         const map = {};
@@ -336,6 +336,7 @@ const ENGAGEMENT_WINDOWS = [
 ];
 
 function ClassInfoPanel({ cls, students, studentEngagement, engagementWindow, onEngagementWindowChange, onRemoveStudent, onDeleteClass }) {
+  const [confirmRemoveId, setConfirmRemoveId] = useState(null);
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
@@ -373,12 +374,30 @@ function ClassInfoPanel({ cls, students, studentEngagement, engagementWindow, on
               <li key={s.id} className="py-1.5 px-2 rounded hover:bg-gray-50 group">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-700">{s.name}</span>
-                  <button
-                    onClick={() => onRemoveStudent(s.id)}
-                    className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    remove
-                  </button>
+                  {confirmRemoveId === s.id ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-xs text-red-600">Remove {s.name}?</span>
+                      <button
+                        onClick={() => { onRemoveStudent(s.id); setConfirmRemoveId(null); }}
+                        className="text-xs font-semibold text-red-600 hover:text-red-800"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => setConfirmRemoveId(null)}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        No
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmRemoveId(s.id)}
+                      className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      remove
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-2.5 mt-0.5">
                   <span className={`text-xs tabular-nums ${eng.lookup > 0 ? 'text-blue-600' : 'text-gray-300'}`} title="Word lookups">
@@ -484,7 +503,7 @@ function AssignmentsPanel({ assignments, allTexts, books, students, progress, st
 function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCancel }) {
   const [selectedTextId, setSelectedTextId] = useState('');
   const [title, setTitle] = useState('');
-  const [tasks, setTasks] = useState({ readingPass: true, flashcards: true, recordAudio: false, shadowReading: false, timedReading: false, exercises: false });
+  const [tasks, setTasks] = useState({ readingPass: true, flashcards: true, recordAudio: false, shadowReading: false, exercises: false });
   const [dueDate, setDueDate] = useState('');
   const [showProbePreview, setShowProbePreview] = useState(false);
   const selectedText = allTexts.find(t => t.id === selectedTextId);
@@ -511,7 +530,6 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
         flashcards: tasks.flashcards,
         recordAudio: tasks.recordAudio,
         shadowReading: tasks.shadowReading,
-        timedReading: tasks.timedReading,
         exercises: tasks.exercises,
       },
       due_date: dueDate || null,
@@ -617,15 +635,6 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
             Shadow reading
             {!hasAudio && selectedTextId && <span className="text-xs text-gray-400">(no audio)</span>}
           </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={tasks.timedReading}
-              onChange={e => setTasks(prev => ({ ...prev, timedReading: e.target.checked }))}
-              className="rounded border-gray-300"
-            />
-            Timed reading
-          </label>
           <label className={`flex items-center gap-2 text-sm ${hasProbes ? 'text-gray-700' : 'text-gray-300'}`}>
             <input
               type="checkbox"
@@ -696,7 +705,6 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
   const taskList = Object.entries(assignment.tasks).filter(([, v]) => v);
   const isArchived = !!assignment.archivedAt;
   const hasRecordTask = !!assignment.tasks.recordAudio;
-  const hasTimedTask = !!assignment.tasks.timedReading;
   const hasFlashcardTask = !!assignment.tasks.flashcards;
   const hasShadowTask = !!assignment.tasks.shadowReading;
   const hasExerciseTask = !!assignment.tasks.exercises;
@@ -718,12 +726,6 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
 
   function getStudentPhonemeSessions(studentId) {
     return phonemeSessions.filter(ps => ps.user_id === studentId);
-  }
-
-  function getStudentWpmHistory(studentId) {
-    return fluencySessions
-      .filter(f => f.user_id === studentId)
-      .map(f => f.wpm);
   }
 
   function getStudentCards(studentId) {
@@ -879,12 +881,11 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
                 <th className="text-left font-medium py-1">Student</th>
                 {taskList.map(([key]) => (
                   <th key={key} className="text-center font-medium py-1 w-28">
-                    {{ readingPass: 'Reading', flashcards: 'Flashcards', recordAudio: 'Recording', shadowReading: 'Shadow', timedReading: 'Timed', exercises: 'Exercises' }[key] || key}
+                    {{ readingPass: 'Reading', flashcards: 'Flashcards', recordAudio: 'Recording', shadowReading: 'Shadow', exercises: 'Exercises' }[key] || key}
                   </th>
                 ))}
                 {hasRecordTask && <th className="text-center font-medium py-1 w-20">Listen</th>}
                 {hasRecordTask && <th className="text-left font-medium py-1">Pronunciation</th>}
-                {hasTimedTask && <th className="text-left font-medium py-1">WPM</th>}
               </tr>
             </thead>
             <tbody>
@@ -988,15 +989,10 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
                           </td>
                         );
                       })()}
-                      {hasTimedTask && (
-                        <td className="py-1.5">
-                          <WpmTimeline readings={getStudentWpmHistory(s.id)} />
-                        </td>
-                      )}
                     </tr>
                     {expandedFlashcardStudent === s.id && hasFlashcardTask && (
                       <tr>
-                        <td colSpan={taskList.length + 1 + (hasRecordTask ? 2 : 0) + (hasTimedTask ? 1 : 0)}>
+                        <td colSpan={taskList.length + 1 + (hasRecordTask ? 2 : 0)}>
                           <FlashcardDetail cards={cards} reviews={reviews} />
                         </td>
                       </tr>
@@ -1157,35 +1153,6 @@ function LeitnerBox({ box }) {
   );
 }
 
-
-function WpmTimeline({ readings }) {
-  if (readings.length === 0) {
-    return <span className="text-xs text-gray-300">—</span>;
-  }
-
-  const first = readings[0];
-  const last = readings[readings.length - 1];
-  const delta = readings.length > 1 ? last - first : null;
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-gray-500 font-mono tabular-nums">
-        {readings.join(' → ')}
-      </span>
-      {delta !== null && (
-        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-          delta > 0
-            ? 'text-green-700 bg-green-50'
-            : delta < 0
-              ? 'text-red-600 bg-red-50'
-              : 'text-gray-500 bg-gray-100'
-        }`}>
-          {delta > 0 ? '+' : ''}{delta}
-        </span>
-      )}
-    </div>
-  );
-}
 
 function fromSupabaseAssignment(row) {
   return {

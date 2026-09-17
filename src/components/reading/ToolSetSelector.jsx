@@ -4,8 +4,8 @@ const TOOL_SETS = [
   { id: 'listen', labelKey: 'listenRead', icon: 'headphones', color: '#3b82f6' },
   { id: 'translate', labelKey: 'translate', icon: 'translate', color: '#6366f1' },
   { id: 'shadow', labelKey: 'shadowRead', icon: 'loop', color: '#d97706' },
-  { id: 'timed', labelKey: 'timedRead', icon: 'timer', color: '#059669' },
   { id: 'record', labelKey: 'record', icon: 'mic', color: '#dc2626' },
+  { id: 'assignments', labelKey: 'assignments', icon: 'clipboard', color: '#8b5cf6' },
 ];
 
 function Icon({ name, color, active }) {
@@ -44,13 +44,14 @@ function Icon({ name, color, active }) {
           <line x1="5" y1="15" x2="11" y2="15" stroke="currentColor" strokeWidth="1.5" />
         </svg>
       );
-    case 'timer':
+    case 'clipboard':
       return (
         <svg style={style} width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="8" cy="9" r="6" />
-          <line x1="8" y1="9" x2="8" y2="6" />
-          <line x1="8" y1="1" x2="8" y2="3" />
-          <line x1="6" y1="1" x2="10" y2="1" />
+          <rect x="3" y="2" width="10" height="13" rx="1.5" />
+          <path d="M6 2V1.5a1.5 1.5 0 0 1 3 0V2" />
+          <line x1="5.5" y1="6" x2="10.5" y2="6" />
+          <line x1="5.5" y1="9" x2="10.5" y2="9" />
+          <line x1="5.5" y1="12" x2="8.5" y2="12" />
         </svg>
       );
     default:
@@ -58,10 +59,11 @@ function Icon({ name, color, active }) {
   }
 }
 
-export default function ToolSetSelector({ active, onSelect, hasAudio, hasSyntaxGlosses, l1 }) {
+export default function ToolSetSelector({ active, onSelect, hasAudio, hasSyntaxGlosses, isEnrolled, assignmentCount = 0, l1 }) {
   const available = TOOL_SETS.filter(t => {
+    if (t.id === 'assignments') return isEnrolled;
     if (t.id === 'translate') return hasSyntaxGlosses;
-    if (!hasAudio) return t.id === 'timed' || t.id === 'record';
+    if (!hasAudio) return t.id === 'record' || t.id === 'assignments';
     return true;
   });
 
@@ -79,7 +81,7 @@ export default function ToolSetSelector({ active, onSelect, hasAudio, hasSyntaxG
           <button
             key={tool.id}
             onClick={() => onSelect(tool.id)}
-            className={`flex flex-col items-center justify-center gap-1 px-1 sm:px-2 py-2 min-h-[56px] rounded-lg border transition-all ${
+            className={`relative flex flex-col items-center justify-center gap-1 px-1 sm:px-2 py-2 min-h-[56px] rounded-lg border transition-all ${
               isActive
                 ? 'bg-white border-gray-300 shadow-sm'
                 : 'bg-gray-50 border-gray-200 hover:bg-white hover:border-gray-300'
@@ -93,6 +95,11 @@ export default function ToolSetSelector({ active, onSelect, hasAudio, hasSyntaxG
             >
               {label}
             </span>
+            {tool.id === 'assignments' && assignmentCount > 0 && !isActive && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-violet-500 text-white text-[10px] font-bold px-1">
+                {assignmentCount}
+              </span>
+            )}
           </button>
         );
       })}

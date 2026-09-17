@@ -18,147 +18,6 @@ export function displayScore(assessment) {
   return assessment.accuracy ?? 0;
 }
 
-export async function runPronunciationAssessment({ userId, textId, storagePath, referenceText, audioBlob, supabase }) {
-  await supabase
-    .from('student_recordings')
-    .update({ assessment_status: 'processing', assessment_error: null })
-    .eq('user_id', userId)
-    .eq('text_id', textId);
-
-  try {
-    const whisperRes = await fetch('/.netlify/functions/transcribe-whisper', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ storagePath }),
-    });
-    const whisperData = await whisperRes.json();
-    if (whisperData.error) throw new Error(`Whisper: ${whisperData.error}`);
-
-    const refTokens = tokenizeReference(referenceText);
-    const alignment = alignWords(refTokens, whisperData.words || []);
-
-    let azureData = null;
-    try {
-      const audioBuffer = await decodeAudioBlob(audioBlob);
-      const sentences = detectSentences(referenceText, null);
-      const chunks = buildSentenceChunks(sentences, refTokens, CHUNK_MIN_WORDS);
-      const wordPositions = getWordPositions(referenceText);
-
-      const chunkResults = await Promise.all(chunks.map(async (chunk, idx) => {
-        const timeRange = getChunkTimeRange(chunk, alignment, whisperData.words);
-        if (!timeRange) return null;
-
-        const wavBlob = encodeWavSlice(audioBuffer, timeRange.startSec, timeRange.endSec);
-        if (!wavBlob) return null;
-
-        const chunkPath = `${userId}/${textId}_chunk${idx}.wav`;
-        const chunkRefText = extractChunkText(referenceText, wordPositions, chunk.firstWordIdx, chunk.lastWordIdx);
-
-        try {
-          await supabase.storage
-            .from('student-recordings')
-            .upload(chunkPath, wavBlob, { contentType: 'audio/wav', upsert: true });
-
-          const res = await fetch('/.netlify/functions/assess-pronunciation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ storagePath: chunkPath, referenceText: chunkRefText }),
-          });
-          const data = await res.json();
-
-          await supabase.storage.from('student-recordings').remove([chunkPath]);
-
-          if (data.error) {
-            console.warn(`Azure PA chunk ${idx} error:`, data.error);
-            return null;
-          }
-          return data;
-        } catch (err) {
-          console.warn(`Azure PA chunk ${idx} failed:`, err);
-          await supabase.storage.from('student-recordings').remove([chunkPath]).catch(() => {});
-          return null;
-        }
-      }));
-
-      const mergedWords = [];
-      const fluencyScores = [];
-      const prosodyScores = [];
-      const completenessScores = [];
-
-      for (let ci = 0; ci < chunkResults.length; ci++) {
-        const result = chunkResults[ci];
-        if (!result) continue;
-        if (result.words?.length) {
-          for (const w of result.words) {
-            mergedWords.push({ ...w, _chunkFirst: chunks[ci].firstWordIdx, _chunkLast: chunks[ci].lastWordIdx });
-          }
-        }
-        if (result.fluencyScore != null) fluencyScores.push(result.fluencyScore);
-        if (result.prosodyScore != null) prosodyScores.push(result.prosodyScore);
-        if (result.completenessScore != null) completenessScores.push(result.completenessScore);
-      }
-
-      if (mergedWords.length > 0) {
-        const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
-        azureData = {
-          words: mergedWords,
-          fluencyScore: avg(fluencyScores),
-          prosodyScore: avg(prosodyScores),
-          completenessScore: avg(completenessScores),
-        };
-      }
-    } catch (azureErr) {
-      console.warn('Azure PA failed, saving Whisper-only results:', azureErr);
-    }
-
-    const flags = generateFlagEvents({ userId, textId, alignment, azureData });
-    const overallAccuracy = computeOverallAccuracy(alignment, azureData);
-
-    const assessmentRow = {
-      user_id: userId,
-      text_id: textId,
-      whisper_transcript: whisperData.transcript,
-      whisper_word_timestamps: whisperData.words,
-      alignment,
-      azure_word_scores: azureData?.words || null,
-      azure_fluency_score: azureData?.fluencyScore ?? null,
-      azure_prosody_score: azureData?.prosodyScore ?? null,
-      azure_completeness_score: azureData?.completenessScore ?? null,
-      overall_accuracy: overallAccuracy,
-      processed_at: new Date().toISOString(),
-    };
-
-    await supabase
-      .from('pronunciation_assessments')
-      .upsert(assessmentRow, { onConflict: 'user_id,text_id' });
-
-    await supabase
-      .from('flag_events')
-      .delete()
-      .eq('student_id', userId)
-      .eq('text_id', textId)
-      .eq('source', 'ai');
-
-    if (flags.length > 0) {
-      await supabase.from('flag_events').insert(flags);
-    }
-
-    await supabase
-      .from('student_recordings')
-      .update({ assessment_status: 'complete', assessment_error: null })
-      .eq('user_id', userId)
-      .eq('text_id', textId);
-
-    return { success: true, assessmentData: assessmentRow };
-  } catch (err) {
-    await supabase
-      .from('student_recordings')
-      .update({ assessment_status: 'error', assessment_error: err.message })
-      .eq('user_id', userId)
-      .eq('text_id', textId);
-    return { success: false, error: err.message };
-  }
-}
 
 function buildSentenceChunks(sentences, refTokens, minWords) {
   if (!sentences.length) {
@@ -623,9 +482,9 @@ function identifyWeakPhonemes(medians) {
   return entries.slice(0, quartileSize).map(([phoneme]) => phoneme);
 }
 
-// --- Fluency assessment (Whisper + chunked Azure PA) ---
+// --- Recording assessment (Whisper + chunked Azure PA + phoneme aggregation + WPM) ---
 
-export async function runFluencyAssessment({ userId, textId, fullText, audioBlob, storagePath, supabase, durationSeconds, onProgress }) {
+export async function runRecordingAssessment({ userId, textId, fullText, audioBlob, storagePath, supabase, onProgress }) {
   await supabase
     .from('student_recordings')
     .update({ assessment_status: 'processing', assessment_error: null })
@@ -727,6 +586,22 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
       ? Math.round(scoredWords.reduce((a, b) => a + b.accuracyScore, 0) / scoredWords.length)
       : 0;
 
+    const wordsRead = spokenEntries.length;
+    let wpm = null;
+    if (wordsRead > 0 && whisperData.words?.length > 0) {
+      const matchedTimestamps = spokenEntries
+        .map(e => e.timestampMs)
+        .filter(t => t != null);
+      if (matchedTimestamps.length >= 2) {
+        const firstMs = Math.min(...matchedTimestamps);
+        const lastMs = Math.max(...matchedTimestamps);
+        const durationSec = (lastMs - firstMs) / 1000;
+        if (durationSec > 0) {
+          wpm = Math.round((wordsRead / durationSec) * 60);
+        }
+      }
+    }
+
     const assessmentRow = {
       user_id: userId,
       text_id: textId,
@@ -738,6 +613,8 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
       azure_prosody_score: azureData?.prosodyScore ?? null,
       azure_completeness_score: azureData?.completenessScore ?? null,
       overall_accuracy: overallAccuracy,
+      wpm: wpm,
+      words_read: wordsRead,
       processed_at: new Date().toISOString(),
     };
 
@@ -755,7 +632,7 @@ export async function runFluencyAssessment({ userId, textId, fullText, audioBlob
       const sessionRow = {
         user_id: userId,
         text_id: textId,
-        duration_seconds: durationSeconds || null,
+        duration_seconds: null,
         words_assessed: scoredWords.length,
         overall_accuracy: overallAccuracy,
         fluency_score: azureData?.fluencyScore ?? null,
