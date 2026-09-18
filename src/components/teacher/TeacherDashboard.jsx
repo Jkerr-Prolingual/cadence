@@ -881,7 +881,6 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
                   </th>
                 ))}
                 {hasRecordTask && <th className="text-center font-medium py-1 w-20">Listen</th>}
-                {hasRecordTask && <th className="text-right font-medium py-1 w-16">WPM</th>}
                 {hasRecordTask && <th className="text-left font-medium py-1">Pronunciation</th>}
               </tr>
             </thead>
@@ -958,20 +957,13 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
                         const pSessions = getStudentPhonemeSessions(s.id);
                         const latestPhoneme = pSessions.length > 0 ? pSessions[pSessions.length - 1] : null;
                         return (<>
-                          <td className="text-right py-1.5 tabular-nums">
-                            {assess?.wpm != null ? (
-                              <span className="text-xs font-medium text-gray-700">{Math.round(assess.wpm)}</span>
-                            ) : (
-                              <span className="text-xs text-gray-300">&mdash;</span>
-                            )}
-                          </td>
                           <td className="py-1.5">
                             {assess ? (
                               <div className="text-xs text-gray-600 tabular-nums">
                                 <div className="flex items-center gap-2">
-                                  <span title="Accuracy">{Math.round(assess.overall_accuracy)}%</span>
+                                  <span title="Accuracy">A{Math.round(assess.overall_accuracy)}</span>
                                   {assess.azure_fluency_score != null && <span className="text-gray-400" title="Fluency">F{Math.round(assess.azure_fluency_score)}</span>}
-                                  {assess.azure_prosody_score != null && <span className="text-gray-400" title="Prosody">P{Math.round(assess.azure_prosody_score)}</span>}
+                                  {assess.wpm != null && <span className="text-gray-400" title="Words per minute">{Math.round(assess.wpm)}wpm</span>}
                                 </div>
                                 {latestPhoneme?.weak_phonemes?.length > 0 && (
                                   <div className="flex items-center gap-1 mt-0.5 flex-wrap">
@@ -996,7 +988,7 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
                     </tr>
                     {expandedFlashcardStudent === s.id && hasFlashcardTask && (
                       <tr>
-                        <td colSpan={taskList.length + 1 + (hasRecordTask ? 3 : 0)}>
+                        <td colSpan={taskList.length + 1 + (hasRecordTask ? 2 : 0)}>
                           <FlashcardDetail cards={cards} reviews={reviews} />
                         </td>
                       </tr>
