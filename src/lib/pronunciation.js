@@ -640,9 +640,14 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
         phoneme_medians: medians,
         phoneme_counts: counts,
         weak_phonemes: weakPhonemes,
-        phoneme_confusions: Object.keys(phonemeConfusions).length > 0 ? phonemeConfusions : null,
       };
-      await supabase.from('phoneme_sessions').insert(sessionRow);
+      const hasConfusions = Object.keys(phonemeConfusions).length > 0;
+      if (hasConfusions) sessionRow.phoneme_confusions = phonemeConfusions;
+      const { error: psError } = await supabase.from('phoneme_sessions').insert(sessionRow);
+      if (psError && hasConfusions && psError.message?.includes('phoneme_confusions')) {
+        delete sessionRow.phoneme_confusions;
+        await supabase.from('phoneme_sessions').insert(sessionRow);
+      }
       phonemeSession = sessionRow;
     }
 

@@ -138,6 +138,7 @@ export default function AssignmentsDashboard({ userId, onSelectText, refreshKey,
             <th className="text-center font-medium py-2 px-1.5 whitespace-nowrap">
               {getUILabel('fluency', l1)}
             </th>
+            <th className="w-6"></th>
           </tr>
         </thead>
         <tbody>
@@ -151,7 +152,7 @@ export default function AssignmentsDashboard({ userId, onSelectText, refreshKey,
             return (
               <tr
                 key={assignment.id}
-                className={`border-b border-gray-50 cursor-pointer transition-colors hover:bg-gray-50 ${allDone ? 'opacity-50' : ''}`}
+                className={`group border-b border-gray-50 cursor-pointer transition-colors ${allDone ? 'bg-green-50/40 hover:bg-gray-50' : 'hover:bg-amber-50'}`}
                 onClick={() => onSelectText(assignment.textId)}
               >
                 <td className="py-2 pl-1 pr-3">
@@ -181,7 +182,7 @@ export default function AssignmentsDashboard({ userId, onSelectText, refreshKey,
                         &#10003;
                       </span>
                     ) : (
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-300 text-xs">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-500 text-xs">
                         &#9675;
                       </span>
                     )}
@@ -212,6 +213,11 @@ export default function AssignmentsDashboard({ userId, onSelectText, refreshKey,
                     <span className="text-xs text-gray-300">&mdash;</span>
                   )}
                 </td>
+                <td className="py-2 pl-1 pr-1">
+                  {!allDone && (
+                    <span className="text-gray-300 group-hover:text-amber-500 transition-colors text-xs">&#9654;</span>
+                  )}
+                </td>
               </tr>
             );
           })}
@@ -224,7 +230,7 @@ export default function AssignmentsDashboard({ userId, onSelectText, refreshKey,
 function ShadowCell({ value }) {
   if (!value) {
     return (
-      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-300 text-xs">
+      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-500 text-xs">
         &#9675;
       </span>
     );
@@ -268,7 +274,7 @@ function ExerciseCell({ completed, result }) {
     );
   }
   return (
-    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-300 text-xs">
+    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-500 text-xs">
       &#9675;
     </span>
   );
