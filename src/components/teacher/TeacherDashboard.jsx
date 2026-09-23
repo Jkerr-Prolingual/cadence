@@ -968,11 +968,14 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
                                 {latestPhoneme?.weak_phonemes?.length > 0 && (
                                   <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                                     <span className="text-gray-400 text-[10px]">Weak:</span>
-                                    {latestPhoneme.weak_phonemes.slice(0, 5).map(p => (
-                                      <span key={p} className="font-mono text-[10px] px-1 py-0.5 rounded bg-orange-50 text-orange-600" title={`${p}: ${latestPhoneme.phoneme_medians?.[p] ?? '?'}%`}>
-                                        /{p}/
-                                      </span>
-                                    ))}
+                                    {latestPhoneme.weak_phonemes.slice(0, 5).map((p, i) => {
+                                      const phoneme = typeof p === 'string' ? p : p.phoneme;
+                                      return (
+                                        <span key={phoneme ?? i} className="font-mono text-[10px] px-1 py-0.5 rounded bg-orange-50 text-orange-600" title={`${phoneme}: ${latestPhoneme.phoneme_medians?.[phoneme] ?? '?'}%`}>
+                                          /{phoneme}/
+                                        </span>
+                                      );
+                                    })}
                                     {latestPhoneme.weak_phonemes.length > 5 && (
                                       <span className="text-[10px] text-gray-400">+{latestPhoneme.weak_phonemes.length - 5}</span>
                                     )}

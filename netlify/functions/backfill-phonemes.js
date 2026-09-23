@@ -15,10 +15,21 @@ export default async (req) => {
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  // Repair existing rows with object-shaped weak_phonemes
+  let repaired = 0;
+  const { data: allSessions } = await supabase.from('phoneme_sessions').select('id, weak_phonemes');
+  for (const ps of (allSessions || [])) {
+    if (Array.isArray(ps.weak_phonemes) && ps.weak_phonemes.length > 0 && typeof ps.weak_phonemes[0] === 'object') {
+      const fixed = ps.weak_phonemes.map(p => p.phoneme || p);
+      await supabase.from('phoneme_sessions').update({ weak_phonemes: fixed }).eq('id', ps.id);
+      repaired++;
+    }
+  }
+
   const { data: assessments, error } = await supabase
     .from('pronunciation_assessments')
     .select('user_id, text_id, azure_word_scores, overall_accuracy, azure_fluency_score, azure_prosody_score, whisper_word_timestamps, processed_at');
-  if (error) return Response.json({ error: error.message, created: 0, skipped: 0, details: [] });
+  if (error) return Response.json({ error: error.message, created: 0, skipped: 0, repaired, details: [] });
 
   let created = 0;
   let skipped = 0;
@@ -79,10 +90,9 @@ export default async (req) => {
       continue;
     }
 
-    const weakPhonemes = Object.entries(medians)
-      .filter(([, score]) => score < 70)
-      .sort((a, b) => a[1] - b[1])
-      .map(([phoneme, score]) => ({ phoneme, score }));
+    const sortedEntries = Object.entries(medians).sort((a, b) => a[1] - b[1]);
+    const quartileSize = Math.max(1, Math.ceil(sortedEntries.length / 4));
+    const weakPhonemes = sortedEntries.slice(0, quartileSize).map(([phoneme]) => phoneme);
 
     // Compute confusions from NBest data
     const pairData = {};
@@ -152,5 +162,5 @@ export default async (req) => {
     }
   }
 
-  return Response.json({ total: assessments.length, created, skipped, details });
+  return Response.json({ total: assessments.length, created, skipped, repaired, details });
 };

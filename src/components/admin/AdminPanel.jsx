@@ -1759,7 +1759,7 @@ export default function AdminPanel() {
                   setBackfillStatus({
                     summary: result.error
                       ? `Error: ${result.error}`
-                      : `Done — ${result.total} assessments found, ${result.created} created, ${result.skipped} skipped`,
+                      : `Done — ${result.total} assessments, ${result.created} created, ${result.skipped} skipped${result.repaired ? `, ${result.repaired} repaired` : ''}`,
                     details: result.details || [],
                   });
                 } catch (err) {
