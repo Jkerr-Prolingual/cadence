@@ -1756,11 +1756,14 @@ export default function AdminPanel() {
                 setBackfillStatus(null);
                 try {
                   const result = await backfillPhonemeSessions(supabase);
-                  setBackfillStatus(result.error
-                    ? `Error: ${result.error}`
-                    : `Done — ${result.created} created, ${result.skipped} skipped`);
+                  setBackfillStatus({
+                    summary: result.error
+                      ? `Error: ${result.error}`
+                      : `Done — ${result.total} assessments found, ${result.created} created, ${result.skipped} skipped`,
+                    details: result.details || [],
+                  });
                 } catch (err) {
-                  setBackfillStatus(`Error: ${err.message}`);
+                  setBackfillStatus({ summary: `Error: ${err.message}`, details: [] });
                 }
                 setBackfillRunning(false);
               }}
@@ -1770,9 +1773,16 @@ export default function AdminPanel() {
               {backfillRunning ? 'Running...' : 'Run Backfill'}
             </button>
             {backfillStatus && (
-              <p className={`mt-3 text-sm ${backfillStatus.startsWith('Error') ? 'text-red-600' : 'text-green-700'}`}>
-                {backfillStatus}
-              </p>
+              <div className="mt-3">
+                <p className={`text-sm ${backfillStatus.summary?.startsWith('Error') ? 'text-red-600' : 'text-green-700'}`}>
+                  {backfillStatus.summary}
+                </p>
+                {backfillStatus.details?.length > 0 && (
+                  <pre className="mt-2 text-xs text-gray-600 bg-gray-50 p-3 rounded max-h-60 overflow-y-auto">
+                    {backfillStatus.details.map(d => `${d.text_id}: ${d.status}`).join('\n')}
+                  </pre>
+                )}
+              </div>
             )}
           </div>
         </div>

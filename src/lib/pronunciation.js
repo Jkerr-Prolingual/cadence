@@ -698,10 +698,11 @@ export async function backfillPhonemeSessions(supabase) {
   const { data: assessments, error } = await supabase
     .from('pronunciation_assessments')
     .select('user_id, text_id, azure_word_scores, overall_accuracy, azure_fluency_score, azure_prosody_score, whisper_word_timestamps, processed_at');
-  if (error || !assessments) return { error: error?.message, created: 0, skipped: 0 };
+  if (error || !assessments) return { error: error?.message, created: 0, skipped: 0, details: [] };
 
   let created = 0;
   let skipped = 0;
+  const details = [];
   for (const a of assessments) {
     const { data: existing } = await supabase
       .from('phoneme_sessions')
@@ -709,14 +710,33 @@ export async function backfillPhonemeSessions(supabase) {
       .eq('user_id', a.user_id)
       .eq('text_id', a.text_id)
       .limit(1);
-    if (existing?.length) { skipped++; continue; }
+    if (existing?.length) {
+      details.push({ text_id: a.text_id, status: 'skipped: already exists' });
+      skipped++;
+      continue;
+    }
 
     const words = a.azure_word_scores || [];
-    if (!words.length) { skipped++; continue; }
+    if (!words.length) {
+      details.push({ text_id: a.text_id, status: 'skipped: no azure_word_scores' });
+      skipped++;
+      continue;
+    }
+
+    const hasPhonemes = words.some(w => w.phonemes?.length > 0);
+    if (!hasPhonemes) {
+      details.push({ text_id: a.text_id, status: `skipped: ${words.length} words but no phoneme data` });
+      skipped++;
+      continue;
+    }
 
     const phonemeGroups = aggregatePhonemes(words);
     const { medians, counts } = computePhonemeMedians(phonemeGroups);
-    if (!Object.keys(medians).length) { skipped++; continue; }
+    if (!Object.keys(medians).length) {
+      details.push({ text_id: a.text_id, status: `skipped: phonemes found but none met min instances (${MIN_PHONEME_INSTANCES})` });
+      skipped++;
+      continue;
+    }
 
     const weakPhonemes = identifyWeakPhonemes(medians);
     const confusions = aggregateConfusions(words);
@@ -748,8 +768,12 @@ export async function backfillPhonemeSessions(supabase) {
     if (Object.keys(confusions).length) row.phoneme_confusions = confusions;
 
     const { error: insertErr } = await supabase.from('phoneme_sessions').insert(row);
-    if (insertErr) console.error('Backfill insert failed:', a.user_id, a.text_id, insertErr.message);
-    else created++;
+    if (insertErr) {
+      details.push({ text_id: a.text_id, status: `insert failed: ${insertErr.message}` });
+    } else {
+      details.push({ text_id: a.text_id, status: 'created' });
+      created++;
+    }
   }
-  return { created, skipped };
+  return { created, skipped, total: assessments.length, details };
 }
