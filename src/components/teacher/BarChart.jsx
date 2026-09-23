@@ -1,4 +1,4 @@
-export default function BarChart({ values, labels, color = '#64748b', delta, height = 120, barWidth = 20, gap = 3, label }) {
+export default function BarChart({ values, labels, color = '#64748b', median, height = 120, barWidth = 20, gap = 3, label }) {
   if (!values || values.length === 0) {
     return <span className="text-gray-300 text-xs">No data</span>;
   }
@@ -11,14 +11,12 @@ export default function BarChart({ values, labels, color = '#64748b', delta, hei
 
   return (
     <div>
-      {(label || delta != null) && (
+      {(label || median != null) && (
         <div className="flex items-center gap-2 mb-2">
           {label && <span className="text-xs font-medium text-gray-500">{label}</span>}
-          {delta != null && values.length >= 2 && (
-            <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-              delta > 0 ? 'bg-green-100 text-green-700' : delta < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
-            }`}>
-              {delta > 0 ? '+' : ''}{delta}
+          {median != null && values.length >= 2 && (
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+              med {median}
             </span>
           )}
         </div>

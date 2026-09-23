@@ -75,11 +75,11 @@ export default function RosterTable({ rows, onSelectStudent }) {
               <td className="px-3 py-2.5 text-gray-600 text-center tabular-nums">{row.booksCompleted}</td>
               <td className="px-3 py-2.5 text-gray-600 text-center tabular-nums">{row.assignmentsDone}</td>
 
-              {/* WPM sparkline + delta */}
+              {/* WPM sparkline + median */}
               <td className="px-3 py-2.5 text-left">
                 <span className="inline-flex items-center gap-2">
                   <Sparkline values={row.wpmValues} color="#64748b" />
-                  <DeltaBadge value={row.wpmDelta} show={row.wpmValues.length >= 2} />
+                  <MedianBadge value={row.wpmDelta} show={row.wpmValues.length >= 2} />
                 </span>
               </td>
 
@@ -128,12 +128,11 @@ export default function RosterTable({ rows, onSelectStudent }) {
   );
 }
 
-function DeltaBadge({ value, show }) {
-  if (!show) return null;
-  const color = value > 0 ? 'bg-green-100 text-green-700' : value < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500';
+function MedianBadge({ value, show }) {
+  if (!show || value == null) return null;
   return (
-    <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium tabular-nums ${color}`}>
-      {value > 0 ? '+' : ''}{value}
+    <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium tabular-nums bg-gray-100 text-gray-600">
+      med {value}
     </span>
   );
 }

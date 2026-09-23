@@ -588,6 +588,7 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
 
     const wordsRead = spokenEntries.length;
     let wpm = null;
+    let durationSec = null;
     if (wordsRead > 0 && whisperData.words?.length > 0) {
       const matchedTimestamps = spokenEntries
         .map(e => e.timestampMs)
@@ -595,7 +596,7 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
       if (matchedTimestamps.length >= 2) {
         const firstMs = Math.min(...matchedTimestamps);
         const lastMs = Math.max(...matchedTimestamps);
-        const durationSec = (lastMs - firstMs) / 1000;
+        durationSec = (lastMs - firstMs) / 1000;
         if (durationSec > 0) {
           wpm = Math.round((wordsRead / durationSec) * 60);
         }
@@ -632,7 +633,7 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
       const sessionRow = {
         user_id: userId,
         text_id: textId,
-        duration_seconds: null,
+        duration_seconds: durationSec != null ? Math.round(durationSec) : 0,
         words_assessed: scoredWords.length,
         overall_accuracy: overallAccuracy,
         fluency_score: azureData?.fluencyScore ?? null,
@@ -643,12 +644,13 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
       };
       const hasConfusions = Object.keys(phonemeConfusions).length > 0;
       if (hasConfusions) sessionRow.phoneme_confusions = phonemeConfusions;
-      const { error: psError } = await supabase.from('phoneme_sessions').insert(sessionRow);
+      let { error: psError } = await supabase.from('phoneme_sessions').insert(sessionRow);
       if (psError && hasConfusions && psError.message?.includes('phoneme_confusions')) {
         delete sessionRow.phoneme_confusions;
-        await supabase.from('phoneme_sessions').insert(sessionRow);
+        ({ error: psError } = await supabase.from('phoneme_sessions').insert(sessionRow));
       }
-      phonemeSession = sessionRow;
+      if (psError) console.error('phoneme_sessions insert failed:', psError.message);
+      if (!psError) phonemeSession = sessionRow;
     }
 
     const flags = generateFlagEvents({ userId, textId, alignment, azureData });
@@ -690,4 +692,64 @@ export async function getPhonemeSessionsForText(supabase, userId, textId) {
     .eq('text_id', textId)
     .order('session_date', { ascending: true });
   return data || [];
+}
+
+export async function backfillPhonemeSessions(supabase) {
+  const { data: assessments, error } = await supabase
+    .from('pronunciation_assessments')
+    .select('user_id, text_id, azure_word_scores, overall_accuracy, azure_fluency_score, azure_prosody_score, whisper_word_timestamps, processed_at');
+  if (error || !assessments) return { error: error?.message, created: 0, skipped: 0 };
+
+  let created = 0;
+  let skipped = 0;
+  for (const a of assessments) {
+    const { data: existing } = await supabase
+      .from('phoneme_sessions')
+      .select('id')
+      .eq('user_id', a.user_id)
+      .eq('text_id', a.text_id)
+      .limit(1);
+    if (existing?.length) { skipped++; continue; }
+
+    const words = a.azure_word_scores || [];
+    if (!words.length) { skipped++; continue; }
+
+    const phonemeGroups = aggregatePhonemes(words);
+    const { medians, counts } = computePhonemeMedians(phonemeGroups);
+    if (!Object.keys(medians).length) { skipped++; continue; }
+
+    const weakPhonemes = identifyWeakPhonemes(medians);
+    const confusions = aggregateConfusions(words);
+
+    let durationSec = 0;
+    const timestamps = a.whisper_word_timestamps || [];
+    if (timestamps.length >= 2) {
+      const starts = timestamps.map(t => t.start).filter(t => t != null);
+      const ends = timestamps.map(t => t.end).filter(t => t != null);
+      if (starts.length && ends.length) {
+        durationSec = Math.round(Math.max(...ends) - Math.min(...starts));
+      }
+    }
+
+    const scoredWords = words.filter(w => w.accuracyScore != null && w.errorType !== 'Omission' && w.errorType !== 'Insertion');
+    const row = {
+      user_id: a.user_id,
+      text_id: a.text_id,
+      session_date: a.processed_at || new Date().toISOString(),
+      duration_seconds: durationSec,
+      words_assessed: scoredWords.length,
+      overall_accuracy: a.overall_accuracy,
+      fluency_score: a.azure_fluency_score,
+      prosody_score: a.azure_prosody_score,
+      phoneme_medians: medians,
+      phoneme_counts: counts,
+      weak_phonemes: weakPhonemes,
+    };
+    if (Object.keys(confusions).length) row.phoneme_confusions = confusions;
+
+    const { error: insertErr } = await supabase.from('phoneme_sessions').insert(row);
+    if (insertErr) console.error('Backfill insert failed:', a.user_id, a.text_id, insertErr.message);
+    else created++;
+  }
+  return { created, skipped };
 }

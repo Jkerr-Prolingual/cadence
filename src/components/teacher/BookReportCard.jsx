@@ -34,21 +34,21 @@ export default function BookReportCard({ book, onSelectChapter }) {
               values={book.wpm.values}
               labels={book.wpm.labels}
               color="#475569"
-              delta={book.wpm.delta}
+              median={book.wpm.median}
               label="WPM by Chapter"
             />
             <BarChart
               values={book.accuracy.values}
               labels={book.accuracy.labels}
               color="#475569"
-              delta={book.accuracy.delta}
+              median={book.accuracy.median}
               label="Accuracy by Chapter"
             />
             <BarChart
               values={book.fluency?.values || []}
               labels={book.fluency?.labels || []}
               color="#475569"
-              delta={book.fluency?.delta}
+              median={book.fluency?.median}
               label="Fluency by Chapter"
             />
           </div>

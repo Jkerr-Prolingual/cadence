@@ -1,5 +1,12 @@
 import { useMemo, useCallback } from 'react';
 
+function median(arr) {
+  if (arr.length === 0) return null;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
 const WEAK_PHONEME_THRESHOLD = 50;
 const WEAK_PHONEME_MIN_SESSIONS = 3;
 const GROWTH_MIN_SESSIONS = 5;
@@ -113,7 +120,7 @@ export default function useReportData({
       }
       const wpmEntries = Object.entries(wpmByText).map(([text_id, wpm]) => ({ text_id, wpm }));
       const wpmValues = sortByChapterOrder(wpmEntries, allTexts).map(e => e.wpm);
-      const wpmDelta = wpmValues.length >= 2 ? wpmValues[wpmValues.length - 1] - wpmValues[0] : 0;
+      const wpmDelta = median(wpmValues);
       const avgWpm = wpmValues.length > 0 ? Math.round(wpmValues.reduce((a, b) => a + b, 0) / wpmValues.length) : null;
 
       const studentPhonemes = phonemeSessions.filter(
@@ -295,17 +302,17 @@ export default function useReportData({
           wpm: {
             values: wpmValues,
             labels: wpmLabels,
-            delta: wpmValues.length >= 2 ? wpmValues[wpmValues.length - 1] - wpmValues[0] : null,
+            median: median(wpmValues),
           },
           accuracy: {
             values: accValues,
             labels: accLabels,
-            delta: accValues.length >= 2 ? accValues[accValues.length - 1] - accValues[0] : null,
+            median: median(accValues),
           },
           fluency: {
             values: fluencyValues,
             labels: fluencyLabels,
-            delta: fluencyValues.length >= 2 ? fluencyValues[fluencyValues.length - 1] - fluencyValues[0] : null,
+            median: median(fluencyValues),
           },
           phonemes: {
             histogram: phonemeHistogram,
