@@ -5,7 +5,6 @@ import { getVoiceOptions, generateAudio, whisperTimestampsToWordTimestamps } fro
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { extractImages } from '../../lib/imageUtils';
-import { backfillPhonemeSessions } from '../../lib/pronunciation';
 
 const STEPS = ['Content', 'Analysis', 'Audio & Publish'];
 
@@ -1755,7 +1754,8 @@ export default function AdminPanel() {
                 setBackfillRunning(true);
                 setBackfillStatus(null);
                 try {
-                  const result = await backfillPhonemeSessions(supabase);
+                  const res = await fetch('/.netlify/functions/backfill-phonemes', { method: 'POST' });
+                  const result = await res.json();
                   setBackfillStatus({
                     summary: result.error
                       ? `Error: ${result.error}`
