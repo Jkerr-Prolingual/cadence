@@ -2,7 +2,7 @@ import Sparkline from './Sparkline';
 import { ipaPhonemes } from '../../data/ipaPhonemes';
 import { getConfusionDisplay } from '../../data/confusionPairs';
 
-const GROWTH_MIN_SESSIONS = 5;
+const GROWTH_MIN_SESSIONS = 2;
 
 export default function PhonemeGrowthTable({ rows, confusionTrends }) {
   if (!rows || rows.length === 0) {

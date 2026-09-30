@@ -1,11 +1,15 @@
 import { CONTRACTIONS } from './wordUtils';
 
+function straightenApostrophes(word) {
+  return word.replace(/[‘’′]/g, "'");
+}
+
 function normalize(word) {
-  return word.toLowerCase().replace(/[^a-zA-ZÀ-ÿ'-]/g, '');
+  return straightenApostrophes(word).toLowerCase().replace(/[^a-zA-ZÀ-ÿ'-]/g, '');
 }
 
 function expandToWords(token) {
-  const lower = token.toLowerCase();
+  const lower = straightenApostrophes(token).toLowerCase();
   const expansion = CONTRACTIONS[lower];
   if (expansion) return expansion.split(' ');
   return [lower];

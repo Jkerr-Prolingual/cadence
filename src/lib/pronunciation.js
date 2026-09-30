@@ -4,18 +4,26 @@ import { cleanToken } from './wordUtils';
 
 const FLAG_THRESHOLD = 50;
 const PAUSE_THRESHOLD_MS = 1000;
-const CHUNK_MIN_WORDS = 4;
+const CHUNK_MIN_WORDS = 15;
 const AUDIO_BUFFER_SEC = 0.3;
 const MIN_PHONEME_INSTANCES = 5;
 
+const WEAK_PHONEME_DISPLAY_THRESHOLD = 50;
+const WEAK_PHONEME_PENALTY_WEIGHT = 0.5;
+
 export function displayScore(assessment) {
   if (!assessment || assessment.type === 'omission') return 0;
+  const wordAccuracy = assessment.accuracy ?? 0;
   const phonemes = assessment.phonemes;
   if (phonemes?.length) {
     const scores = phonemes.map(p => p.accuracyScore).filter(s => s != null);
-    if (scores.length) return Math.min(...scores);
+    if (scores.length) {
+      const weakCount = scores.filter(s => s < WEAK_PHONEME_DISPLAY_THRESHOLD).length;
+      const weakRatio = weakCount / scores.length;
+      return Math.round(wordAccuracy * (1 - weakRatio * WEAK_PHONEME_PENALTY_WEIGHT));
+    }
   }
-  return assessment.accuracy ?? 0;
+  return wordAccuracy;
 }
 
 
@@ -322,8 +330,11 @@ function generateFlagEvents({ userId, textId, alignment, azureData }) {
 }
 
 function accuracyToSeverity(accuracy) {
-  if (accuracy < 30) return 5;
-  return 4;
+  if (accuracy < 40) return 5;
+  if (accuracy < 50) return 4;
+  if (accuracy < 65) return 3;
+  if (accuracy < 75) return 2;
+  return 1;
 }
 
 export async function assessSentencePronunciation({ audioBlob, referenceText, firstWordIdx, lastWordIdx, supabase, userId, textId }) {
@@ -581,6 +592,10 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
       completenessScore: avg(completenessScores),
     } : null;
 
+    if (mergedWords.length === 0) {
+      throw new Error('No pronunciation scores received — Azure may be unreachable');
+    }
+
     const scoredWords = mergedWords.filter(w => w.accuracyScore != null && w.errorType !== 'Omission' && w.errorType !== 'Insertion');
     const overallAccuracy = scoredWords.length > 0
       ? Math.round(scoredWords.reduce((a, b) => a + b.accuracyScore, 0) / scoredWords.length)
@@ -590,15 +605,17 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
     let wpm = null;
     let durationSec = null;
     if (wordsRead > 0 && whisperData.words?.length > 0) {
-      const matchedTimestamps = spokenEntries
-        .map(e => e.timestampMs)
-        .filter(t => t != null);
-      if (matchedTimestamps.length >= 2) {
-        const firstMs = Math.min(...matchedTimestamps);
-        const lastMs = Math.max(...matchedTimestamps);
+      const spokenWithTs = spokenEntries.filter(e => e.spokenIdx != null);
+      if (spokenWithTs.length >= 2) {
+        const firstMs = Math.min(...spokenWithTs.map(e => e.timestampMs).filter(t => t != null));
+        const lastSpokenIdx = Math.max(...spokenWithTs.map(e => e.spokenIdx));
+        const lastWhisperWord = whisperData.words[lastSpokenIdx];
+        const lastMs = lastWhisperWord?.end != null
+          ? Math.round(lastWhisperWord.end * 1000)
+          : Math.max(...spokenWithTs.map(e => e.timestampMs).filter(t => t != null));
         durationSec = (lastMs - firstMs) / 1000;
         if (durationSec > 0) {
-          wpm = Math.round((wordsRead / durationSec) * 60);
+          wpm = Math.min(300, Math.round((wordsRead / durationSec) * 60));
         }
       }
     }
@@ -619,9 +636,10 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
       processed_at: new Date().toISOString(),
     };
 
-    await supabase
+    const { error: upsertError } = await supabase
       .from('pronunciation_assessments')
       .upsert(assessmentRow, { onConflict: 'user_id,text_id' });
+    if (upsertError) throw new Error(`Failed to save assessment: ${upsertError.message}`);
 
     const phonemeGroups = aggregatePhonemes(mergedWords);
     const { medians, counts } = computePhonemeMedians(phonemeGroups);
@@ -665,11 +683,12 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
       await supabase.from('flag_events').insert(flags);
     }
 
-    await supabase
+    const { error: statusError } = await supabase
       .from('student_recordings')
       .update({ assessment_status: 'complete', assessment_error: null })
       .eq('user_id', userId)
       .eq('text_id', textId);
+    if (statusError) console.error('Failed to update assessment status:', statusError.message);
 
     if (onProgress) onProgress(1);
 
@@ -694,86 +713,3 @@ export async function getPhonemeSessionsForText(supabase, userId, textId) {
   return data || [];
 }
 
-export async function backfillPhonemeSessions(supabase) {
-  const { data: assessments, error } = await supabase
-    .from('pronunciation_assessments')
-    .select('user_id, text_id, azure_word_scores, overall_accuracy, azure_fluency_score, azure_prosody_score, whisper_word_timestamps, processed_at');
-  if (error || !assessments) return { error: error?.message, created: 0, skipped: 0, details: [] };
-
-  let created = 0;
-  let skipped = 0;
-  const details = [];
-  for (const a of assessments) {
-    const { data: existing } = await supabase
-      .from('phoneme_sessions')
-      .select('id')
-      .eq('user_id', a.user_id)
-      .eq('text_id', a.text_id)
-      .limit(1);
-    if (existing?.length) {
-      details.push({ text_id: a.text_id, status: 'skipped: already exists' });
-      skipped++;
-      continue;
-    }
-
-    const words = a.azure_word_scores || [];
-    if (!words.length) {
-      details.push({ text_id: a.text_id, status: 'skipped: no azure_word_scores' });
-      skipped++;
-      continue;
-    }
-
-    const hasPhonemes = words.some(w => w.phonemes?.length > 0);
-    if (!hasPhonemes) {
-      details.push({ text_id: a.text_id, status: `skipped: ${words.length} words but no phoneme data` });
-      skipped++;
-      continue;
-    }
-
-    const phonemeGroups = aggregatePhonemes(words);
-    const { medians, counts } = computePhonemeMedians(phonemeGroups);
-    if (!Object.keys(medians).length) {
-      details.push({ text_id: a.text_id, status: `skipped: phonemes found but none met min instances (${MIN_PHONEME_INSTANCES})` });
-      skipped++;
-      continue;
-    }
-
-    const weakPhonemes = identifyWeakPhonemes(medians);
-    const confusions = aggregateConfusions(words);
-
-    let durationSec = 0;
-    const timestamps = a.whisper_word_timestamps || [];
-    if (timestamps.length >= 2) {
-      const starts = timestamps.map(t => t.start).filter(t => t != null);
-      const ends = timestamps.map(t => t.end).filter(t => t != null);
-      if (starts.length && ends.length) {
-        durationSec = Math.round(Math.max(...ends) - Math.min(...starts));
-      }
-    }
-
-    const scoredWords = words.filter(w => w.accuracyScore != null && w.errorType !== 'Omission' && w.errorType !== 'Insertion');
-    const row = {
-      user_id: a.user_id,
-      text_id: a.text_id,
-      session_date: a.processed_at || new Date().toISOString(),
-      duration_seconds: durationSec,
-      words_assessed: scoredWords.length,
-      overall_accuracy: a.overall_accuracy,
-      fluency_score: a.azure_fluency_score,
-      prosody_score: a.azure_prosody_score,
-      phoneme_medians: medians,
-      phoneme_counts: counts,
-      weak_phonemes: weakPhonemes,
-    };
-    if (Object.keys(confusions).length) row.phoneme_confusions = confusions;
-
-    const { error: insertErr } = await supabase.from('phoneme_sessions').insert(row);
-    if (insertErr) {
-      details.push({ text_id: a.text_id, status: `insert failed: ${insertErr.message}` });
-    } else {
-      details.push({ text_id: a.text_id, status: 'created' });
-      created++;
-    }
-  }
-  return { created, skipped, total: assessments.length, details };
-}

@@ -281,7 +281,9 @@ export default function TextDisplay({
 
               if (wordAssessmentMap) {
                 const assessment = wordAssessmentMap.get(token.wordIdx);
-                if (assessment && assessment.type !== 'omission') {
+                if (assessment && assessment.type === 'omission') {
+                  wordStyle = { ...wordStyle, borderBottom: '3px dashed #ef4444', paddingBottom: '2px', opacity: 0.6 };
+                } else if (assessment) {
                   const acc = displayScore(assessment);
                   const assessColor = acc >= 85 ? '#9333ea'
                     : acc >= 70 ? '#22c55e'

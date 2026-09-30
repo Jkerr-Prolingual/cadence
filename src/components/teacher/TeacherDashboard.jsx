@@ -497,6 +497,21 @@ function AssignmentsPanel({ assignments, allTexts, books, students, progress, st
 }
 
 function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCancel }) {
+  const BOOK_STORAGE_KEY = 'relato_teacher_lastBookId';
+  const { byBook: bookTexts, standalone: standaloneTexts } = useMemo(
+    () => groupTextsByBook(allTexts, books),
+    [allTexts, books]
+  );
+  const booksWithChapters = useMemo(
+    () => books.filter(b => bookTexts[b.id]?.length),
+    [books, bookTexts]
+  );
+
+  const [selectedBookId, setSelectedBookId] = useState(() => {
+    const saved = localStorage.getItem(BOOK_STORAGE_KEY);
+    if (saved && booksWithChapters.some(b => b.id === saved)) return saved;
+    return booksWithChapters[0]?.id || '';
+  });
   const [selectedTextId, setSelectedTextId] = useState('');
   const [title, setTitle] = useState('');
   const [tasks, setTasks] = useState({ readingPass: true, flashcards: true, recordAudio: false, shadowReading: false, exercises: false });
@@ -506,10 +521,10 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
   const hasAudio = selectedText?.audio_urls || selectedText?.audioUrls;
   const hasProbes = getBookProbesForText(books, selectedText, 'es').length > 0;
 
-  const { byBook: bookTexts, standalone: standaloneTexts, bookMap } = useMemo(
-    () => groupTextsByBook(allTexts, books),
-    [allTexts, books]
-  );
+  const chaptersForBook = useMemo(() => {
+    if (!selectedBookId) return standaloneTexts;
+    return bookTexts[selectedBookId] || [];
+  }, [selectedBookId, bookTexts, standaloneTexts]);
 
   async function handleCreate() {
     if (!selectedTextId) return;
@@ -535,48 +550,62 @@ function CreateAssignmentForm({ allTexts, books = [], classId, onCreated, onCanc
 
   return (
     <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Text</label>
-        <select
-          value={selectedTextId}
-          onChange={e => {
-            setSelectedTextId(e.target.value);
-            const t = allTexts.find(x => x.id === e.target.value);
-            if (t && !title) setTitle(`Read: ${t.title}`);
-            if (!t?.audio_urls && !t?.audioUrls) setTasks(prev => ({ ...prev, shadowReading: false }));
-            if (getBookProbesForText(books, t, 'es').length === 0) setTasks(prev => ({ ...prev, exercises: false }));
-          }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-        >
-          <option value="">Select a text...</option>
-          {books.map(b => {
-            const chapters = bookTexts[b.id];
-            if (!chapters?.length) return null;
-            return (
-              <optgroup key={b.id} label={b.title}>
-                {chapters.map(t => (
-                  <option key={t.id} value={t.id}>
-                    Ch. {t.chapter_order ?? '?'}: {t.title} — {t.cefr || t.cefr_estimate || 'unrated'}
-                  </option>
-                ))}
-              </optgroup>
-            );
-          })}
-          {standaloneTexts.length > 0 && books.some(b => bookTexts[b.id]?.length) && (
-            <optgroup label="Standalone Texts">
-              {standaloneTexts.map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.title} — {t.cefr || t.cefr_estimate || 'unrated'}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {(!books.some(b => bookTexts[b.id]?.length)) && standaloneTexts.map(t => (
-            <option key={t.id} value={t.id}>
-              {t.title} — {t.cefr || t.cefr_estimate || 'unrated'}
-            </option>
-          ))}
-        </select>
+      <div className="space-y-2">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Book</label>
+          <select
+            value={selectedBookId}
+            onChange={e => {
+              const bookId = e.target.value;
+              setSelectedBookId(bookId);
+              setSelectedTextId('');
+              setTitle('');
+              if (bookId) localStorage.setItem(BOOK_STORAGE_KEY, bookId);
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+          >
+            {booksWithChapters.map(b => (
+              <option key={b.id} value={b.id}>{b.title}</option>
+            ))}
+            {standaloneTexts.length > 0 && (
+              <option value="">Standalone texts</option>
+            )}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Chapter</label>
+          <select
+            value={selectedTextId}
+            onChange={e => {
+              const textId = e.target.value;
+              setSelectedTextId(textId);
+              const t = allTexts.find(x => x.id === textId);
+              if (t) {
+                setTitle(`Read: ${t.title}`);
+                const tHasAudio = t.audio_urls || t.audioUrls;
+                const tHasProbes = getBookProbesForText(books, t, 'es').length > 0;
+                setTasks({
+                  readingPass: true,
+                  flashcards: true,
+                  recordAudio: true,
+                  shadowReading: !!tHasAudio,
+                  exercises: tHasProbes,
+                });
+              }
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+          >
+            <option value="">Select a chapter...</option>
+            {chaptersForBook.map(t => (
+              <option key={t.id} value={t.id}>
+                {selectedBookId
+                  ? `Ch. ${t.chapter_order ?? '?'}: ${t.title}`
+                  : t.title
+                } — {t.cefr || t.cefr_estimate || 'unrated'}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div>

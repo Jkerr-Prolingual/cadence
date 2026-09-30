@@ -279,8 +279,6 @@ function MessagesTab() {
 export default function AdminPanel() {
   const { user } = useAuth();
   const [adminTab, setAdminTab] = useState('corpus');
-  const [backfillStatus, setBackfillStatus] = useState(null);
-  const [backfillRunning, setBackfillRunning] = useState(false);
   const [step, setStep] = useState(1);
 
   // Step 1: Content
@@ -840,7 +838,7 @@ export default function AdminPanel() {
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Admin Panel</h1>
 
       <div className="flex gap-1 mb-6">
-        {[{ key: 'corpus', label: 'Corpus' }, { key: 'messages', label: 'Messages' }, { key: 'tools', label: 'Tools' }].map(({ key, label }) => (
+        {[{ key: 'corpus', label: 'Corpus' }, { key: 'messages', label: 'Messages' }].map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setAdminTab(key)}
@@ -1741,52 +1739,6 @@ export default function AdminPanel() {
       )}
     </>}
 
-      {adminTab === 'tools' && (
-        <div className="space-y-6">
-          <div className="border border-gray-200 rounded-lg p-6">
-            <h3 className="text-sm font-semibold text-gray-800 mb-2">Backfill Phoneme Sessions</h3>
-            <p className="text-xs text-gray-500 mb-4">
-              Creates missing phoneme session rows from existing pronunciation assessments.
-              Skips recordings that already have phoneme data. Safe to run multiple times.
-            </p>
-            <button
-              onClick={async () => {
-                setBackfillRunning(true);
-                setBackfillStatus(null);
-                try {
-                  const res = await fetch('/.netlify/functions/backfill-phonemes', { method: 'POST' });
-                  const result = await res.json();
-                  setBackfillStatus({
-                    summary: result.error
-                      ? `Error: ${result.error}`
-                      : `Done — ${result.total} assessments, ${result.created} created, ${result.skipped} skipped${result.repaired ? `, ${result.repaired} repaired` : ''}`,
-                    details: result.details || [],
-                  });
-                } catch (err) {
-                  setBackfillStatus({ summary: `Error: ${err.message}`, details: [] });
-                }
-                setBackfillRunning(false);
-              }}
-              disabled={backfillRunning}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
-            >
-              {backfillRunning ? 'Running...' : 'Run Backfill'}
-            </button>
-            {backfillStatus && (
-              <div className="mt-3">
-                <p className={`text-sm ${backfillStatus.summary?.startsWith('Error') ? 'text-red-600' : 'text-green-700'}`}>
-                  {backfillStatus.summary}
-                </p>
-                {backfillStatus.details?.length > 0 && (
-                  <pre className="mt-2 text-xs text-gray-600 bg-gray-50 p-3 rounded max-h-60 overflow-y-auto">
-                    {backfillStatus.details.map(d => `${d.text_id}: ${d.status}`).join('\n')}
-                  </pre>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
     </div>
   );

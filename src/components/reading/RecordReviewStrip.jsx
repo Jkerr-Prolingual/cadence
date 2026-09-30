@@ -14,6 +14,7 @@ export default function RecordReviewStrip({
   saving,
   saveError,
   recorderError,
+  audioBlobReady = true,
   l1 = 'en',
   hasRecording = false,
   assessmentStatus = null,
@@ -112,14 +113,15 @@ export default function RecordReviewStrip({
             </button>
             <button
               onClick={onSaveRecording}
-              disabled={saving}
+              disabled={saving || !audioBlobReady}
               className="px-4 py-2.5 sm:py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50"
             >
-              {saving ? t('saving') : t('saveRecording')}
+              {saving ? t('saving') : !audioBlobReady ? t('processing') : t('saveRecording')}
             </button>
             <button
               onClick={onAnalyze}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors"
+              disabled={saving || !audioBlobReady}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors disabled:opacity-50"
             >
               {t('analyze')}
             </button>

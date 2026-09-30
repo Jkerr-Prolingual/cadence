@@ -9,7 +9,6 @@ function median(arr) {
 
 const WEAK_PHONEME_THRESHOLD = 50;
 const WEAK_PHONEME_MIN_SESSIONS = 3;
-const GROWTH_MIN_SESSIONS = 5;
 
 export default function useReportData({
   students,
@@ -482,14 +481,16 @@ function computePhonemeHistogram(phonemeSessions) {
   const data = {};
   for (const ps of phonemeSessions) {
     const medians = ps.phoneme_medians || {};
-    for (const [phoneme, median] of Object.entries(medians)) {
-      if (!data[phoneme]) data[phoneme] = [];
-      data[phoneme].push(median);
+    const date = ps.session_date;
+    for (const [phoneme, val] of Object.entries(medians)) {
+      if (!data[phoneme] || (date && (!data[phoneme].date || date > data[phoneme].date))) {
+        data[phoneme] = { median: val, date };
+      }
     }
   }
-  return Object.entries(data).map(([phoneme, scores]) => ({
+  return Object.entries(data).map(([phoneme, entry]) => ({
     phoneme,
-    median: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+    median: Math.round(entry.median),
   }));
 }
 
@@ -563,9 +564,9 @@ function computeWeakPhonemes(phonemeSessions) {
   const weak = [];
   for (const [phoneme, scores] of Object.entries(phonemeData)) {
     if (scores.length < WEAK_PHONEME_MIN_SESSIONS) continue;
-    const median = scores[Math.floor(scores.length / 2)];
-    if (median < WEAK_PHONEME_THRESHOLD) {
-      weak.push({ phoneme, median: Math.round(median), sessions: scores.length });
+    const med = median(scores);
+    if (med < WEAK_PHONEME_THRESHOLD) {
+      weak.push({ phoneme, median: Math.round(med), sessions: scores.length });
     }
   }
   return weak.sort((a, b) => a.median - b.median);

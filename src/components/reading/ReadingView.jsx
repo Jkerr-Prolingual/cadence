@@ -209,7 +209,7 @@ export default function ReadingView() {
     let cancelled = false;
 
     (async () => {
-      const [{ data: assessment }, { data: rec }] = await Promise.all([
+      const [assessRes, recRes] = await Promise.all([
         supabase
           .from('pronunciation_assessments')
           .select('*')
@@ -224,7 +224,11 @@ export default function ReadingView() {
           .maybeSingle(),
       ]);
       if (cancelled) return;
+      if (recRes.error) console.warn('Failed to check recording status:', recRes.error);
+      if (assessRes.error) console.warn('Failed to check assessment:', assessRes.error);
 
+      const assessment = assessRes.data;
+      const rec = recRes.data;
       setHasRecording(!!rec);
 
       if (rec) {
@@ -776,6 +780,7 @@ export default function ReadingView() {
       });
 
       if (result.success) {
+        if (selectedTextIdRef.current !== textId) return;
         setAssessmentData(result.assessmentData);
         setWordAssessmentMap(buildWordAssessmentMap(result.assessmentData, sentences));
         setAssessmentStatus('complete');
@@ -783,7 +788,7 @@ export default function ReadingView() {
         if (result.phonemeSession) {
           setPhonemeSession(result.phonemeSession);
           const sessions = await getPhonemeSessionsForText(supabase, user.id, textId);
-          setPhonemeHistory(sessions);
+          if (selectedTextIdRef.current === textId) setPhonemeHistory(sessions);
         }
         setAnalysisProgress(1);
         await completeTaskForText(user.id, textId, 'recordAudio').catch(() => {});
@@ -1060,6 +1065,7 @@ export default function ReadingView() {
           saving={saving}
           saveError={saveError}
           recorderError={recorder.error}
+          audioBlobReady={!!recorder.audioBlob}
           l1={l1}
           hasRecording={hasRecording}
           assessmentStatus={assessmentStatus}

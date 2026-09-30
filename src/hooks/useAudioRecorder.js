@@ -52,9 +52,8 @@ export default function useAudioRecorder() {
       streamRef.current = stream;
       setActiveStream(stream);
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=opus', 'audio/mp4']
+        .find(t => MediaRecorder.isTypeSupported(t)) || 'audio/webm';
 
       const recorder = new MediaRecorder(stream, {
         mimeType,
