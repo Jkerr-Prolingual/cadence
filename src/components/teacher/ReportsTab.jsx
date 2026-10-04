@@ -91,6 +91,7 @@ export default function ReportsTab({
       {selectedStudentId && selectedStudent && (
         <ReportNavHeader
           student={selectedStudent}
+          allStudents={studentIds.map(id => students.find(s => s.id === id)).filter(Boolean)}
           chapterTitle={selectedChapterId ? (selectedText?.title || chapterDetail?.chapterTitle) : null}
           onBack={() => { setSelectedStudentId(null); setSelectedChapterId(null); }}
           onBackToStudent={() => setSelectedChapterId(null)}

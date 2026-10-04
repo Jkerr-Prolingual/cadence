@@ -1,5 +1,6 @@
 export default function ReportNavHeader({
   student,
+  allStudents,
   chapterTitle,
   onBack,
   onBackToStudent,
@@ -13,7 +14,7 @@ export default function ReportNavHeader({
   const atChapter = !!chapterTitle;
 
   return (
-    <div className="mb-5 border-b border-gray-200 pb-4">
+    <div className="mb-5 border-b border-gray-200 pb-4 sticky top-0 bg-white z-10">
       {/* Back link */}
       <button
         onClick={atChapter ? onBackToStudent : onBack}
@@ -63,6 +64,17 @@ export default function ReportNavHeader({
                 label={prevStudent?.name}
                 direction="prev"
               />
+              {allStudents && allStudents.length > 1 && (
+                <select
+                  value={student.id}
+                  onChange={(e) => onNavigateStudent(e.target.value)}
+                  className="px-2 py-1.5 rounded-md text-xs font-medium text-gray-600 bg-gray-100 border-none cursor-pointer hover:bg-gray-200 transition-colors max-w-[10rem] truncate"
+                >
+                  {allStudents.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              )}
               <NavButton
                 onClick={() => onNavigateStudent(nextStudent?.id)}
                 disabled={!nextStudent}

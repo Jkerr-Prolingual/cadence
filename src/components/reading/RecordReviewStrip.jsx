@@ -26,6 +26,7 @@ export default function RecordReviewStrip({
   playbackPlaying = false,
   onShowPhonemeReport,
   phonemeSession = null,
+  previousSession = null,
   preFlightStatus = 'idle',
   preFlightCondition = null,
   preFlightLevel = 0,
@@ -167,6 +168,18 @@ export default function RecordReviewStrip({
   if (assessmentStatus === 'complete' && assessmentData) {
     const accuracy = assessmentData.overall_accuracy;
     const wpm = assessmentData.wpm;
+
+    const prevAcc = previousSession?.overall_accuracy;
+    const prevWpm = previousSession?.duration_seconds > 0 && previousSession?.words_assessed > 0
+      ? Math.round((previousSession.words_assessed / previousSession.duration_seconds) * 60)
+      : null;
+    const prevFlu = previousSession?.fluency_score;
+
+    const accDelta = accuracy != null && prevAcc != null ? Math.round(accuracy - prevAcc) : null;
+    const wpmDelta = wpm != null && prevWpm != null ? Math.round(wpm - prevWpm) : null;
+    const fluDelta = assessmentData.azure_fluency_score != null && prevFlu != null
+      ? Math.round(assessmentData.azure_fluency_score - prevFlu) : null;
+
     return (
       <div className="border-t border-gray-200 bg-white px-4 py-3 sm:py-4">
         <div className="max-w-2xl mx-auto text-center space-y-3">
@@ -177,16 +190,19 @@ export default function RecordReviewStrip({
             {wpm != null && (
               <span className="text-sm text-gray-700">
                 <strong className="tabular-nums">{wpm}</strong> WPM
+                <DeltaInline value={wpmDelta} />
               </span>
             )}
             {accuracy != null && (
               <span className="text-sm text-gray-700">
                 {t('accuracy')}: <strong className="tabular-nums">{Math.round(accuracy)}%</strong>
+                <DeltaInline value={accDelta} unit="%" />
               </span>
             )}
             {assessmentData.azure_fluency_score != null && (
               <span className="text-xs text-gray-400">
                 {t('fluency')}: {Math.round(assessmentData.azure_fluency_score)}%
+                <DeltaInline value={fluDelta} unit="%" />
               </span>
             )}
             {assessmentData.azure_prosody_score != null && (
@@ -315,6 +331,16 @@ export default function RecordReviewStrip({
         </button>
       </div>
     </div>
+  );
+}
+
+function DeltaInline({ value, unit = '' }) {
+  if (value == null || value === 0) return null;
+  const positive = value > 0;
+  return (
+    <span className={`ml-1 text-[11px] font-medium ${positive ? 'text-green-600' : 'text-red-500'}`}>
+      {positive ? '+' : ''}{value}{unit}
+    </span>
   );
 }
 

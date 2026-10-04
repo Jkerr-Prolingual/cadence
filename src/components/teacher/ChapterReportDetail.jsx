@@ -26,6 +26,11 @@ export default function ChapterReportDetail({ detail, studentRecordings }) {
         />
       </div>
 
+      {/* Recording history */}
+      {detail.phonemes.sessions?.length > 1 && (
+        <RecordingHistory sessions={detail.phonemes.sessions} />
+      )}
+
       {/* Pronunciation assessment */}
       {detail.assessment && (
         <div className="border border-gray-200 rounded-lg p-4 space-y-3">
@@ -432,6 +437,104 @@ function ChangeCell({ value }) {
   if (value === 0) return <span className="text-gray-400 text-[11px]">no change</span>;
   const color = value < 0 ? 'text-green-600' : 'text-red-600';
   return <span className={`text-[11px] font-medium ${color}`}>({value < 0 ? '' : '+'}{value})</span>;
+}
+
+function RecordingHistory({ sessions }) {
+  const first = sessions[0];
+  const latest = sessions[sessions.length - 1];
+
+  function delta(current, previous) {
+    if (current == null || previous == null) return null;
+    return Math.round(current - previous);
+  }
+
+  function DeltaBadge({ value, unit = '' }) {
+    if (value == null || value === 0) return null;
+    const positive = value > 0;
+    return (
+      <span className={`text-[11px] font-medium ${positive ? 'text-green-600' : 'text-red-500'}`}>
+        {positive ? '+' : ''}{value}{unit}
+      </span>
+    );
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-gray-700">Recording History</h3>
+        <span className="text-xs text-gray-400">{sessions.length} session{sessions.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="px-2 py-1.5 text-left font-medium text-gray-500">Date</th>
+              <th className="px-2 py-1.5 text-right font-medium text-gray-500">WPM</th>
+              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Accuracy</th>
+              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Fluency</th>
+              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessions.map((s, i) => {
+              const isFirst = i === 0;
+              const isLatest = i === sessions.length - 1;
+              const prev = isFirst ? null : sessions[i - 1];
+              const accDelta = prev ? delta(s.overallAccuracy, prev.overallAccuracy) : null;
+              const wpmDelta = prev ? delta(s.wpm, prev.wpm) : null;
+              const fluDelta = prev ? delta(s.fluencyScore, prev.fluencyScore) : null;
+              return (
+                <tr
+                  key={s.id || i}
+                  className={`border-b border-gray-100 ${isLatest ? 'bg-blue-50' : ''}`}
+                >
+                  <td className="px-2 py-1.5 text-gray-600">
+                    {new Date(s.sessionDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    {isFirst && <span className="ml-1 text-[10px] text-gray-400">first</span>}
+                    {isLatest && <span className="ml-1 text-[10px] text-blue-500">latest</span>}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
+                    {s.wpm != null ? s.wpm : '—'}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums" style={{ color: accuracyColor(s.overallAccuracy) }}>
+                    {s.overallAccuracy != null ? `${Math.round(s.overallAccuracy)}%` : '—'}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums" style={{ color: accuracyColor(s.fluencyScore) }}>
+                    {s.fluencyScore != null ? `${Math.round(s.fluencyScore)}%` : '—'}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {isFirst ? (
+                      <span className="text-[11px] text-gray-300">baseline</span>
+                    ) : (
+                      <span className="flex items-center justify-end gap-1.5">
+                        <DeltaBadge value={accDelta} unit="%" />
+                        <DeltaBadge value={wpmDelta} />
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {/* First-to-latest summary */}
+      {sessions.length >= 2 && (
+        <div className="flex items-center gap-4 text-xs text-gray-500 pt-1">
+          <span>Overall change:</span>
+          {delta(latest.overallAccuracy, first.overallAccuracy) != null && (
+            <span>Accuracy <DeltaBadge value={delta(latest.overallAccuracy, first.overallAccuracy)} unit="%" /></span>
+          )}
+          {delta(latest.wpm, first.wpm) != null && (
+            <span>WPM <DeltaBadge value={delta(latest.wpm, first.wpm)} /></span>
+          )}
+          {delta(latest.fluencyScore, first.fluencyScore) != null && (
+            <span>Fluency <DeltaBadge value={delta(latest.fluencyScore, first.fluencyScore)} unit="%" /></span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Metric({ label, value }) {

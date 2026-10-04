@@ -421,6 +421,16 @@ export default function useReportData({
         histogram: phonemeHistogram,
         growthTable: phonemeGrowth,
         confusionTrends,
+        sessions: chapterPhonemes.map(ps => ({
+          id: ps.id,
+          sessionDate: ps.session_date,
+          overallAccuracy: ps.overall_accuracy,
+          fluencyScore: ps.fluency_score,
+          wpm: ps.duration_seconds > 0 && ps.words_assessed > 0
+            ? Math.round((ps.words_assessed / ps.duration_seconds) * 60)
+            : null,
+          wordsAssessed: ps.words_assessed,
+        })).sort((a, b) => (a.sessionDate || '').localeCompare(b.sessionDate || '')),
       },
       exercise: latestExercise ? {
         score: latestExercise.score,

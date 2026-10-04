@@ -1077,6 +1077,7 @@ export default function ReadingView() {
           playbackPlaying={playbackPlaying}
           onShowPhonemeReport={() => setShowPhonemeReport(true)}
           phonemeSession={phonemeSession}
+          previousSession={phonemeHistory.length >= 2 ? phonemeHistory[phonemeHistory.length - 2] : null}
           preFlightStatus="idle"
           preFlightCondition={null}
           preFlightLevel={0}

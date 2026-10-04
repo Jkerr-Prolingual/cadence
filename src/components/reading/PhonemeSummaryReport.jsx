@@ -166,6 +166,16 @@ export function ScoreBar({ label, value, description }) {
   );
 }
 
+function SessionDelta({ value, unit = '' }) {
+  if (value == null || value === 0) return null;
+  const positive = value > 0;
+  return (
+    <span className={`ml-1 text-[10px] font-medium ${positive ? 'text-green-600' : 'text-red-500'}`}>
+      {positive ? '+' : ''}{value}{unit}
+    </span>
+  );
+}
+
 export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, phonemeWordExamples, l1, onClose }) {
   const [showAll, setShowAll] = useState(false);
 
@@ -292,6 +302,15 @@ export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, p
                 {phonemeHistory.map((s, i) => {
                   const date = new Date(s.session_date);
                   const isLatest = i === phonemeHistory.length - 1;
+                  const prev = i > 0 ? phonemeHistory[i - 1] : null;
+                  const sessionWpm = s.duration_seconds > 0 && s.words_assessed > 0
+                    ? Math.round((s.words_assessed / s.duration_seconds) * 60) : null;
+                  const prevWpm = prev?.duration_seconds > 0 && prev?.words_assessed > 0
+                    ? Math.round((prev.words_assessed / prev.duration_seconds) * 60) : null;
+                  const accDelta = prev && s.overall_accuracy != null && prev.overall_accuracy != null
+                    ? Math.round(s.overall_accuracy - prev.overall_accuracy) : null;
+                  const wpmDelta = sessionWpm != null && prevWpm != null
+                    ? sessionWpm - prevWpm : null;
                   return (
                     <div
                       key={s.id || i}
@@ -303,12 +322,21 @@ export default function PhonemeSummaryReport({ phonemeSession, phonemeHistory, p
                         {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                       </span>
                       <div className="flex items-center gap-3">
+                        {sessionWpm != null && (
+                          <span className="tabular-nums text-gray-500">
+                            {sessionWpm} <span className="text-gray-400">wpm</span>
+                            <SessionDelta value={wpmDelta} />
+                          </span>
+                        )}
                         <span className="tabular-nums" style={{ color: accuracyColor(s.overall_accuracy) }}>
                           {Math.round(s.overall_accuracy)}%
+                          <SessionDelta value={accDelta} unit="%" />
                         </span>
-                        <span className="text-gray-400">
-                          {s.words_assessed} {getUILabel('wordsAssessed', l1)}
-                        </span>
+                        {s.fluency_score != null && (
+                          <span className="tabular-nums text-gray-400">
+                            {getUILabel('fluency', l1)}: {Math.round(s.fluency_score)}%
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
