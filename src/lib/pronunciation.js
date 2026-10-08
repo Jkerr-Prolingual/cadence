@@ -493,6 +493,15 @@ function identifyWeakPhonemes(medians) {
   return entries.slice(0, quartileSize).map(([phoneme]) => phoneme);
 }
 
+function findLastSpokenRefIdx(spokenEntries) {
+  if (spokenEntries.length === 0) return -1;
+  const refIndices = spokenEntries.map(e => e.refIdx).sort((a, b) => a - b);
+  const p95 = Math.floor(refIndices.length * 0.95);
+  const endpoint = refIndices[Math.min(p95, refIndices.length - 1)];
+  const max = refIndices[refIndices.length - 1];
+  return (max - endpoint <= 10) ? max : endpoint;
+}
+
 // --- Recording assessment (Whisper + chunked Azure PA + phoneme aggregation + WPM) ---
 
 export async function runRecordingAssessment({ userId, textId, fullText, audioBlob, storagePath, supabase, onProgress }) {
@@ -517,8 +526,17 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
     const fullTokens = tokenizeReference(fullText);
     const alignment = alignWords(fullTokens, whisperData.words || []);
 
+    const matchCount = alignment.filter(e => e.type === 'match').length;
+    const spokenCount = alignment.filter(e => e.spokenIdx != null).length;
+    if (spokenCount > 0 && matchCount / spokenCount < 0.25) {
+      throw new Error(
+        'Recording does not match this chapter — only ' +
+        Math.round(matchCount / spokenCount * 100) + '% of words matched the text'
+      );
+    }
+
     const spokenEntries = alignment.filter(e => e.refIdx != null && e.spokenIdx != null);
-    const lastSpokenRefIdx = spokenEntries.length > 0 ? Math.max(...spokenEntries.map(e => e.refIdx)) : -1;
+    const lastSpokenRefIdx = findLastSpokenRefIdx(spokenEntries);
     if (lastSpokenRefIdx < 0) throw new Error('No spoken words detected in recording');
 
     const allWordPositions = getWordPositions(fullText);
@@ -531,12 +549,21 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
     const wordPositions = getWordPositions(referenceText);
     if (onProgress) onProgress(0.3);
 
+    let skippedChunks = 0;
     const chunkResults = await Promise.all(chunks.map(async (chunk, idx) => {
       const timeRange = getChunkTimeRange(chunk, alignment, whisperData.words);
-      if (!timeRange) return null;
+      if (!timeRange) {
+        console.warn(`[pronunciation] Chunk ${idx} (words ${chunk.firstWordIdx}-${chunk.lastWordIdx}) skipped — no spoken words in range`);
+        skippedChunks++;
+        return null;
+      }
 
       const wavBlob = encodeWavSlice(audioBuffer, timeRange.startSec, timeRange.endSec);
-      if (!wavBlob) return null;
+      if (!wavBlob) {
+        console.warn(`[pronunciation] Chunk ${idx} skipped — audio slice was empty`);
+        skippedChunks++;
+        return null;
+      }
 
       const chunkPath = `${userId}/${textId}_fluency_chunk${idx}.wav`;
       const chunkRefText = extractChunkText(referenceText, wordPositions, chunk.firstWordIdx, chunk.lastWordIdx);
@@ -565,6 +592,10 @@ export async function runRecordingAssessment({ userId, textId, fullText, audioBl
     }));
 
     if (onProgress) onProgress(0.8);
+
+    if (skippedChunks > 0) {
+      console.warn(`[pronunciation] ${skippedChunks}/${chunks.length} chunks skipped — word scores may be incomplete`);
+    }
 
     const mergedWords = [];
     const fluencyScores = [];

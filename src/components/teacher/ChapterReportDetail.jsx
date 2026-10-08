@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ScoreBar } from '../reading/PhonemeSummaryReport';
 import { accuracyColor, accuracyBg, formatRelativeDate } from '../../lib/reportUtils';
+import { buildWordAssessmentMap } from '../../lib/pronunciation';
 import { ipaPhonemes } from '../../data/ipaPhonemes';
 import { getConfusionDisplay } from '../../data/confusionPairs';
 import PhonemeHistogram from './PhonemeHistogram';
@@ -193,27 +194,75 @@ function RecordingSection({ studentId, textId, recordings }) {
 }
 
 function WordScoresLoader({ studentId, textId }) {
-  const [wordScores, setWordScores] = useState(null);
+  const [assessmentData, setAssessmentData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   async function loadWordScores() {
-    if (wordScores) { setExpanded(e => !e); return; }
+    if (assessmentData) { setExpanded(e => !e); return; }
     setLoading(true);
     const { data } = await supabase
       .from('pronunciation_assessments')
-      .select('azure_word_scores, alignment')
+      .select('azure_word_scores, alignment, whisper_word_timestamps')
       .eq('user_id', studentId)
       .eq('text_id', textId)
       .order('processed_at', { ascending: false })
       .limit(1)
       .single();
     setLoading(false);
-    if (data?.azure_word_scores) {
-      setWordScores(data.azure_word_scores);
+    if (data?.alignment || data?.azure_word_scores) {
+      setAssessmentData(data);
       setExpanded(true);
     }
   }
+
+  const wordEntries = useMemo(() => {
+    if (!assessmentData) return [];
+    const map = buildWordAssessmentMap(assessmentData);
+
+    if (assessmentData.alignment?.length) {
+      const refWords = new Map();
+      for (const e of assessmentData.alignment) {
+        if (e.refIdx != null && e.refWord && !refWords.has(e.refIdx)) {
+          refWords.set(e.refIdx, e.refWord);
+        }
+      }
+
+      const spokenIndices = assessmentData.alignment
+        .filter(e => e.refIdx != null && e.spokenIdx != null)
+        .map(e => e.refIdx);
+      const lastSpoken = spokenIndices.length > 0 ? Math.max(...spokenIndices) : -1;
+      const maxIdx = lastSpoken >= 0 ? lastSpoken : Math.max(0, ...[...refWords.keys()]);
+
+      const entries = [];
+      for (let i = 0; i <= maxIdx; i++) {
+        const word = refWords.get(i);
+        const assessment = map.get(i);
+        if (word) {
+          entries.push({
+            word,
+            accuracy: assessment?.accuracy ?? null,
+            type: assessment?.type || 'match',
+            errorType: assessment?.errorType || null,
+          });
+        }
+      }
+      return entries;
+    }
+
+    if (assessmentData.azure_word_scores?.length) {
+      return assessmentData.azure_word_scores
+        .filter(w => w.errorType !== 'Insertion')
+        .map(w => ({
+          word: w.word,
+          accuracy: w.accuracyScore ?? 0,
+          type: w.errorType === 'Omission' ? 'omission' : 'match',
+          errorType: w.errorType || null,
+        }));
+    }
+
+    return [];
+  }, [assessmentData]);
 
   return (
     <div>
@@ -224,10 +273,10 @@ function WordScoresLoader({ studentId, textId }) {
       >
         {loading ? 'Loading...' : expanded ? 'Hide word scores' : 'Show word scores'}
       </button>
-      {expanded && wordScores && (
+      {expanded && wordEntries.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1">
-          {wordScores.map((ws, i) => {
-            const accuracy = ws.accuracy ?? ws.accuracyScore ?? 100;
+          {wordEntries.map((ws, i) => {
+            const accuracy = ws.accuracy ?? (ws.type === 'omission' ? 0 : 100);
             const color = accuracyColor(accuracy);
             const bg = accuracyBg(accuracy);
             return (
@@ -235,7 +284,7 @@ function WordScoresLoader({ studentId, textId }) {
                 key={i}
                 className="text-xs font-medium px-1.5 py-0.5 rounded tabular-nums"
                 style={{ color, backgroundColor: bg }}
-                title={`${ws.word}: ${Math.round(accuracy)}%${ws.errorType && ws.errorType !== 'None' ? ` (${ws.errorType})` : ''}`}
+                title={`${ws.word}: ${Math.round(accuracy)}%${ws.errorType && ws.errorType !== 'None' ? ` (${ws.errorType})` : ''}${ws.type === 'omission' ? ' (skipped)' : ''}`}
               >
                 {ws.word}
               </span>

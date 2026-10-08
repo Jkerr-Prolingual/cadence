@@ -84,9 +84,15 @@ export default function TeacherDashboard() {
           supabase.from('srs_cards').select('user_id, word, text_id, leitner_box, card_type, cefr, added_date, last_review_date, next_review_date').in('user_id', studentIds),
           supabase.from('review_log').select('user_id, word, correct, reviewed_at').in('user_id', studentIds),
           supabase.from('exercise_results').select('user_id, text_id, score, total, completed_at, answers').in('user_id', studentIds).then(r => r, () => ({ data: [] })),
-          supabase.from('phoneme_sessions').select('user_id, text_id, session_date, overall_accuracy, phoneme_medians, weak_phonemes, words_assessed, phoneme_confusions').in('user_id', studentIds).order('session_date', { ascending: true }).then(r => r, () => ({ data: [] })),
+          supabase.from('phoneme_sessions').select('user_id, text_id, session_date, overall_accuracy, phoneme_medians, weak_phonemes, words_assessed, phoneme_confusions').in('user_id', studentIds).order('session_date', { ascending: true }).then(r => {
+            if (r.error && r.error.message?.includes('phoneme_confusions')) {
+              return supabase.from('phoneme_sessions').select('user_id, text_id, session_date, overall_accuracy, phoneme_medians, weak_phonemes, words_assessed').in('user_id', studentIds).order('session_date', { ascending: true });
+            }
+            return r;
+          }, () => ({ data: [] })),
         ]);
         if (profilesRes.error) console.error('Profiles fetch error:', profilesRes.error);
+        if (phonemeRes.error) console.error('Phoneme sessions fetch error:', phonemeRes.error);
         const map = {};
         for (const p of (profilesRes.data || [])) map[p.id] = p;
         setStudentProfiles(map);

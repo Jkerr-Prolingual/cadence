@@ -8,7 +8,7 @@ function median(arr) {
 }
 
 const WEAK_PHONEME_THRESHOLD = 50;
-const WEAK_PHONEME_MIN_SESSIONS = 3;
+const WEAK_PHONEME_MIN_SESSIONS = 1;
 
 export default function useReportData({
   students,
