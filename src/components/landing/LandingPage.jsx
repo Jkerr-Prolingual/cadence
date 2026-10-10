@@ -464,15 +464,19 @@ export default function LandingPage() {
               ))}
             </ul>
 
-            <Link
-              to="/login?mode=signup"
-              className="mt-8 inline-flex items-center text-sm font-medium text-violet-600 hover:text-violet-700"
+            <p className="mt-6 text-sm text-gray-500">
+              Teacher accounts are set up individually. Send me a message and I'll
+              get you started.
+            </p>
+            <a
+              href="#contact"
+              className="mt-3 inline-flex items-center text-sm font-medium text-violet-600 hover:text-violet-700"
             >
-              Create a teacher account
+              Request a teacher account
               <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-            </Link>
+            </a>
           </div>
 
           {/* Teacher dashboard screenshot */}

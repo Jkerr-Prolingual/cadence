@@ -10,9 +10,28 @@ export default function ContactForm() {
   async function handleSubmit(e) {
     e.preventDefault();
     setStatus('loading');
+
+    const formData = {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      message: message.trim(),
+    };
+
+    // Submit to Netlify Forms for email notification
+    try {
+      await fetch('/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ 'form-name': 'contact', ...formData }).toString(),
+      });
+    } catch (_) {
+      // Netlify submission is best-effort; Supabase is the primary store
+    }
+
+    // Submit to Supabase for admin panel visibility
     const { error } = await supabase
       .from('contact_messages')
-      .insert({ name: name.trim(), email: email.trim().toLowerCase(), message: message.trim() });
+      .insert(formData);
     if (error) {
       setStatus('error');
     } else {
@@ -32,10 +51,18 @@ export default function ContactForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 space-y-3 text-left">
+    <form
+      name="contact"
+      method="POST"
+      data-netlify="true"
+      onSubmit={handleSubmit}
+      className="mt-6 space-y-3 text-left"
+    >
+      <input type="hidden" name="form-name" value="contact" />
       <div className="grid sm:grid-cols-2 gap-3">
         <input
           type="text"
+          name="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name"
@@ -44,6 +71,7 @@ export default function ContactForm() {
         />
         <input
           type="email"
+          name="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Your email"
@@ -52,6 +80,7 @@ export default function ContactForm() {
         />
       </div>
       <textarea
+        name="message"
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         placeholder="Your message..."
