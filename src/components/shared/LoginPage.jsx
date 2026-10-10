@@ -8,7 +8,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [role, setRole] = useState('student');
   const [l1, setL1] = useState(DEFAULT_L1);
   const [l2, setL2] = useState(DEFAULT_L2);
   const [mode, setMode] = useState(searchParams.get('mode') === 'signup' ? 'signup' : 'login');
@@ -38,7 +37,7 @@ export default function LoginPage() {
         options: {
           data: {
             display_name: displayName.trim() || email.split('@')[0],
-            role,
+            role: 'student',
             l1,
             l2,
           },
@@ -143,26 +142,6 @@ export default function LoginPage() {
                   placeholder={email ? email.split('@')[0] : ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">I am a...</label>
-                <div className="flex gap-2">
-                  {[{ value: 'student', label: 'Student' }, { value: 'teacher', label: 'Teacher' }].map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => setRole(r.value)}
-                      className={`flex-1 py-2 rounded-md text-sm font-medium border transition-colors ${
-                        role === r.value
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div>
