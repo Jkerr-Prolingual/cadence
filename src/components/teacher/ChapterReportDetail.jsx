@@ -114,8 +114,14 @@ function RecordingSection({ studentId, textId, recordings }) {
 
   async function handlePlay() {
     if (playing) {
-      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      if (audioRef.current) audioRef.current.pause();
       setPlaying(false);
+      return;
+    }
+
+    if (audioRef.current) {
+      audioRef.current.play().catch(() => setPlaying(false));
+      setPlaying(true);
       return;
     }
 
@@ -135,7 +141,7 @@ function RecordingSection({ studentId, textId, recordings }) {
 
     const audio = new Audio(url);
     audioRef.current = audio;
-    audio.onended = () => setPlaying(false);
+    audio.onended = () => { audioRef.current = null; setPlaying(false); };
     audio.play().catch(() => setPlaying(false));
     setPlaying(true);
   }
@@ -193,6 +199,36 @@ function RecordingSection({ studentId, textId, recordings }) {
   );
 }
 
+function detectRereads(alignment) {
+  const indices = new Set();
+  if (!alignment?.length) return indices;
+  let i = 0;
+  while (i < alignment.length) {
+    if (alignment[i].type !== 'insertion') { i++; continue; }
+    const run = [];
+    while (i < alignment.length && alignment[i].type === 'insertion') {
+      run.push((alignment[i].spokenWord || '').toLowerCase().replace(/[^a-z'-]/g, ''));
+      i++;
+    }
+    if (run.length < 2) continue;
+    const following = [];
+    for (let j = i; j < alignment.length && following.length < run.length; j++) {
+      if (alignment[j].type !== 'insertion') following.push(alignment[j]);
+    }
+    let matched = 0;
+    for (let k = 0; k < run.length && k < following.length; k++) {
+      const ref = (following[k].refWord || '').toLowerCase().replace(/[^a-z'-]/g, '');
+      if (run[k] === ref) matched++; else break;
+    }
+    if (matched >= 2) {
+      for (let k = 0; k < matched; k++) {
+        if (following[k].refIdx != null) indices.add(following[k].refIdx);
+      }
+    }
+  }
+  return indices;
+}
+
 function WordScoresLoader({ studentId, textId }) {
   const [assessmentData, setAssessmentData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -219,6 +255,7 @@ function WordScoresLoader({ studentId, textId }) {
   const wordEntries = useMemo(() => {
     if (!assessmentData) return [];
     const map = buildWordAssessmentMap(assessmentData);
+    const rereads = detectRereads(assessmentData.alignment);
 
     if (assessmentData.alignment?.length) {
       const refWords = new Map();
@@ -244,6 +281,9 @@ function WordScoresLoader({ studentId, textId }) {
             accuracy: assessment?.accuracy ?? null,
             type: assessment?.type || 'match',
             errorType: assessment?.errorType || null,
+            pauseMs: assessment?.pauseMs || null,
+            reread: rereads.has(i),
+            spokenWord: assessment?.spokenWord || null,
           });
         }
       }
@@ -258,6 +298,9 @@ function WordScoresLoader({ studentId, textId }) {
           accuracy: w.accuracyScore ?? 0,
           type: w.errorType === 'Omission' ? 'omission' : 'match',
           errorType: w.errorType || null,
+          pauseMs: null,
+          reread: false,
+          spokenWord: null,
         }));
     }
 
@@ -274,22 +317,43 @@ function WordScoresLoader({ studentId, textId }) {
         {loading ? 'Loading...' : expanded ? 'Hide word scores' : 'Show word scores'}
       </button>
       {expanded && wordEntries.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1">
-          {wordEntries.map((ws, i) => {
-            const accuracy = ws.accuracy ?? (ws.type === 'omission' ? 0 : 100);
-            const color = accuracyColor(accuracy);
-            const bg = accuracyBg(accuracy);
-            return (
-              <span
-                key={i}
-                className="text-xs font-medium px-1.5 py-0.5 rounded tabular-nums"
-                style={{ color, backgroundColor: bg }}
-                title={`${ws.word}: ${Math.round(accuracy)}%${ws.errorType && ws.errorType !== 'None' ? ` (${ws.errorType})` : ''}${ws.type === 'omission' ? ' (skipped)' : ''}`}
-              >
-                {ws.word}
-              </span>
-            );
-          })}
+        <div className="mt-3 space-y-2">
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-gray-400">
+            <span><span className="text-gray-500 font-medium">↻</span> re-read</span>
+            <span><span className="text-gray-500 font-medium">··</span> pause</span>
+            <span><span className="text-gray-500 font-medium">~</span> substitution</span>
+            <span><span className="line-through">word</span> skipped</span>
+          </div>
+          <div className="flex flex-wrap gap-1 items-center">
+            {wordEntries.map((ws, i) => {
+              const accuracy = ws.accuracy ?? (ws.type === 'omission' ? 0 : 100);
+              const color = accuracyColor(accuracy);
+              const bg = accuracyBg(accuracy);
+              const isOmission = ws.type === 'omission';
+              const isSubstitution = ws.type === 'substitution';
+              const isRereadStart = ws.reread && (i === 0 || !wordEntries[i - 1]?.reread);
+
+              const titleParts = [`${ws.word}: ${Math.round(accuracy)}%`];
+              if (isSubstitution && ws.spokenWord) titleParts.push(`said "${ws.spokenWord}"`);
+              if (isOmission) titleParts.push('skipped');
+              if (ws.pauseMs) titleParts.push(`${(ws.pauseMs / 1000).toFixed(1)}s pause`);
+              if (ws.reread) titleParts.push('re-read');
+
+              return (
+                <span key={i} className="inline-flex items-center">
+                  {isRereadStart && <span className="text-[10px] text-gray-400 mr-0.5">↻</span>}
+                  {ws.pauseMs && !isRereadStart && <span className="text-[10px] text-gray-400 mr-0.5">··</span>}
+                  <span
+                    className={`text-xs font-medium px-1.5 py-0.5 rounded tabular-nums${isOmission ? ' line-through' : ''}`}
+                    style={{ color, backgroundColor: bg }}
+                    title={titleParts.join(' · ')}
+                  >
+                    {ws.word}{isSubstitution ? '~' : ''}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

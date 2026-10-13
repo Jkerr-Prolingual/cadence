@@ -732,6 +732,7 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
   const [expandedFlashcardStudent, setExpandedFlashcardStudent] = useState(null);
   const [probePreview, setProbePreview] = useState(null);
   const audioElRef = useRef(null);
+  const pausedStudentRef = useRef(null);
   const text = allTexts.find(t => t.id === assignment.textId);
   const taskList = Object.entries(assignment.tasks).filter(([, v]) => v);
   const isArchived = !!assignment.archivedAt;
@@ -776,12 +777,21 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
     if (!rec) return;
 
     if (playingStudentId === studentId) {
-      if (audioElRef.current) { audioElRef.current.pause(); audioElRef.current = null; }
+      if (audioElRef.current) audioElRef.current.pause();
+      pausedStudentRef.current = studentId;
       setPlayingStudentId(null);
       return;
     }
 
+    if (pausedStudentRef.current === studentId && audioElRef.current) {
+      audioElRef.current.play().catch(() => setPlayingStudentId(null));
+      pausedStudentRef.current = null;
+      setPlayingStudentId(studentId);
+      return;
+    }
+
     if (audioElRef.current) { audioElRef.current.pause(); audioElRef.current = null; }
+    pausedStudentRef.current = null;
 
     let url = audioUrls[studentId];
     if (!url) {
@@ -797,7 +807,7 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
 
     const audio = new Audio(url);
     audioElRef.current = audio;
-    audio.onended = () => setPlayingStudentId(null);
+    audio.onended = () => { audioElRef.current = null; pausedStudentRef.current = null; setPlayingStudentId(null); };
     audio.play().catch(() => setPlayingStudentId(null));
     setPlayingStudentId(studentId);
   }
@@ -980,7 +990,7 @@ function AssignmentCard({ assignment, allTexts, books = [], students, progress, 
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >
-                              {playingStudentId === s.id ? 'Stop' : 'Play'}
+                              {playingStudentId === s.id ? 'Pause' : 'Play'}
                             </button>
                           ) : (
                             <span className="text-xs text-gray-300">—</span>
