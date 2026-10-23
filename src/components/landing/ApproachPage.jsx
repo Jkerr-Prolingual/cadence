@@ -70,10 +70,9 @@ export default function ApproachPage() {
             </p>
             <p>
               Over six years of study, extensive reading became the most
-              productive use of my time — more than drills, grammar tables, or
-              apps promising fluency in three months. Reading. The kind of
-              reading where you stop noticing the effort and start noticing the
-              meaning.
+              productive use of my time, more than drills, grammar tables, or
+              apps promising fluency in three months. At some point I stopped
+              noticing the effort and started noticing the meaning.
             </p>
             <p>
               I looked for the same thing for my own students — English learners
@@ -141,11 +140,10 @@ export default function ApproachPage() {
               eventually to authentic ones.
             </p>
             <p>
-              In my own classroom, the pattern has been consistent: students who
-              plateau are almost always the ones who don't read for pleasure. No
-              sequence of isolated taps and drills substitutes for sustained
-              contact with meaningful language — to move past the beginning
-              levels, learners need to read and listen at volume.
+              In my own classroom, the pattern has been consistent: the students
+              who plateau are usually the ones who don't read for pleasure.
+              Drills and exercises don't replace reading and listening at
+              volume.
             </p>
           </div>
         </div>
@@ -161,14 +159,10 @@ export default function ApproachPage() {
             <p>
               Extensive reading has a substantial international research base,
               led by researchers like Paul Nation and Stephen Krashen. It remains
-              less visible in many US K–12 conversations about literacy and
-              English-language development, which have often focused,
-              appropriately, on foundational reading skills and close textual
-              analysis. What gets less attention is the sustained volume of
-              comprehensible reading that language growth also requires — and
-              debates over reading instruction have sometimes obscured the fact
-              that explicit foundational instruction and sustained meaningful
-              reading serve different, complementary purposes.
+              less visible in many US K–12 conversations about literacy, which
+              have focused on foundational reading skills and close textual
+              analysis. Explicit instruction and sustained meaningful reading
+              serve different, complementary purposes.
             </p>
 
             <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 my-8">
@@ -211,8 +205,7 @@ export default function ApproachPage() {
                 how it's used. Reading for meaning belongs to meaning-focused
                 input; deliberate vocabulary or pronunciation work built from a
                 text supports language-focused learning; and re-reading familiar
-                material builds fluency. That versatility is what makes reading such a central component of
-                a balanced program.
+                material builds fluency.
               </p>
             </div>
 
@@ -331,11 +324,10 @@ export default function ApproachPage() {
           </h3>
           <div className="space-y-4 text-gray-500 leading-relaxed">
             <p>
-              Vocabulary control isn't an afterthought in a Relato reader — it's
-              a first-class engineering concern. AI assists at every step —
-              drafting, vocabulary analysis, grammar checking, level
-              calibration — but a human author reviews and revises every
-              sentence against the constraint spec for narrative quality,
+              Every Relato reader is written against a vocabulary budget.
+              AI assists with drafting, vocabulary analysis, grammar checking,
+              and level calibration, but a human author reviews and revises
+              every sentence against the constraint spec for narrative quality,
               natural language, and cultural fit.
             </p>
 
@@ -370,7 +362,7 @@ export default function ApproachPage() {
             <p>
               Repeated encounters improve the odds of incidental vocabulary
               learning, though no fixed number guarantees acquisition on its
-              own — later encounters reinforce and deepen what earlier ones
+              own. Later encounters reinforce and deepen what earlier ones
               establish (Nation, 2001). Relato uses the following minimum design
               targets for each vocabulary tier:
             </p>
@@ -395,7 +387,7 @@ export default function ApproachPage() {
               Every book is authored against a written spec: target CEFR level,
               permitted and avoided grammar constructs, tense restrictions,
               sentence-length limits, chapter targets, and vocabulary budgets by
-              tier. <strong>Every Relato reader has a paper trail.</strong>
+              tier.
             </p>
           </div>
         </div>
