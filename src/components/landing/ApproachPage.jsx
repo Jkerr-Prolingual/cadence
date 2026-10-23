@@ -64,8 +64,8 @@ export default function ApproachPage() {
             <p>
               In my early forties, I began learning Mandarin seriously. I'd
               already learned Spanish to a high level, so I knew adult language
-              acquisition was possible — what I wanted to understand was the
-              process itself: how a learner moves past the intermediate plateau
+              acquisition was possible. What I wanted to understand was the
+              process itself, how a learner moves past the intermediate plateau
               toward real working proficiency.
             </p>
             <p>
@@ -75,7 +75,7 @@ export default function ApproachPage() {
               noticing the effort and started noticing the meaning.
             </p>
             <p>
-              I looked for the same thing for my own students — English learners
+              I looked for the same thing for my own students, English learners
               who could already read in their first language but were stuck at
               the beginning levels. I couldn't find it. What existed was either
               poorly graded, written for young children, or beyond my students'
@@ -95,7 +95,7 @@ export default function ApproachPage() {
           <div className="space-y-4 text-gray-500 leading-relaxed">
             <p>
               Acquiring a language requires an enormous volume of meaningful
-              exposure — far more than drills, vocabulary lists, or test prep
+              exposure, far more than drills, vocabulary lists, or test prep
               can provide on their own. Extensive reading is the most efficient
               way to supply that volume: sustained, fluent, enjoyable reading at
               a level where students understand enough to keep going, picking up
@@ -117,11 +117,11 @@ export default function ApproachPage() {
               <p className="text-gray-500 leading-relaxed">
                 Research generally places the lexical coverage needed for
                 successful independent reading between 95% and 98%. For
-                comfortable, fluent reading, 98% is a useful target — roughly
+                comfortable, fluent reading, 98% is a useful target: roughly
                 one unfamiliar word in every fifty. As coverage falls below that
                 range, comprehension becomes less reliable and reading grows
                 laborious rather than acquisitive. For beginning English
-                learners, almost no authentic text clears that bar — which is
+                learners, almost no authentic text clears that bar, which is
                 why graded readers exist.
               </p>
             </div>
@@ -135,7 +135,7 @@ export default function ApproachPage() {
               foundational decoding skills in young children. Graded readers are
               for learners who can already read: controlled vocabulary, frequent
               recycling of words and structures, and stories written for the
-              interests of adolescents and adults — not young children. As
+              interests of adolescents and adults, not young children. As
               proficiency grows, learners move to more complex graded texts and
               eventually to authentic ones.
             </p>
@@ -309,7 +309,7 @@ export default function ApproachPage() {
           <p className="mt-8 text-gray-500 leading-relaxed">
             The fourth strand, meaning-focused output, is best developed through
             classroom interaction, conversation, and writing for a real
-            audience — not an app. A teacher dashboard ties the other three
+            audience, not an app. A teacher dashboard ties the other three
             together: reading progress, pronunciation flags, exercise results,
             and fluency metrics in one place.
           </p>
@@ -337,7 +337,7 @@ export default function ApproachPage() {
             <p>
               Every word is leveled against the CEFR scale using EFLLex (Dürlich
               & François, 2018), a lexical resource built from real EFL textbook
-              corpora — over 15,000 entries, each assigned a level based on where
+              corpora: over 15,000 entries, each assigned a level based on where
               it first appears with meaningful frequency.
             </p>
 
