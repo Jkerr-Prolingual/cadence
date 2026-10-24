@@ -97,6 +97,40 @@ export async function logReviewEvent({ word, response, boxBefore, boxAfter }) {
   });
 }
 
+export async function updateSrsCard(word, updates) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const row = {};
+  if (updates.front !== undefined) row.front = updates.front;
+  if (updates.back !== undefined) row.back = updates.back;
+  if (updates.translation !== undefined) row.translation = updates.translation;
+
+  if (Object.keys(row).length === 0) return;
+
+  const { error } = await supabase.from('srs_cards')
+    .update(row)
+    .eq('user_id', user.id)
+    .eq('word', word);
+  if (error) throw error;
+}
+
+export async function deleteSrsCard(word) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from('srs_card_sources')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('word', word);
+
+  const { error } = await supabase.from('srs_cards')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('word', word);
+  if (error) throw error;
+}
+
 export async function upsertSrsCard(cardData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;

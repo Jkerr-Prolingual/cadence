@@ -100,31 +100,38 @@ function ReviewCard({ card, onResponse, l1 }) {
   );
 }
 
-export default function LeitnerReview({ onComplete, textId }) {
+export default function LeitnerReview({ onComplete, textId, wordFilter, boxFilter }) {
   const { l1 } = useAuth();
   const [cards, setCards] = useState(null);
   const [idx, setIdx] = useState(0);
   const [results, setResults] = useState([]);
   const [phase, setPhase] = useState('review');
   const [dueTomorrow, setDueTomorrow] = useState(0);
-  const [reviewAll, setReviewAll] = useState(false);
+
+  function applyFilters(list) {
+    let filtered = list;
+    if (wordFilter) filtered = filtered.filter(c => wordFilter.has(c.word));
+    if (boxFilter != null) filtered = filtered.filter(c => (c.box || 1) === boxFilter);
+    return filtered;
+  }
 
   useEffect(() => {
     getDueSrsCards(textId)
-      .then(due => setCards(due))
+      .then(due => setCards(applyFilters(due)))
       .catch(() => setCards([]));
-  }, [textId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textId, wordFilter, boxFilter]);
 
   async function handleReviewAll() {
     setCards(null);
     try {
       const all = await getAllSrsCards(textId);
-      setReviewAll(true);
-      setCards(all);
+      setCards(applyFilters(all));
       setIdx(0);
       setResults([]);
       setPhase('review');
-    } catch {
+    } catch (err) {
+      console.error('Failed to load cards:', err);
       setCards([]);
     }
   }
@@ -148,7 +155,7 @@ export default function LeitnerReview({ onComplete, textId }) {
         const allCards = await getAllSrsCards();
         const tomorrow = Date.now() + 24 * 60 * 60 * 1000;
         setDueTomorrow(allCards.filter(c => c.nextReviewDate <= tomorrow).length);
-      } catch {}
+      } catch (err) { console.error('Failed to compute due count:', err); }
       setPhase('summary');
     } else {
       setIdx(i => i + 1);

@@ -111,6 +111,7 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
   const [imageAttribution, setImageAttribution] = useState(null);
   const [saved, setSaved] = useState(false);
   const [saveMessage, setSaveMessage] = useState(null);
+  const [saveError, setSaveError] = useState(null);
 
   const [phraseSelection, setPhraseSelection] = useState('');
   const [selectionError, setSelectionError] = useState('');
@@ -152,30 +153,36 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
 
   async function handleSave() {
     if (!front.trim() || !back.trim()) return;
+    setSaveError(null);
     const srsWord = isStructure && structureData ? `egp_${structureData.egp_id}` : lookupKey;
     const srsCardType = isStructure ? 'structure_cloze' : cardType;
-    const result = await upsertSrsCard({
-      word: srsWord,
-      front: front.trim(),
-      back: back.trim(),
-      cardType: srsCardType,
-      cefr,
-      translation: cardType === 'translation' ? back.trim() : translation,
-      l1,
-      imageUrl,
-      imageAttribution,
-      textId: textId || null,
-      textTitle: textTitle || null,
-      box: 1,
-      nextReviewDate: Date.now(),
-      createdAt: Date.now(),
-    });
-    setSaved(true);
-    if (result && !result.isNew && result.existingTextTitle && result.existingTextTitle !== textTitle) {
-      setSaveMessage(`Added to existing card from "${result.existingTextTitle}"`);
+    try {
+      const result = await upsertSrsCard({
+        word: srsWord,
+        front: front.trim(),
+        back: back.trim(),
+        cardType: srsCardType,
+        cefr,
+        translation: cardType === 'translation' ? back.trim() : translation,
+        l1,
+        imageUrl,
+        imageAttribution,
+        textId: textId || null,
+        textTitle: textTitle || null,
+        box: 1,
+        nextReviewDate: Date.now(),
+        createdAt: Date.now(),
+      });
+      setSaved(true);
+      if (result && !result.isNew && result.existingTextTitle && result.existingTextTitle !== textTitle) {
+        setSaveMessage(`Added to existing card from "${result.existingTextTitle}"`);
+      }
+      onCreated?.();
+      setTimeout(onClose, result && !result.isNew ? 1200 : 600);
+    } catch (err) {
+      console.error('Flashcard save failed:', err);
+      setSaveError('Save failed — tap to retry');
     }
-    onCreated?.();
-    setTimeout(onClose, result && !result.isNew ? 1200 : 600);
   }
 
   const canSave = front.trim() && back.trim();
@@ -263,15 +270,19 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
                 selectedUrl={imageUrl}
                 onSelect={(url, attr) => { setImageUrl(url); setImageAttribution(attr); }}
               />
+              {saveError && (
+                <p className="text-xs text-red-500 text-center">{saveError}</p>
+              )}
               <button
                 onClick={handleSave}
                 disabled={!canSave || saved}
                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   saved ? 'bg-green-500 text-white'
+                    : saveError ? 'bg-red-600 text-white hover:bg-red-700'
                     : 'bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed'
                 }`}
               >
-                {saved ? (saveMessage || 'Saved!') : getUILabel('addToReviewDeck', l1)}
+                {saved ? (saveMessage || 'Saved!') : saveError ? 'Retry' : getUILabel('addToReviewDeck', l1)}
               </button>
             </div>
           )}
@@ -321,15 +332,19 @@ export default function CardCreator({ word, lemma, cefr, sentence, textId, textT
                 selectedUrl={imageUrl}
                 onSelect={(url, attr) => { setImageUrl(url); setImageAttribution(attr); }}
               />
+              {saveError && (
+                <p className="text-xs text-red-500 text-center">{saveError}</p>
+              )}
               <button
                 onClick={handleSave}
                 disabled={!canSave || saved}
                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   saved ? 'bg-green-500 text-white'
+                    : saveError ? 'bg-red-600 text-white hover:bg-red-700'
                     : 'bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed'
                 }`}
               >
-                {saved ? (saveMessage || 'Saved!') : getUILabel('addToReviewDeck', l1)}
+                {saved ? (saveMessage || 'Saved!') : saveError ? 'Retry' : getUILabel('addToReviewDeck', l1)}
               </button>
             </div>
           )}

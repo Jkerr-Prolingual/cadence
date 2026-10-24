@@ -441,7 +441,7 @@ export default function AdminPanel() {
           .upload(coverPath, bookCoverFile, { contentType: bookCoverFile.type, upsert: true });
         if (coverError) throw coverError;
         const { data: urlData } = supabase.storage.from('book-covers').getPublicUrl(coverPath);
-        coverImageUrl = urlData.publicUrl;
+        coverImageUrl = `${urlData.publicUrl}?t=${Date.now()}`;
       }
       let parsedManifest = null;
       if (bookManifestJson.trim()) {
@@ -695,7 +695,7 @@ export default function AdminPanel() {
           .upload(coverPath, coverFile, { contentType: coverFile.type, upsert: true });
         if (coverError) throw coverError;
         const { data: urlData } = supabase.storage.from('text-covers').getPublicUrl(coverPath);
-        coverImageUrl = urlData.publicUrl;
+        coverImageUrl = `${urlData.publicUrl}?t=${Date.now()}`;
       }
 
       let imagesToStore = [...existingImages];
