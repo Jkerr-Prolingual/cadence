@@ -73,9 +73,12 @@ export default function useReportData({
     return filtered;
   }, [assignments, bookFilter, bookChapters, dateRange]);
 
+  const hasAssignments = assignments.length > 0;
+
   const assignedTextIds = useMemo(() => {
+    if (!hasAssignments) return new Set(allTexts.map(t => t.id));
     return new Set(filteredAssignments.map(a => a.textId));
-  }, [filteredAssignments]);
+  }, [hasAssignments, filteredAssignments, allTexts]);
 
   const assignmentDateByText = useMemo(() => {
     const map = {};
